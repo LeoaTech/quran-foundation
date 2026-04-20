@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LMS Quran — Database Schema</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f4f0;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #6b6a63;
+    --color-border-tertiary: rgba(0,0,0,0.12);
+    --color-border-secondary: rgba(0,0,0,0.22);
+    --color-border-primary: rgba(0,0,0,0.35);
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --font-mono: ui-monospace, monospace;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1c1c1a;
+      --color-background-secondary: #242422;
+      --color-text-primary: #e8e6dc;
+      --color-text-secondary: #9c9a92;
+      --color-border-tertiary: rgba(255,255,255,0.1);
+      --color-border-secondary: rgba(255,255,255,0.18);
+      --color-border-primary: rgba(255,255,255,0.28);
+    }
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    padding: 2rem;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 1.5rem;
+  }
+  .tab-bar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 0 0 1rem;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    margin-bottom: 1.5rem;
+  }
+  .tab {
+    padding: 6px 14px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+  }
+  .tab.active {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    font-weight: 500;
+    border-color: var(--color-border-primary);
+  }
+  .pane { display: none; }
+  .pane.active { display: block; }
+  .note {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    padding: 10px 14px;
+    background: var(--color-background-primary);
+    border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+    border-left: 2px solid #1D9E75;
+  }
+  .note.changed { border-left-color: #BA7517; }
+  .note strong { font-weight: 500; color: var(--color-text-primary); }
+  .note code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: var(--color-background-secondary);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 0.5px solid var(--color-border-tertiary);
+  }
+  .erd-container {
+    background: var(--color-background-primary);
+    border-radius: var(--border-radius-lg);
+    border: 0.5px solid var(--color-border-tertiary);
+    padding: 1rem;
+    overflow-x: auto;
+  }
+</style>
+</head>
+<body>
+
+<h1>LMS Quran School — Database Schema</h1>
+<p class="subtitle">Updated schema with topics, progress sessions, and homework criteria · Urdu/Arabic text support throughout</p>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="show('academic')">Academic setup ✱</div>
+  <div class="tab" onclick="show('ops')">Daily operations ✱</div>
+  <div class="tab" onclick="show('org')">Org structure</div>
+  <div class="tab" onclick="show('users')">Users &amp; roles</div>
+  <div class="tab" onclick="show('assess')">Assessments</div>
+</div>
+
+<div class="pane active" id="p-academic">
+  <p class="note changed"><strong>Changed.</strong> <code>SURAHS</code> removed. Replaced by <code>TOPICS</code>, created by admin teachers per course — free-form, bilingual. <code>TOPIC_SUBTOPICS</code> lets teachers optionally break a topic into finer units.</p>
+  <div class="erd-container"><div id="erd-academic"></div></div>
+</div>
+
+<div class="pane" id="p-ops">
+  <p class="note changed"><strong>Changed.</strong> <code>PROGRESS_LOGS</code> replaced by <code>PROGRESS_SESSIONS</code> (classwork) + <code>HOMEWORK_ENTRIES</code> (1-to-1). <code>HOMEWORK_CRITERIA</code> is the admin-defined template per class. <code>HOMEWORK_SCORES</code> records per-criterion marks per student.</p>
+  <div class="erd-container"><div id="erd-ops"></div></div>
+</div>
+
+<div class="pane" id="p-org">
+  <p class="note"><strong>Unchanged.</strong> Organizations, centers, and classrooms. <code>name_ur</code> / <code>name_ar</code> carry Urdu/Arabic text stored as UTF-8.</p>
+  <div class="erd-container"><div id="erd-org"></div></div>
+</div>
+
+<div class="pane" id="p-users">
+  <p class="note"><strong>Unchanged.</strong> One <code>USERS</code> table for all roles. RBAC via <code>USER_ROLES</code> junction. <code>preferred_lang</code> drives RTL rendering per user.</p>
+  <div class="erd-container"><div id="erd-users"></div></div>
+</div>
+
+<div class="pane" id="p-assess">
+  <p class="note"><strong>Unchanged.</strong> Assessments and oral evaluations. Results now reference <code>TOPICS</code> via <code>topic_tested_id</code> instead of surahs.</p>
+  <div class="erd-container"><div id="erd-assess"></div></div>
+</div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: 'system-ui, sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: 'system-ui, sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    primaryColor: dark ? '#1a3a2e' : '#e1f5ee',
+    primaryTextColor: dark ? '#9FE1CB' : '#085041',
+    primaryBorderColor: dark ? '#0F6E56' : '#5DCAA5',
+    secondaryColor: dark ? '#1a2a3e' : '#e6f1fb',
+    tertiaryColor: dark ? '#2a1a3e' : '#eeedfe',
+  },
+});
+
+async function renderERD(id, definition) {
+  try {
+    const uid = id + '-svg-' + Math.random().toString(36).slice(2);
+    const { svg } = await mermaid.render(uid, definition);
+    document.getElementById(id).innerHTML = svg;
+    document.querySelectorAll('#' + id + ' .node').forEach(node => {
+      const firstPath = node.querySelector('path[d]');
+      if (!firstPath) return;
+      const d = firstPath.getAttribute('d');
+      const nums = d.match(/-?[\d.]+/g)?.map(Number);
+      if (!nums || nums.length < 8) return;
+      const xs = [nums[0], nums[2], nums[4], nums[6]];
+      const ys = [nums[1], nums[3], nums[5], nums[7]];
+      const x = Math.min(...xs), y = Math.min(...ys);
+      const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x',x); rect.setAttribute('y',y);
+      rect.setAttribute('width',w); rect.setAttribute('height',h);
+      rect.setAttribute('rx','8');
+      for (const a of ['fill','stroke','stroke-width','class','style']) {
+        if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+      }
+      firstPath.replaceWith(rect);
+    });
+    document.querySelectorAll('#' + id + ' .row-rect-odd path, #' + id + ' .row-rect-even path').forEach(p => {
+      p.setAttribute('stroke','none');
+    });
+  } catch(e) {
+    document.getElementById(id).innerHTML = '<p style="color:var(--color-text-secondary);font-size:13px;padding:1rem;">Could not render diagram.</p>';
+  }
+}
+
+const diagrams = {
+'erd-academic': `erDiagram
+  COURSES {
+    uuid id PK
+    uuid org_id FK
+    varchar name
+    varchar name_ur
+    varchar name_ar
+    varchar type "hifz/nazra/tajweed/arabic"
+    text description_ur
+    boolean is_active
+  }
+  COURSE_LEVELS {
+    uuid id PK
+    uuid course_id FK
+    int level_order
+    varchar title
+    varchar title_ur
+    text description_ur
+  }
+  TOPICS {
+    uuid id PK
+    uuid course_id FK
+    uuid created_by FK "admin teacher user_id"
+    varchar title
+    varchar title_ur "Urdu title"
+    varchar title_ar "Arabic title"
+    text description_ur
+    int display_order
+    boolean is_active
+    timestamp created_at
+  }
+  TOPIC_SUBTOPICS {
+    uuid id PK
+    uuid topic_id FK
+    varchar title
+    varchar title_ur
+    varchar title_ar
+    int display_order
+  }
+  CLASSES {
+    uuid id PK
+    uuid center_id FK
+    uuid course_id FK
+    uuid course_level_id FK
+    varchar name
+    varchar name_ur
+    int max_capacity
+    varchar schedule_days
+    time start_time
+    boolean is_active
+  }
+  CLASS_TEACHERS {
+    uuid id PK
+    uuid class_id FK
+    uuid teacher_user_id FK
+    boolean is_primary
+    date assigned_from
+  }
+  COURSES ||--o{ COURSE_LEVELS : "has levels"
+  COURSES ||--o{ TOPICS : "owns"
+  TOPICS ||--o{ TOPIC_SUBTOPICS : "broken into"
+  COURSES ||--o{ CLASSES : "taught as"
+  CLASSES ||--o{ CLASS_TEACHERS : "has teachers"
+`,
+'erd-ops': `erDiagram
+  PROGRESS_SESSIONS {
+    uuid id PK
+    uuid enrollment_id FK
+    uuid class_id FK
+    uuid teacher_user_id FK
+    date session_date
+    uuid cw_topic_id FK "classwork topic"
+    uuid cw_subtopic_id FK "optional"
+    varchar cw_grade "excellent/good/average/revision"
+    text cw_note_ur "classwork teacher note"
+    text cw_note_ar
+    timestamp created_at
+  }
+  HOMEWORK_ENTRIES {
+    uuid id PK
+    uuid session_id FK "1-to-1 with session"
+    boolean is_submitted
+    date due_date
+    text overall_note_ur
+    timestamp recorded_at
+  }
+  HOMEWORK_CRITERIA {
+    uuid id PK
+    uuid class_id FK "defined per class"
+    uuid topic_id FK
+    uuid subtopic_id FK "optional"
+    varchar label "e.g. Recitation accuracy"
+    varchar label_ur
+    int max_marks
+    int display_order
+    boolean is_active
+  }
+  HOMEWORK_SCORES {
+    uuid id PK
+    uuid homework_entry_id FK
+    uuid criteria_id FK
+    int marks_obtained
+    text note_ur "per-criterion note"
+  }
+  ENROLLMENTS {
+    uuid id PK
+    uuid student_user_id FK
+    uuid class_id FK
+    uuid center_id FK
+    date enrolled_on
+    date withdrawn_on
+    varchar status "active/withdrawn"
+    varchar prior_level
+    text notes_ur
+  }
+  ATTENDANCE_SESSIONS {
+    uuid id PK
+    uuid class_id FK
+    date session_date
+    uuid marked_by FK
+    timestamp marked_at
+  }
+  ATTENDANCE_RECORDS {
+    uuid id PK
+    uuid session_id FK
+    uuid student_user_id FK
+    varchar status "present/absent/late"
+    text note_ur
+  }
+  ENROLLMENTS ||--o{ PROGRESS_SESSIONS : "has sessions"
+  PROGRESS_SESSIONS ||--|| HOMEWORK_ENTRIES : "paired with"
+  HOMEWORK_ENTRIES ||--o{ HOMEWORK_SCORES : "scored on"
+  HOMEWORK_CRITERIA ||--o{ HOMEWORK_SCORES : "defines"
+  ENROLLMENTS ||--o{ ATTENDANCE_RECORDS : "tracks"
+  ATTENDANCE_SESSIONS ||--o{ ATTENDANCE_RECORDS : "contains"
+`,
+'erd-org': `erDiagram
+  ORGANIZATIONS {
+    uuid id PK
+    varchar name
+    varchar name_ur
+    varchar name_ar
+    varchar logo_url
+    varchar contact_email
+    varchar contact_phone
+    timestamp created_at
+  }
+  CENTERS {
+    uuid id PK
+    uuid org_id FK
+    varchar name
+    varchar name_ur
+    text address
+    text address_ur
+    varchar city
+    varchar phone
+    boolean is_active
+    timestamp created_at
+  }
+  CLASSROOMS {
+    uuid id PK
+    uuid center_id FK
+    varchar name
+    varchar name_ur
+    int capacity
+    boolean is_active
+  }
+  ORGANIZATIONS ||--o{ CENTERS : "has"
+  CENTERS ||--o{ CLASSROOMS : "contains"
+`,
+'erd-users': `erDiagram
+  USERS {
+    uuid id PK
+    varchar full_name
+    varchar full_name_ur
+    varchar display_name_ar
+    date date_of_birth
+    varchar gender
+    varchar phone
+    varchar whatsapp
+    varchar email
+    varchar password_hash
+    varchar preferred_lang "ur/ar/en"
+    boolean is_active
+    timestamp created_at
+  }
+  ROLES {
+    uuid id PK
+    varchar name
+    varchar description
+  }
+  USER_ROLES {
+    uuid id PK
+    uuid user_id FK
+    uuid role_id FK
+    uuid center_id FK
+    timestamp assigned_at
+  }
+  GUARDIANS {
+    uuid id PK
+    uuid student_user_id FK
+    uuid guardian_user_id FK
+    varchar relation
+    boolean is_primary
+  }
+  USERS ||--o{ USER_ROLES : "assigned"
+  ROLES ||--o{ USER_ROLES : "defines"
+  USERS ||--o{ GUARDIANS : "has guardian"
+`,
+'erd-assess': `erDiagram
+  ASSESSMENTS {
+    uuid id PK
+    uuid class_id FK
+    uuid created_by FK
+    varchar title
+    varchar title_ur
+    varchar type "written/oral/topic_test"
+    date assessment_date
+    int max_score
+    text instructions_ur
+    timestamp created_at
+  }
+  ASSESSMENT_RESULTS {
+    uuid id PK
+    uuid assessment_id FK
+    uuid student_user_id FK
+    uuid examiner_user_id FK
+    int score
+    varchar oral_grade "excellent/good/average/fail"
+    uuid topic_tested_id FK
+    uuid subtopic_tested_id FK
+    text remarks_ur
+    text remarks_ar
+    timestamp recorded_at
+  }
+  ASSESSMENTS ||--o{ ASSESSMENT_RESULTS : "yields"
+`
+};
+
+for (const [id, def] of Object.entries(diagrams)) {
+  await renderERD(id, def);
+}
+</script>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('p-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>
