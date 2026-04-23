@@ -48,6 +48,8 @@ app.get('/health', (_req, res) => {
 
 // Routes
 app.use('/api/v1/auth',              require('./routes/auth'));
+app.use('/api/v1',                   require('./routes/centers'));
+app.use('/api/v1',                   require('./routes/users'));
 app.use('/api/v1/progress-sessions', require('./routes/progress'));
 
 // 404 handler

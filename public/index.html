@@ -1112,6 +1112,46 @@ body {
   </div>
 </div>
 
+<!-- NEW CENTER MODAL -->
+<div class="modal-overlay" id="modal-newcenter" onclick="handleNewCenterBackdrop(event)">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">New center</div>
+      <button class="modal-close" onclick="closeNewCenterModal()" aria-label="Close">&times;</button>
+    </div>
+    <form onsubmit="handleCreateCenter(event)">
+      <div class="modal-error" id="nc-error"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div class="modal-field" style="margin-bottom:0;">
+          <label for="nc-name">Name (English)</label>
+          <input id="nc-name" type="text" placeholder="e.g. Gulshan Center" required/>
+        </div>
+        <div class="modal-field" style="margin-bottom:0;">
+          <label for="nc-name-ur">Name (Urdu)</label>
+          <input id="nc-name-ur" type="text" placeholder="گلشن سینٹر" dir="rtl" style="font-family:'Amiri',serif;font-size:15px;"/>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label for="nc-city">City</label>
+        <input id="nc-city" type="text" placeholder="e.g. Karachi"/>
+      </div>
+      <div class="modal-field">
+        <label for="nc-phone">Phone</label>
+        <input id="nc-phone" type="tel" placeholder="+9221…"/>
+      </div>
+      <div class="modal-field">
+        <label for="nc-address">Address (English)</label>
+        <input id="nc-address" type="text" placeholder="Block 10, Gulshan-e-Iqbal"/>
+      </div>
+      <div class="modal-field" style="margin-bottom:22px;">
+        <label for="nc-address-ur">Address (Urdu)</label>
+        <input id="nc-address-ur" type="text" placeholder="بلاک ۱۰، گلشن اقبال" dir="rtl" style="font-family:'Amiri',serif;font-size:15px;"/>
+      </div>
+      <button id="nc-btn" class="btn-auth" type="submit">Create center</button>
+    </form>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -1359,6 +1399,77 @@ function handleModalBackdrop(e) {
   if (e.target === document.getElementById('modal-changepw')) closeChangePw();
 }
 
+// ── New Center Modal ────────────────────────────────────────────────────────
+
+function openNewCenterModal() {
+  const modal = document.getElementById('modal-newcenter');
+  modal.classList.add('open');
+  ['nc-name', 'nc-name-ur', 'nc-city', 'nc-phone', 'nc-address', 'nc-address-ur'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  const errEl = document.getElementById('nc-error');
+  errEl.textContent = '';
+  errEl.classList.remove('visible');
+  document.getElementById('nc-btn').disabled = false;
+  document.getElementById('nc-btn').textContent = 'Create center';
+  setTimeout(() => document.getElementById('nc-name').focus(), 50);
+}
+
+function closeNewCenterModal() {
+  document.getElementById('modal-newcenter').classList.remove('open');
+}
+
+function handleNewCenterBackdrop(e) {
+  if (e.target === document.getElementById('modal-newcenter')) closeNewCenterModal();
+}
+
+async function handleCreateCenter(e) {
+  e.preventDefault();
+
+  const body = {
+    name:       document.getElementById('nc-name').value.trim(),
+    name_ur:    document.getElementById('nc-name-ur').value.trim()   || undefined,
+    city:       document.getElementById('nc-city').value.trim()      || undefined,
+    phone:      document.getElementById('nc-phone').value.trim()     || undefined,
+    address:    document.getElementById('nc-address').value.trim()   || undefined,
+    address_ur: document.getElementById('nc-address-ur').value.trim()|| undefined,
+  };
+
+  // Strip undefined keys
+  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+
+  const errorEl = document.getElementById('nc-error');
+  const btn     = document.getElementById('nc-btn');
+  errorEl.textContent = '';
+  errorEl.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  try {
+    const res  = await API.request('POST', '/centers', body);
+    if (!res) return;
+
+    const data = await res.json();
+    if (!res.ok) {
+      errorEl.textContent = data.error?.message || 'Failed to create center.';
+      errorEl.classList.add('visible');
+      return;
+    }
+
+    closeNewCenterModal();
+    showToast(`Center "${data.name}" created.`);
+    // Refresh the centers view
+    showView('admin-centers');
+
+  } catch {
+    errorEl.textContent = 'Network error. Please try again.';
+    errorEl.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create center';
+  }
+}
+
 async function handleChangePw(e) {
   e.preventDefault();
 
@@ -1488,7 +1599,7 @@ function showApp(role, user) {
   showView(r.defaultView);
 }
 
-function showView(viewId) {
+async function showView(viewId) {
   currentView = viewId;
 
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1498,8 +1609,26 @@ function showView(viewId) {
   document.getElementById('topbar-title').textContent = titleMap[viewId] || viewId;
 
   const fn = viewMap[viewId];
-  const content = fn ? fn() : viewGeneric(viewId, '');
-  document.getElementById('content-area').innerHTML = `<div class="view active">${content}</div>`;
+  const resultOrPromise = fn ? fn() : viewGeneric(viewId, '');
+
+  if (resultOrPromise instanceof Promise) {
+    // Show a lightweight skeleton while the async view fetches data.
+    document.getElementById('content-area').innerHTML =
+      `<div class="view active"><div style="display:flex;align-items:center;justify-content:center;min-height:220px;color:var(--ink-pale);font-size:13px;">Loading…</div></div>`;
+    try {
+      const content = await resultOrPromise;
+      if (currentView === viewId) {
+        document.getElementById('content-area').innerHTML = `<div class="view active">${content}</div>`;
+      }
+    } catch {
+      if (currentView === viewId) {
+        document.getElementById('content-area').innerHTML =
+          `<div class="view active">${viewGeneric('Error', 'Could not load this view. Please try again.')}</div>`;
+      }
+    }
+  } else {
+    document.getElementById('content-area').innerHTML = `<div class="view active">${resultOrPromise}</div>`;
+  }
 }
 
 // ── VIEW HTML ─────────────────────────────────
@@ -1827,6 +1956,81 @@ function viewEnroll() {
   </div>`;
 }
 
+// ── Demo data used in preview mode ───────────────────────────────────────────
+const DEMO_CENTERS = [
+  { id: 'd1', name: 'Gulshan Center',   name_ur: 'گلشن سینٹر',        city: 'Karachi', is_active: true,  _s: 312, _t: 11 },
+  { id: 'd2', name: 'Clifton Center',   name_ur: 'کلفٹن سینٹر',       city: 'Karachi', is_active: true,  _s: 278, _t: 9  },
+  { id: 'd3', name: 'PECHS Center',     name_ur: 'پی ای سی ایچ ایس',  city: 'Karachi', is_active: true,  _s: 201, _t: 8  },
+  { id: 'd4', name: 'North Karachi',    name_ur: 'شمالی کراچی',        city: 'Karachi', is_active: true,  _s: 189, _t: 7  },
+  { id: 'd5', name: 'Korangi Center',   name_ur: 'کورنگی سینٹر',      city: 'Karachi', is_active: true,  _s: 156, _t: 6  },
+  { id: 'd6', name: 'Landhi Center',    name_ur: 'لانڈھی سینٹر',      city: 'Karachi', is_active: false, _s: 89,  _t: 4  },
+  { id: 'd7', name: 'DHA Center',       name_ur: 'ڈی ایچ اے سینٹر',  city: 'Karachi', is_active: true,  _s: 59,  _t: 3  },
+];
+
+function renderCenterCard(c) {
+  const statusChip = c.is_active
+    ? '<span class="chip chip-green">Active</span>'
+    : '<span class="chip chip-sand">Inactive</span>';
+  const students = c._s ?? '—';
+  const teachers = c._t ?? '—';
+  return `
+    <div class="center-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div class="center-name">${c.name}</div>
+          <div class="center-sub">${c.name_ur || ''}${c.city ? ' · ' + c.city : ''}</div>
+        </div>
+        ${statusChip}
+      </div>
+      <div class="center-stats">
+        <div><div class="c-stat-val">${students}</div><div class="c-stat-label">Students</div></div>
+        <div><div class="c-stat-val">${teachers}</div><div class="c-stat-label">Teachers</div></div>
+      </div>
+    </div>`;
+}
+
+async function viewCenters() {
+  if (isPreviewMode) {
+    const cards = DEMO_CENTERS.map(renderCenterCard).join('');
+    return `
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <div><h2>Centers</h2><p>Al-Noor Quran Academy · ${DEMO_CENTERS.filter(c => c.is_active).length} active centers</p></div>
+        <button class="btn btn-primary" style="margin-top:4px;" disabled>+ New center</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">${cards}</div>`;
+  }
+
+  // Live — fetch org + centers in parallel.
+  const [centersRes, orgRes] = await Promise.all([
+    API.request('GET', '/centers'),
+    API.request('GET', '/org'),
+  ]);
+
+  const centersData = centersRes?.ok ? await centersRes.json() : { data: [], meta: {} };
+  const org         = orgRes?.ok     ? await orgRes.json()     : null;
+
+  const centers  = centersData.data || [];
+  const meta     = centersData.meta || {};
+  const orgName  = org?.name || 'Organization';
+  const active   = centers.filter(c => c.is_active).length;
+
+  const cards = centers.length
+    ? centers.map(renderCenterCard).join('')
+    : `<div class="card" style="grid-column:1/-1;"><div class="card-body" style="padding:40px;text-align:center;color:var(--ink-pale);font-size:14px;">No centers found.</div></div>`;
+
+  const pagination = meta.total_pages > 1
+    ? `<p style="font-size:12px;color:var(--ink-pale);margin-top:16px;text-align:right;">Showing ${centers.length} of ${meta.total} centers</p>`
+    : '';
+
+  return `
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
+      <div><h2>Centers</h2><p>${orgName} · ${active} active center${active !== 1 ? 's' : ''}</p></div>
+      <button class="btn btn-primary" style="margin-top:4px;" onclick="openNewCenterModal()">+ New center</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">${cards}</div>
+    ${pagination}`;
+}
+
 function viewGeneric(title, sub) {
   return `
   <div class="page-header"><h2>${title}</h2><p>${sub}</p></div>
@@ -1835,7 +2039,7 @@ function viewGeneric(title, sub) {
 
 const viewMap = {
   'admin-dashboard':  viewAdminDashboard,
-  'admin-centers':    () => viewGeneric('Centers', 'Manage all centers'),
+  'admin-centers':    viewCenters,
   'admin-courses':    () => viewGeneric('Courses & Topics', 'Manage curriculum'),
   'admin-teachers':   () => viewGeneric('Teachers', 'All teachers across centers'),
   'admin-students':   () => viewGeneric('Students', 'All students across centers'),
