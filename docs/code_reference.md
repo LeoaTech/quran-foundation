@@ -1,0 +1,586 @@
+# Quran Foundation LMS — Code Reference
+
+Complete technical reference for all implemented modules. Use this alongside `api_reference.html` and `database_schema.html`.
+
+---
+
+## Table of Contents
+
+1. [Project Structure](#project-structure)
+2. [Entry Points](#entry-points)
+3. [Database & Migrations](#database--migrations)
+4. [Utilities](#utilities)
+5. [Middleware](#middleware)
+6. [Auth Module](#auth-module)
+7. [Centers Module](#centers-module)
+8. [Users & Roles Module](#users--roles-module)
+9. [Progress Sessions Module](#progress-sessions-module)
+10. [Jobs & Workers](#jobs--workers)
+11. [Error Codes Reference](#error-codes-reference)
+12. [RBAC Summary](#rbac-summary)
+
+---
+
+## Project Structure
+
+```
+src/
+  app.js                        Express app setup, middleware, route mounting
+  server.js                     HTTP server entry point
+
+  db/
+    knex.js                     Knex singleton (env-aware)
+    migrations/
+      001_extensions.js         uuid-ossp extension
+      002_organizations_centers.js  organizations, centers, classrooms
+      003_users_roles.js        roles, users, user_roles, guardians
+      004_courses_topics.js     courses, topics, subtopics
+      005_classes.js            classes, class_teachers, homework_criteria
+      006_enrollments_attendance.js enrollments, attendance_records
+      007_progress.js           progress_sessions, homework_entries, homework_scores
+      008_assessments.js        assessments
+
+  utils/
+    errors.js                   AppError class
+    redis.js                    Lazy Redis client singleton
+
+  middleware/
+    auth.js                     JWT Bearer token verification → req.user
+    rbac.js                     requireRoles(...roles) factory
+    validate.js                 Zod schema validation → req.body
+
+  repositories/                 All Knex DB queries — no SQL elsewhere
+    auth.repository.js
+    centers.repository.js
+    users.repository.js
+    progress.repository.js
+
+  services/                     Business logic
+    auth.service.js
+    centers.service.js
+    users.service.js
+    progress.service.js
+
+  controllers/                  Thin req/res wrappers — parse req, call service, send res
+    auth.controller.js
+    centers.controller.js
+    users.controller.js
+    progress.controller.js
+
+  routes/                       Express routers with Zod schemas and RBAC
+    auth.js                     → mounted at /api/v1/auth
+    centers.js                  → mounted at /api/v1
+    users.js                    → mounted at /api/v1
+    progress.js                 → mounted at /api/v1/progress-sessions
+
+  jobs/
+    notifyGuardian.js           Bull queue definition
+
+  workers/
+    whatsappWorker.js           Bull worker stub
+```
+
+---
+
+## Entry Points
+
+### `src/server.js`
+
+Starts the HTTP server. Verifies DB connection with `SELECT 1` before listening.
+
+```js
+const PORT = parseInt(process.env.PORT || '3000', 10);
+await db.raw('SELECT 1'); // fails fast on bad DB config
+app.listen(PORT, callback);
+```
+
+### `src/app.js`
+
+Express app configuration. Route mount order:
+
+```
+/api/v1/auth              → routes/auth.js
+/api/v1                   → routes/centers.js
+/api/v1                   → routes/users.js
+/api/v1/progress-sessions → routes/progress.js
+```
+
+Middleware stack (in order): `helmet` → `cors` → `rateLimit` → `express.json` → `express.urlencoded` → `express.static(public/)`
+
+---
+
+## Database & Migrations
+
+### `src/db/knex.js`
+
+Singleton Knex instance. Reads `NODE_ENV` to select the correct `knexfile.js` config block.
+
+```js
+module.exports = knex(config[process.env.NODE_ENV || 'development']);
+```
+
+### Migration 001 — Extensions
+
+Enables `uuid-ossp` so `uuid_generate_v4()` is available as a column default.
+
+### Migration 002 — Organizations, Centers, Classrooms
+
+| Table | Key columns |
+|-------|-------------|
+| `organizations` | `id`, `name`, `name_ur`, `name_ar`, `logo_url`, `contact_email`, `contact_phone`, `is_active` |
+| `centers` | `id`, `org_id` FK, `name`, `name_ur`, `address`, `address_ur`, `city`, `phone`, `is_active` |
+| `classrooms` | `id`, `center_id` FK, `name`, `name_ur`, `capacity`, `session_name`, `session_date`, `is_active` |
+
+### Migration 003 — Users, Roles, Guardians
+
+| Table | Key columns |
+|-------|-------------|
+| `roles` | `id`, `name` (unique), `description`, `is_active` |
+| `users` | `id`, `email` (unique), `password_hash`, `full_name`, `full_name_ur`, `display_name_ar`, `phone`, `whatsapp`, `date_of_birth`, `gender`, `preferred_lang`, `last_login_at`, `is_active` |
+| `user_roles` | `id`, `user_id` FK, `role_id` FK, `center_id` FK (nullable for super_admin), `assigned_at`; unique on `(user_id, role_id, center_id)` |
+| `guardians` | `id`, `student_user_id` FK, `guardian_user_id` FK, `relation`, `is_primary`; unique on `(student_user_id, guardian_user_id)` |
+
+**Important:** `users` has no `center_id` column. Center scope flows exclusively through `user_roles.center_id`.
+
+---
+
+## Utilities
+
+### `src/utils/errors.js` — `AppError`
+
+```js
+new AppError(code, message, message_ur, status = 400, field = null)
+```
+
+| Param | Type | Purpose |
+|-------|------|---------|
+| `code` | string | SNAKE_CASE error code (e.g. `NOT_FOUND`) |
+| `message` | string | English description |
+| `message_ur` | string | Urdu description (always required) |
+| `status` | number | HTTP status code |
+| `field` | string \| null | Field name for validation errors only |
+
+All thrown `AppError` instances are caught by the global error handler in `app.js` and serialized to the standard error shape defined in `CLAUDE.md`.
+
+### `src/utils/redis.js` — `getRedis()`
+
+Lazy singleton Redis client. Deduplicates concurrent `connect()` calls using a shared promise.
+
+```js
+const { getRedis } = require('../utils/redis');
+const redis = await getRedis(); // safe to call multiple times
+```
+
+---
+
+## Middleware
+
+### `src/middleware/auth.js` — `requireAuth`
+
+Extracts `Authorization: Bearer <token>`, verifies with `JWT_ACCESS_SECRET`, checks `payload.type === 'access'`.
+
+Sets `req.user`:
+```js
+req.user = {
+  id:        payload.sub,       // user UUID
+  roles:     payload.roles,     // string[]
+  center_id: payload.center_id, // UUID | null (null for super_admin)
+}
+```
+
+Error codes thrown: `UNAUTHORIZED` (missing token, 401), `TOKEN_EXPIRED` (401), `INVALID_TOKEN` (401).
+
+### `src/middleware/rbac.js` — `requireRoles(...roles)`
+
+Factory middleware. `super_admin` always passes regardless of listed roles.
+
+```js
+requireRoles('teacher', 'center_manager')
+// super_admin → next()
+// teacher at any center → next()
+// student → 403 FORBIDDEN
+```
+
+### `src/middleware/validate.js` — `validate(schema)`
+
+Wraps a Zod schema. On failure, throws `AppError` with `VALIDATION_ERROR`, HTTP 400, and `field` set to the first failing path joined by `.`. On success, replaces `req.body` with the parsed (coerced) output.
+
+---
+
+## Auth Module
+
+**Route prefix:** `/api/v1/auth`
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/login` | Public | Authenticate, receive tokens |
+| POST | `/refresh` | Public | Exchange refresh token for new access token |
+| POST | `/logout` | `requireAuth` | Revoke refresh token |
+| POST | `/change-password` | `requireAuth` | Change own password |
+
+### Request / Response shapes
+
+**POST /login**
+```json
+// Request
+{ "phone": "+923001234567", "password": "secret", "center_id": "uuid (optional)" }
+
+// Response 200
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "user": { "id", "full_name", "full_name_ur", "preferred_lang", "roles", "center_id" }
+}
+```
+
+**POST /refresh**
+```json
+// Request
+{ "refresh_token": "..." }
+
+// Response 200
+{ "access_token": "..." }
+```
+
+**POST /change-password**
+```json
+// Request
+{ "current_password": "...", "new_password": "min 8 chars" }
+// Response 204
+```
+
+### `src/repositories/auth.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `findByPhone(phone)` | Find active user by phone |
+| `findById(id)` | Find active user by UUID |
+| `getUserRoles(userId)` | Returns `{ role, center_id }[]` — all active role rows across all centers |
+| `updateLastLogin(userId)` | Stamps `last_login_at` |
+| `updatePassword(userId, hash)` | Updates `password_hash` |
+
+### `src/services/auth.service.js`
+
+**`resolveScope(allRoles, requestedCenterId)`** — key helper:
+- If user has `super_admin` role (where `center_id IS NULL`) → returns `{ roles: ['super_admin'], scopedCenterId: requestedCenterId || null }`
+- Otherwise → filters roles to the requested (or first available) center; throws `403 FORBIDDEN` if no match
+
+**Token strategy:**
+- Access token: `{ sub, type: 'access', roles, center_id }` — 15 min default
+- Refresh token: `{ sub, type: 'refresh', jti: uuidv4(), center_id }` — 30 days default
+- Revocation: on logout, JTI stored in Redis with `EX = remaining TTL seconds` under key `revoked:jti:<jti>`
+- Refresh validates JTI is not revoked, then reloads roles from DB so permission changes take effect immediately
+
+---
+
+## Centers Module
+
+**Route prefix:** `/api/v1`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| GET | `/org` | super_admin | Get organization details |
+| GET | `/centers` | super_admin | List centers (paginated, filterable) |
+| POST | `/centers` | super_admin | Create a center |
+| GET | `/centers/:center_id` | super_admin, center_manager | Get a center |
+| PATCH | `/centers/:center_id` | super_admin, center_manager | Update a center |
+| GET | `/centers/:center_id/classrooms` | super_admin, center_manager, teacher | List classrooms |
+| POST | `/centers/:center_id/classrooms` | super_admin, center_manager | Create a classroom |
+
+### Query params — GET /centers
+
+```
+?city=Karachi&is_active=true&page=1&per_page=20
+```
+
+### Request bodies
+
+**POST /centers**
+```json
+{
+  "name": "Main Center",
+  "name_ur": "مرکزی مرکز",
+  "city": "Karachi",
+  "phone": "+92300...",
+  "address": "...",
+  "address_ur": "..."
+}
+```
+`org_id` is auto-injected by the service (fetches the single active org from DB).
+
+**POST /centers/:center_id/classrooms**
+```json
+{
+  "name": "Room A",
+  "name_ur": "کمرہ الف",
+  "capacity": 25,
+  "session_name": "Morning",
+  "session_date": "2025-09-01"
+}
+```
+
+**PATCH /centers/:center_id** — any subset of center fields + optional `is_active` boolean. At least one field required.
+
+### `src/repositories/centers.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `getOrg()` | First active organization row |
+| `listCenters(filters)` | Paginated, filterable by `city`, `isActive` |
+| `countCenters(filters)` | Total count for pagination meta |
+| `getCenterById(centerId)` | Single center row |
+| `createCenter(data)` | Insert + `RETURNING *` |
+| `updateCenter(centerId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `listClassrooms(centerId, filters)` | Filterable by `isActive` |
+| `createClassroom(data)` | Insert + `RETURNING *` |
+
+### `src/services/centers.service.js`
+
+**`assertCenterAccess(user, centerId)`** — throws `403 FORBIDDEN` if a non-super_admin user's `center_id` does not match the target `centerId`.
+
+`listCenters` returns:
+```json
+{
+  "data": [...],
+  "meta": { "page", "per_page", "total", "total_pages" }
+}
+```
+
+---
+
+## Users & Roles Module
+
+**Route prefix:** `/api/v1`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| GET | `/users` | super_admin, center_manager | List users (scoped) |
+| POST | `/users` | super_admin, center_manager | Create user + initial role |
+| GET | `/users/:user_id` | Any authenticated | Get user profile with roles |
+| PATCH | `/users/:user_id` | Any authenticated (service enforces scope) | Update profile |
+| POST | `/users/:user_id/roles` | super_admin, center_manager | Assign additional role |
+| DELETE | `/users/:user_id/roles/:role_id` | super_admin | Remove a role assignment |
+| POST | `/users/:user_id/guardians` | super_admin, center_manager | Link guardian to student |
+| GET | `/users/:user_id/guardians` | super_admin, center_manager | List student's guardians |
+
+### Query params — GET /users
+
+```
+?center_id=uuid&role=teacher&is_active=true&search=Tariq&page=1&per_page=20
+```
+
+`search` queries both `full_name` (English) and `full_name_ur` (Urdu) — case-insensitive via `whereILike`.
+
+center_manager is hard-scoped to their own `center_id`; the `center_id` query param is ignored for non-super_admin callers.
+
+### Request bodies
+
+**POST /users**
+```json
+{
+  "full_name": "Hamza Rauf",
+  "full_name_ur": "حمزہ رؤف",
+  "phone": "+923001234567",
+  "whatsapp": "+923001234567",
+  "date_of_birth": "2012-03-15",
+  "gender": "male",
+  "preferred_lang": "ur",
+  "role": "student",
+  "center_id": "uuid"
+}
+```
+
+**Response 201:**
+```json
+{ "id": "uuid", "full_name": "Hamza Rauf", "temp_password": "Qf3a9f12e4" }
+```
+`temp_password` is returned **once only** — it is not stored anywhere. The hashed version is stored in `users.password_hash`.
+
+**POST /users/:user_id/roles**
+```json
+{ "role": "teacher", "center_id": "uuid" }
+```
+
+**POST /users/:user_id/guardians**
+```json
+{ "guardian_user_id": "uuid", "relation": "father", "is_primary": true }
+```
+
+### `src/repositories/users.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `listUsers(filters)` | Join users → user_roles → roles; bilingual search; paginated |
+| `countUsers(filters)` | `COUNT DISTINCT u.id` with same filters |
+| `getUserById(userId)` | Raw user row (no roles) |
+| `getUserWithRoles(userId)` | User row + `roles[]` sub-query |
+| `createUser({ userData, roleData }, trx)` | Insert user + look up role by name + insert user_roles in one transaction |
+| `updateUser(userId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `getRoleByName(name)` | Lookup role row by name string |
+| `getUserRoleEntry(userId, roleId, centerId)` | Check for duplicate assignment |
+| `assignRole({ userId, roleId, centerId })` | Insert user_roles row |
+| `removeRole(userRoleId)` | Hard delete user_roles row by primary key |
+| `linkGuardian(data)` | Insert guardians row |
+| `listGuardians(studentUserId)` | Join guardians → users, return guardian profile |
+| `getGuardianLink(studentUserId, guardianUserId)` | Duplicate check |
+
+### `src/services/users.service.js`
+
+**Temp password generation:** `Qf` + 8 random hex chars (10 chars total), bcrypt-hashed with salt rounds 10.
+
+**`assertCenterScope(user, targetCenterId)`** — throws `403 FORBIDDEN` if `center_manager`'s `center_id` doesn't match the target center. super_admin always passes.
+
+**`updateUser` scope rules:**
+- Own profile (caller.id === userId) → always allowed
+- Otherwise: non-super_admin must share a `center_id` with the target user via `user_roles`
+
+**`removeRole`** — super_admin only. Takes `user_roles.id` (the join row PK) as `:role_id` in the URL — this is a hard delete of the assignment row, not the user.
+
+---
+
+## Progress Sessions Module
+
+**Route prefix:** `/api/v1/progress-sessions`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| POST | `/` | teacher, center_manager | Log a daily progress session |
+
+### Request body — POST /
+
+```json
+{
+  "enrollment_id": "uuid",
+  "class_id": "uuid",
+  "session_date": "2025-09-15",
+  "classwork": {
+    "topic_id": "uuid (optional)",
+    "subtopic_id": "uuid (optional)",
+    "grade": "excellent | good | average | revision (optional)",
+    "note_ur": "optional Urdu note"
+  },
+  "homework": {
+    "due_date": "YYYY-MM-DD (optional)",
+    "overall_note_ur": "optional",
+    "scores": [
+      { "criteria_id": "uuid", "marks_obtained": 8, "note_ur": "optional" }
+    ]
+  }
+}
+```
+
+### Response 201
+
+```json
+{
+  "session_id": "uuid",
+  "homework_entry_id": "uuid",
+  "homework_total": 8,
+  "homework_max": 10,
+  "homework_pct": 80
+}
+```
+
+### `src/services/progress.service.js` — 8-step flow
+
+1. **Teacher ownership check** — `class_teachers` row for `(class_id, teacher_user_id)` must exist
+2. **Enrollment validation** — enrollment exists, belongs to class, status = `active`
+3. **Duplicate guard** — one session per `(enrollment_id, session_date)`; throws `409 CONFLICT`
+4. **Criteria validation** — all `criteria_id` values must be active criteria for the class; `marks_obtained` ≤ `max_marks`; no duplicate `criteria_id` in the scores array
+5. **Pre-compute totals** — `homework_total`, `homework_max`, `homework_pct` calculated before DB write
+6. **Transaction** — `INSERT progress_sessions` → `INSERT homework_entries` → bulk `INSERT homework_scores` (all or nothing)
+7. **Enqueue notification** — fire-and-forget `notifyGuardianQueue.add(...)` after transaction commit
+8. **Return** computed totals + IDs
+
+---
+
+## Jobs & Workers
+
+### `src/jobs/notifyGuardian.js`
+
+Bull queue named `notify-guardian`. Default job options:
+
+```js
+{
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 5000 }, // 5s → 25s → 125s
+  removeOnComplete: true,
+  removeOnFail: false,
+}
+```
+
+Job payload shape:
+```js
+{
+  session_id, student_user_id, student_name, student_name_ur,
+  class_id, session_date, cw_grade,
+  homework_entry_id, homework_total, homework_max, homework_pct,
+  guardians: [{ full_name, full_name_ur, phone, whatsapp, preferred_lang, relation, is_primary }]
+}
+```
+
+### `src/workers/whatsappWorker.js`
+
+Stub worker that registers a processor on the `notify-guardian` queue. Implement the actual WhatsApp dispatch logic here.
+
+---
+
+## Error Codes Reference
+
+| Code | HTTP | When |
+|------|------|------|
+| `UNAUTHORIZED` | 401 | Missing or malformed Authorization header |
+| `TOKEN_EXPIRED` | 401 | Access token past expiry |
+| `INVALID_TOKEN` | 401 | Token fails signature verification or wrong type |
+| `TOKEN_REVOKED` | 401 | JTI found in Redis revocation set |
+| `INVALID_CREDENTIALS` | 401 | Wrong phone/password (identical message prevents enumeration) |
+| `FORBIDDEN` | 403 | Authenticated but insufficient role or wrong center |
+| `NOT_FOUND` | 404 | Resource does not exist |
+| `CONFLICT` | 409 | Duplicate (session, role assignment, guardian link) |
+| `VALIDATION_ERROR` | 400 | Zod schema failure; includes `field` |
+| `RATE_LIMIT_EXCEEDED` | 429 | Express rate-limiter triggered |
+| `INTERNAL_SERVER_ERROR` | 500 | Unhandled exception |
+
+All error responses follow this shape:
+```json
+{
+  "error": {
+    "code": "SNAKE_CASE_CODE",
+    "message": "English description",
+    "message_ur": "اردو وضاحت",
+    "field": "field_name",
+    "status": 400
+  }
+}
+```
+`field` is only present on `VALIDATION_ERROR`.
+
+---
+
+## RBAC Summary
+
+| Role | Center scope | Typical capabilities |
+|------|-------------|---------------------|
+| `super_admin` | None (`center_id = null` in user_roles) | Full access to all resources, all centers |
+| `center_manager` | Single center | Manage users/classrooms/classes within their center |
+| `teacher` | Single center | Read classrooms, log progress sessions for their classes |
+| `student` | Single center | Own profile only |
+| `guardian` | Via student | Own profile; receives notifications |
+
+**Middleware chain pattern used on every protected route:**
+```js
+router.verb('/path', requireAuth, requireRoles('role1', 'role2'), validate(schema), controller.fn);
+```
+
+**Service-level center enforcement** (beyond RBAC middleware):
+- `assertCenterAccess(user, centerId)` — centers module; checks `user.center_id === centerId`
+- `assertCenterScope(user, centerId)` — users module; same pattern, different name
+- Both: super_admin always passes; non-super_admin must match exactly
