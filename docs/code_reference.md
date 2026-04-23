@@ -15,10 +15,11 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 7. [Centers Module](#centers-module)
 8. [Users & Roles Module](#users--roles-module)
 9. [Courses & Topics Module](#courses--topics-module)
-10. [Progress Sessions Module](#progress-sessions-module)
-11. [Jobs & Workers](#jobs--workers)
-12. [Error Codes Reference](#error-codes-reference)
-13. [RBAC Summary](#rbac-summary)
+10. [Classes Module](#classes-module)
+11. [Progress Sessions Module](#progress-sessions-module)
+12. [Jobs & Workers](#jobs--workers)
+13. [Error Codes Reference](#error-codes-reference)
+14. [RBAC Summary](#rbac-summary)
 
 ---
 
@@ -55,6 +56,7 @@ src/
     centers.repository.js
     users.repository.js
     courses.repository.js
+    classes.repository.js
     progress.repository.js
 
   services/                     Business logic
@@ -62,6 +64,7 @@ src/
     centers.service.js
     users.service.js
     courses.service.js
+    classes.service.js
     progress.service.js
 
   controllers/                  Thin req/res wrappers — parse req, call service, send res
@@ -69,6 +72,7 @@ src/
     centers.controller.js
     users.controller.js
     courses.controller.js
+    classes.controller.js
     progress.controller.js
 
   routes/                       Express routers with Zod schemas and RBAC
@@ -76,6 +80,7 @@ src/
     centers.js                  → mounted at /api/v1
     users.js                    → mounted at /api/v1
     courses.js                  → mounted at /api/v1
+    classes.js                  → mounted at /api/v1
     progress.js                 → mounted at /api/v1/progress-sessions
 
   jobs/
@@ -108,6 +113,7 @@ Express app configuration. Route mount order:
 /api/v1                   → routes/centers.js
 /api/v1                   → routes/users.js
 /api/v1                   → routes/courses.js
+/api/v1                   → routes/classes.js
 /api/v1/progress-sessions → routes/progress.js
 ```
 
@@ -584,6 +590,114 @@ return Array.from(topicMap.values());
 `createCourse` auto-injects `org_id` from the active org (same pattern as centers module). `createTopic` auto-injects `created_by` from `req.user.id`.
 
 Soft deletes (`DELETE` endpoints) call `deactivateTopic` / `deactivateSubtopic` which set `is_active=false` and return the updated row — they never issue a SQL `DELETE`.
+
+---
+
+## Classes Module
+
+**Route prefix:** `/api/v1`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| GET | `/centers/:center_id/classes` | super_admin, center_manager, teacher | List classes (teacher-scoped for teachers) |
+| POST | `/centers/:center_id/classes` | super_admin, center_manager | Create a class |
+| GET | `/classes/:class_id` | super_admin, center_manager, teacher | Get a class |
+| PATCH | `/classes/:class_id` | super_admin, center_manager | Update a class |
+| GET | `/classes/:class_id/teachers` | super_admin, center_manager, teacher | List assigned teachers |
+| POST | `/classes/:class_id/teachers` | super_admin, center_manager | Assign a teacher |
+| DELETE | `/classes/:class_id/teachers/:teacher_id` | super_admin, center_manager | Remove teacher assignment (soft) |
+| GET | `/classes/:class_id/homework-criteria` | super_admin, center_manager, teacher | List criteria |
+| POST | `/classes/:class_id/homework-criteria` | super_admin, center_manager, teacher | Add a criterion |
+| PATCH | `/classes/:class_id/homework-criteria/:criteria_id` | super_admin, center_manager, teacher | Update a criterion |
+| DELETE | `/classes/:class_id/homework-criteria/:criteria_id` | super_admin, center_manager, teacher | Soft-delete criterion |
+
+### Request bodies
+
+**POST /centers/:center_id/classes**
+```json
+{
+  "name": "Tajweed Class B",
+  "name_ur": "تجوید کلاس ب",
+  "course_id": "uuid",
+  "course_level_id": "uuid (optional)",
+  "max_capacity": 18,
+  "schedule_days": "Mon,Wed,Fri",
+  "start_time": "10:00"
+}
+```
+
+**POST /classes/:class_id/teachers**
+```json
+{ "teacher_user_id": "uuid", "is_primary": true, "assigned_from": "2026-04-01" }
+```
+`:teacher_id` in the DELETE URL is `class_teachers.id` (the assignment row PK), not the user UUID.
+
+**POST /classes/:class_id/homework-criteria**
+```json
+{
+  "label": "Recitation accuracy",
+  "label_ur": "تلاوت کی درستی",
+  "topic_id": "uuid (optional)",
+  "subtopic_id": "uuid (optional)",
+  "max_marks": 10,
+  "display_order": 1
+}
+```
+
+### GET /classes/:class_id/homework-criteria — response shape
+
+```json
+[
+  {
+    "id": "uuid",
+    "label": "Recitation accuracy",
+    "label_ur": "تلاوت کی درستی",
+    "topic_id": "uuid",
+    "topic_title_ur": "مخارج الحروف",
+    "subtopic_id": null,
+    "max_marks": 10,
+    "display_order": 1,
+    "is_active": true
+  }
+]
+```
+`topic_title_ur` comes from a left-join with `topics` in the repository.
+
+### `src/repositories/classes.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `listClasses(centerId, filters)` | All classes in a center; filterable by `course_id`, `is_active` |
+| `listClassesForTeacher(centerId, teacherUserId, filters)` | Inner-join with `class_teachers` — only returns the teacher's own classes |
+| `getClassById(classId)` | Single class row |
+| `createClass(data)` | Insert + `RETURNING *` |
+| `updateClass(classId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `listTeachers(classId)` | Active teachers joined with users; ordered primary first |
+| `getClassTeacherEntry(classId, teacherUserId)` | Ownership check — is this user an active teacher of this class? |
+| `getClassTeacherById(classTeacherId)` | Single `class_teachers` row by PK |
+| `assignTeacher(data)` | Insert + `RETURNING *` |
+| `deactivateTeacher(classTeacherId)` | Sets `is_active=false`; never deletes |
+| `listCriteria(classId, opts)` | Active criteria (or all if `includeInactive: true`); left-joined with `topics` for `topic_title_ur` |
+| `getCriteriaById(criteriaId)` | Single `homework_criteria` row |
+| `createCriteria(data)` | Insert + `RETURNING *` |
+| `updateCriteria(criteriaId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `deactivateCriteria(criteriaId)` | Sets `is_active=false` — **never deletes** |
+
+### `src/services/classes.service.js`
+
+**`assertCenterAccess(user, centerId)`** — 403 if non-super_admin's `center_id` doesn't match.
+
+**`assertClassAccess(user, cls)`** — two-tier check:
+- `center_manager` → `user.center_id === cls.center_id`
+- `teacher` → must have an active row in `class_teachers` for `(cls.id, user.id)`
+
+**Teacher scoping in `listClasses`:** teachers receive only their assigned classes (via `listClassesForTeacher`); managers and super_admin receive all classes in the center.
+
+**Homework criteria ownership:** for `teacher` role, all criteria write operations (`createCriteria`, `updateCriteria`, `deleteCriteria`) require the teacher to have an active `class_teachers` row for the class — checked via `getClassTeacherEntry` before any mutation.
+
+**Critical constraint — criteria soft-delete:** `deleteCriteria` calls `deactivateCriteria` which sets `is_active=false`. The `homework_scores` rows referencing a deactivated `criteria_id` are **never touched** — they remain intact so historical reports remain accurate. The `progress.service.js` `getActiveHomeworkCriteria` query already filters `is_active=true`, so deactivated criteria are excluded from future session validation automatically.
 
 ---
 
