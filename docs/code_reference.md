@@ -14,10 +14,11 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 6. [Auth Module](#auth-module)
 7. [Centers Module](#centers-module)
 8. [Users & Roles Module](#users--roles-module)
-9. [Progress Sessions Module](#progress-sessions-module)
-10. [Jobs & Workers](#jobs--workers)
-11. [Error Codes Reference](#error-codes-reference)
-12. [RBAC Summary](#rbac-summary)
+9. [Courses & Topics Module](#courses--topics-module)
+10. [Progress Sessions Module](#progress-sessions-module)
+11. [Jobs & Workers](#jobs--workers)
+12. [Error Codes Reference](#error-codes-reference)
+13. [RBAC Summary](#rbac-summary)
 
 ---
 
@@ -53,24 +54,28 @@ src/
     auth.repository.js
     centers.repository.js
     users.repository.js
+    courses.repository.js
     progress.repository.js
 
   services/                     Business logic
     auth.service.js
     centers.service.js
     users.service.js
+    courses.service.js
     progress.service.js
 
   controllers/                  Thin req/res wrappers — parse req, call service, send res
     auth.controller.js
     centers.controller.js
     users.controller.js
+    courses.controller.js
     progress.controller.js
 
   routes/                       Express routers with Zod schemas and RBAC
     auth.js                     → mounted at /api/v1/auth
     centers.js                  → mounted at /api/v1
     users.js                    → mounted at /api/v1
+    courses.js                  → mounted at /api/v1
     progress.js                 → mounted at /api/v1/progress-sessions
 
   jobs/
@@ -102,6 +107,7 @@ Express app configuration. Route mount order:
 /api/v1/auth              → routes/auth.js
 /api/v1                   → routes/centers.js
 /api/v1                   → routes/users.js
+/api/v1                   → routes/courses.js
 /api/v1/progress-sessions → routes/progress.js
 ```
 
@@ -441,6 +447,143 @@ center_manager is hard-scoped to their own `center_id`; the `center_id` query pa
 - Otherwise: non-super_admin must share a `center_id` with the target user via `user_roles`
 
 **`removeRole`** — super_admin only. Takes `user_roles.id` (the join row PK) as `:role_id` in the URL — this is a hard delete of the assignment row, not the user.
+
+---
+
+## Courses & Topics Module
+
+**Route prefix:** `/api/v1`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| GET | `/courses` | Any authenticated | List all courses |
+| POST | `/courses` | super_admin | Create a course |
+| GET | `/courses/:course_id` | Any authenticated | Get a course |
+| PATCH | `/courses/:course_id` | super_admin | Update a course |
+| POST | `/courses/:course_id/levels` | super_admin | Add a course level |
+| GET | `/courses/:course_id/topics` | Any authenticated | List topics with nested subtopics |
+| POST | `/courses/:course_id/topics` | teacher, center_manager | Create a topic |
+| PATCH | `/courses/:course_id/topics/:topic_id` | teacher, center_manager | Update a topic |
+| DELETE | `/courses/:course_id/topics/:topic_id` | teacher, center_manager | Soft-delete a topic |
+| POST | `/courses/:course_id/topics/:topic_id/subtopics` | teacher, center_manager | Add a subtopic |
+| PATCH | `/courses/:course_id/topics/:topic_id/subtopics/:subtopic_id` | teacher, center_manager | Update a subtopic |
+| DELETE | `/courses/:course_id/topics/:topic_id/subtopics/:subtopic_id` | teacher, center_manager | Soft-delete a subtopic |
+
+### Request bodies
+
+**POST /courses**
+```json
+{
+  "name": "Tajweed",
+  "name_ur": "تجوید",
+  "name_ar": "تجويد",
+  "type": "tajweed",
+  "description_ur": "قرآن کریم کی تلاوت کے اصول"
+}
+```
+Valid `type` values: `hifz`, `nazra`, `tajweed`, `arabic`. `org_id` is auto-injected from the single active org.
+
+**POST /courses/:course_id/levels**
+```json
+{ "title": "Beginner", "title_ur": "ابتدائی", "description_ur": "...", "level_order": 1 }
+```
+
+**POST /courses/:course_id/topics**
+```json
+{
+  "title": "Makharij al-Huruf",
+  "title_ur": "مخارج الحروف",
+  "title_ar": "مخارج الحروف",
+  "description_ur": "حروف کے مخارج کا بیان",
+  "display_order": 1
+}
+```
+`created_by` is auto-injected from `req.user.id`.
+
+**POST /courses/:course_id/topics/:topic_id/subtopics**
+```json
+{ "title": "Huruf Halqi", "title_ur": "حروف حلقی", "title_ar": "الحروف الحلقية", "display_order": 1 }
+```
+
+### GET /courses/:course_id/topics — response shape
+
+Returns topics sorted by `display_order ASC`, each with a `subtopics` array sorted by `display_order ASC`:
+
+```json
+[
+  {
+    "id": "uuid",
+    "title": "Makharij al-Huruf",
+    "title_ur": "مخارج الحروف",
+    "title_ar": "مخارج الحروف",
+    "description_ur": "...",
+    "display_order": 1,
+    "created_by": "uuid",
+    "created_at": "...",
+    "subtopics": [
+      { "id": "uuid", "title": "Huruf Halqi", "title_ur": "حروف حلقی", "title_ar": "...", "display_order": 1 },
+      { "id": "uuid", "title": "Huruf Lisani", "title_ur": "حروف لسانی", "title_ar": "...", "display_order": 2 }
+    ]
+  }
+]
+```
+
+Topics with no subtopics return `"subtopics": []`.
+
+### `src/repositories/courses.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `listCourses({ isActive })` | All courses, optionally filtered by `is_active` |
+| `getCourseById(courseId)` | Single course row |
+| `createCourse(data)` | Insert + `RETURNING *` |
+| `updateCourse(courseId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `listLevelsByCourse(courseId)` | Active levels ordered by `level_order ASC` |
+| `createLevel(data)` | Insert + `RETURNING *` |
+| `getTopicsWithSubtopics(courseId)` | Single left-join query + JS grouping (see below) |
+| `getTopicById(topicId)` | Single topic row |
+| `createTopic(data)` | Insert + `RETURNING *` |
+| `updateTopic(topicId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `deactivateTopic(topicId)` | Sets `is_active=false` — never deletes |
+| `getSubtopicById(subtopicId)` | Single subtopic row |
+| `createSubtopic(data)` | Insert + `RETURNING *` |
+| `updateSubtopic(subtopicId, data)` | Patch + `updated_at` + `RETURNING *` |
+| `deactivateSubtopic(subtopicId)` | Sets `is_active=false` — never deletes |
+
+**`getTopicsWithSubtopics` implementation detail:**
+
+Single Knex left join on `topic_subtopics.is_active = true`, ordered by `t.display_order ASC, s.display_order ASC`. Result rows are then grouped in JS using a `Map` keyed on `topic_id`:
+
+```js
+// One DB query
+const rows = await db('topics as t')
+  .leftJoin('topic_subtopics as s', fn => fn.on('s.topic_id', 't.id').andOnVal('s.is_active', true))
+  .where('t.course_id', courseId).where('t.is_active', true)
+  .select('t.id as topic_id', ..., 's.id as sub_id', ...)
+  .orderBy('t.display_order', 'asc').orderBy('s.display_order', 'asc');
+
+// Group in JS
+const topicMap = new Map();
+for (const row of rows) {
+  if (!topicMap.has(row.topic_id)) topicMap.set(row.topic_id, { ...topicFields, subtopics: [] });
+  if (row.sub_id) topicMap.get(row.topic_id).subtopics.push({ ...subtopicFields });
+}
+return Array.from(topicMap.values());
+```
+
+### `src/services/courses.service.js`
+
+**`requireCourse(courseId)`** — fetches course, throws `404 NOT_FOUND` if missing. Used as a guard in every operation.
+
+**`requireTopic(topicId, courseId)`** — fetches topic, verifies `topic.course_id === courseId`, throws `404` otherwise.
+
+**`requireSubtopic(subtopicId, topicId)`** — fetches subtopic, verifies `subtopic.topic_id === topicId`, throws `404` otherwise.
+
+`createCourse` auto-injects `org_id` from the active org (same pattern as centers module). `createTopic` auto-injects `created_by` from `req.user.id`.
+
+Soft deletes (`DELETE` endpoints) call `deactivateTopic` / `deactivateSubtopic` which set `is_active=false` and return the updated row — they never issue a SQL `DELETE`.
 
 ---
 
