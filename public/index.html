@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Quran Foundation LMS</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --emerald:     #1a6b52;
+  --emerald-mid: #22876a;
+  --emerald-bright: #2aaa84;
+  --emerald-light: #d4f0e8;
+  --emerald-pale: #edf8f4;
+  --gold:        #c8922a;
+  --gold-light:  #faefd8;
+  --sand:        #f7f4ee;
+  --sand-mid:    #ede9e0;
+  --sand-deep:   #d8d3c8;
+  --ink:         #1a1a16;
+  --ink-mid:     #3a3a34;
+  --ink-soft:    #6b6860;
+  --ink-pale:    #a8a59e;
+  --white:       #ffffff;
+  --red:         #c0392b;
+  --red-light:   #fdecea;
+  --blue:        #1e5fa8;
+  --blue-light:  #e3eef9;
+  --amber:       #b07a1a;
+  --amber-light: #fdf3dc;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.07);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.09);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.13);
+
+  --font-display: 'Amiri', serif;
+  --font-body: 'DM Sans', sans-serif;
+
+  --sidebar-w: 220px;
+  --topbar-h: 56px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--sand);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── SCREENS ── */
+.screen { display: none; width: 100%; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ──────────────────────────────────────
+   AUTH SCREEN
+────────────────────────────────────── */
+#screen-auth {
+  flex-direction: row;
+  min-height: 100vh;
+}
+
+.auth-left {
+  width: 42%;
+  background: var(--emerald);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px 52px;
+}
+
+.auth-left-pattern {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255,255,255,0.04) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.auth-left-geo {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='white' stroke-width='0.8'%3E%3Cpolygon points='40,4 76,20 76,60 40,76 4,60 4,20'/%3E%3Cpolygon points='40,16 64,28 64,52 40,64 16,52 16,28'/%3E%3Cpolygon points='40,28 52,36 52,44 40,52 28,44 28,36'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 80px 80px;
+}
+
+.auth-logo { position: relative; z-index: 1; }
+
+.auth-logo-arabic {
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: rgba(255,255,255,0.95);
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+.auth-logo-en {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.auth-left-content { position: relative; z-index: 1; }
+
+.auth-left-headline {
+  font-family: var(--font-display);
+  font-size: 38px;
+  color: var(--white);
+  line-height: 1.25;
+  margin-bottom: 16px;
+}
+
+.auth-left-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.65;
+  max-width: 320px;
+}
+
+.auth-left-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 28px;
+}
+
+.auth-stat { text-align: center; }
+
+.auth-stat-num {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--white);
+  font-weight: 700;
+}
+
+.auth-stat-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+
+.auth-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  background: var(--white);
+}
+
+.auth-box { width: 100%; max-width: 400px; }
+
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 32px;
+  border-bottom: 1.5px solid var(--sand-mid);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-pale);
+  cursor: pointer;
+  text-align: center;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1.5px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.auth-tab.active {
+  color: var(--emerald);
+  border-bottom-color: var(--emerald);
+}
+
+.auth-form { display: none; }
+.auth-form.active { display: block; }
+
+.auth-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+.field { margin-bottom: 18px; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+.field input, .field select {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--sand-deep);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--white);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.field input:focus, .field select:focus {
+  border-color: var(--emerald-bright);
+  box-shadow: 0 0 0 3px rgba(42,170,132,0.12);
+}
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.btn-auth {
+  width: 100%;
+  padding: 13px;
+  background: var(--emerald);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(26,107,82,0.3);
+  margin-top: 4px;
+}
+
+.btn-auth:hover:not(:disabled) {
+  background: var(--emerald-mid);
+  box-shadow: 0 6px 18px rgba(26,107,82,0.35);
+  transform: translateY(-1px);
+}
+
+.btn-auth:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  font-size: 12px;
+  color: var(--red);
+  background: var(--red-light);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin-top: 12px;
+  display: none;
+}
+
+.auth-error.visible { display: block; }
+
+.auth-divider {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-pale);
+  margin: 20px 0 16px;
+  position: relative;
+}
+
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 42%;
+  height: 1px;
+  background: var(--sand-mid);
+}
+
+.auth-divider::before { left: 0; }
+.auth-divider::after { right: 0; }
+
+.role-demo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.role-card {
+  padding: 11px 12px;
+  border: 1.5px solid var(--sand-mid);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-card:hover {
+  border-color: var(--emerald-bright);
+  background: var(--emerald-pale);
+  transform: translateY(-1px);
+}
+
+.role-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.role-info-name { font-size: 12px; font-weight: 500; color: var(--ink-mid); }
+.role-info-sub  { font-size: 11px; color: var(--ink-pale); }
+
+.demo-label {
+  font-size: 11px;
+  color: var(--ink-pale);
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── APP SHELL ── */
+#screen-app { flex-direction: row; min-height: 100vh; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  z-index: 100;
+  transition: transform 0.3s;
+}
+
+.sidebar-logo {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.sidebar-logo-arabic {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--white);
+  line-height: 1.3;
+}
+
+.sidebar-logo-en {
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.sidebar-user {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--emerald);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--white);
+  flex-shrink: 0;
+}
+
+.sidebar-user-name { font-size: 13px; font-weight: 500; color: var(--white); line-height: 1.2; }
+.sidebar-user-role { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+
+.sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+
+.nav-section-title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.28);
+  padding: 12px 20px 6px;
+  font-weight: 500;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  border-left: 2px solid transparent;
+  margin: 1px 0;
+}
+
+.nav-item:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.05); }
+
+.nav-item.active {
+  color: var(--white);
+  background: rgba(42,170,132,0.15);
+  border-left-color: var(--emerald-bright);
+}
+
+.nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+
+.sidebar-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-signout {
+  width: 100%;
+  padding: 9px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  color: rgba(255,255,255,0.5);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-signout:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); }
+
+.btn-changepw {
+  width: 100%;
+  padding: 9px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  font-family: var(--font-body);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s;
+  text-align: center;
+}
+
+.btn-changepw:hover { color: rgba(255,255,255,0.6); }
+
+/* ── MAIN CONTENT ── */
+.app-main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: var(--topbar-h);
+  background: var(--white);
+  border-bottom: 1px solid var(--sand-mid);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar-title { font-size: 16px; font-weight: 500; color: var(--ink); }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.topbar-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.badge-superadmin { background: #ede9fe; color: #5b21b6; }
+.badge-manager    { background: var(--emerald-light); color: var(--emerald); }
+.badge-teacher    { background: var(--blue-light); color: var(--blue); }
+.badge-student    { background: var(--gold-light); color: var(--gold); }
+
+.content-area {
+  flex: 1;
+  padding: 28px;
+  background: var(--sand);
+  overflow-y: auto;
+}
+
+/* ── VIEW PANELS ── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── PAGE HEADER ── */
+.page-header { margin-bottom: 24px; }
+
+.page-header h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--ink);
+  line-height: 1.2;
+  margin-bottom: 3px;
+}
+
+.page-header p { font-size: 13px; color: var(--ink-soft); }
+
+/* ── METRIC CARDS ── */
+.metrics-grid { display: grid; gap: 14px; margin-bottom: 24px; }
+.metrics-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.metrics-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+.metric-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--sand-mid);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.metric-card.green::before  { background: var(--emerald-bright); }
+.metric-card.gold::before   { background: var(--gold); }
+.metric-card.blue::before   { background: var(--blue); }
+.metric-card.neutral::before { background: var(--sand-deep); }
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-pale);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.metric-value.green  { color: var(--emerald); }
+.metric-value.gold   { color: var(--gold); }
+.metric-value.blue   { color: var(--blue); }
+.metric-value.neutral { color: var(--ink-mid); }
+
+.metric-sub { font-size: 12px; color: var(--ink-pale); }
+
+/* ── GRID LAYOUTS ── */
+.two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.col-63    { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--sand-mid);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.card-action { font-size: 12px; color: var(--emerald); cursor: pointer; font-weight: 500; }
+.card-body { padding: 16px 20px 20px; }
+
+/* ── TABLE ── */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-pale);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--sand-mid);
+}
+.tbl td {
+  padding: 11px 14px;
+  font-size: 13px;
+  color: var(--ink-mid);
+  border-bottom: 1px solid var(--sand);
+  vertical-align: middle;
+}
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: var(--sand); }
+
+/* ── PROGRESS BAR ── */
+.prog-bar {
+  height: 6px;
+  background: var(--sand-mid);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--emerald), var(--emerald-bright));
+  transition: width 0.6s ease;
+}
+
+/* ── CHIPS / BADGES ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.chip-green  { background: var(--emerald-light); color: var(--emerald); }
+.chip-gold   { background: var(--gold-light);    color: var(--amber); }
+.chip-blue   { background: var(--blue-light);    color: var(--blue); }
+.chip-red    { background: var(--red-light);     color: var(--red); }
+.chip-sand   { background: var(--sand-mid);      color: var(--ink-soft); }
+
+/* ── ACTIVITY FEED ── */
+.feed-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sand);
+  font-size: 13px;
+}
+
+.feed-item:last-child { border-bottom: none; }
+
+.feed-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.feed-dot-green { background: var(--emerald-bright); }
+.feed-dot-gold  { background: var(--gold); }
+.feed-dot-red   { background: var(--red); }
+
+.feed-text { color: var(--ink-mid); flex: 1; line-height: 1.4; }
+.feed-time { font-size: 11px; color: var(--ink-pale); white-space: nowrap; margin-top: 2px; }
+
+/* ── ATTENDANCE GRID ── */
+.att-grid {
+  display: grid;
+  grid-template-columns: 150px repeat(7, 1fr);
+  gap: 3px;
+  font-size: 12px;
+}
+.att-cell { padding: 7px 4px; text-align: center; border-radius: 4px; }
+.att-hd   { font-size: 10px; font-weight: 500; color: var(--ink-pale); text-transform: uppercase; }
+.att-name { text-align: left; color: var(--ink-mid); font-weight: 500; padding-left: 4px; }
+.att-p    { background: var(--emerald-light); color: var(--emerald); font-weight: 600; }
+.att-a    { background: var(--red-light);     color: var(--red);     font-weight: 600; }
+.att-l    { background: var(--gold-light);    color: var(--amber);   font-weight: 600; }
+
+/* ── FORM CONTROLS ── */
+.form-grid { display: grid; gap: 16px; }
+.form-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+
+.f-group { display: flex; flex-direction: column; gap: 6px; }
+
+.f-label { font-size: 12px; font-weight: 500; color: var(--ink-mid); letter-spacing: 0.02em; }
+
+.f-input, .f-select, .f-textarea {
+  padding: 10px 13px;
+  border: 1.5px solid var(--sand-deep);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.f-input:focus, .f-select:focus, .f-textarea:focus {
+  border-color: var(--emerald-bright);
+  box-shadow: 0 0 0 3px rgba(42,170,132,0.1);
+}
+.f-textarea { resize: none; }
+.f-urdu { direction: rtl; font-family: var(--font-display); }
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+}
+.btn-primary { background: var(--emerald); color: var(--white); box-shadow: 0 2px 8px rgba(26,107,82,0.25); }
+.btn-primary:hover { background: var(--emerald-mid); transform: translateY(-1px); }
+.btn-outline { background: var(--white); border: 1.5px solid var(--sand-deep); color: var(--ink-mid); }
+.btn-outline:hover { border-color: var(--emerald-bright); color: var(--emerald); }
+
+/* ── SCORES ROW ── */
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--sand);
+  font-size: 13px;
+}
+.score-row:last-child { border-bottom: none; }
+.score-label { flex: 1; color: var(--ink-mid); }
+.score-input-wrap { display: flex; align-items: center; gap: 6px; }
+.score-input {
+  width: 56px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--sand-deep);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: center;
+  outline: none;
+}
+.score-max { font-size: 11px; color: var(--ink-pale); }
+
+/* ── PROGRESS HISTORY ── */
+.prog-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sand);
+  font-size: 13px;
+}
+.prog-row:last-child { border-bottom: none; }
+.prog-topic { min-width: 110px; }
+.prog-lesson { font-size: 11px; color: var(--ink-pale); min-width: 60px; }
+
+/* ── CENTER CARD ── */
+.center-card {
+  background: var(--white);
+  border: 1px solid var(--sand-mid);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.center-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.center-name { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.center-sub { font-size: 12px; color: var(--ink-pale); margin-bottom: 14px; }
+.center-stats { display: flex; gap: 16px; }
+.c-stat-val { font-family: var(--font-display); font-size: 20px; color: var(--emerald); font-weight: 700; }
+.c-stat-label { font-size: 11px; color: var(--ink-pale); }
+
+/* ── INLINE BADGE ── */
+.status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+.dot-green { background: var(--emerald-bright); }
+.dot-gold  { background: var(--gold); }
+.dot-red   { background: var(--red); }
+
+/* ── DIVIDER ── */
+.section-divider { border: none; border-top: 1px solid var(--sand-mid); margin: 20px 0; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--ink-pale);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+}
+.modal-close:hover { color: var(--ink); }
+
+.modal-field { margin-bottom: 16px; }
+.modal-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+.modal-field input {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid var(--sand-deep);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.modal-field input:focus {
+  border-color: var(--emerald-bright);
+  box-shadow: 0 0 0 3px rgba(42,170,132,0.12);
+}
+
+.modal-error {
+  font-size: 12px;
+  color: var(--red);
+  background: var(--red-light);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin-bottom: 14px;
+  display: none;
+}
+.modal-error.visible { display: block; }
+
+.modal-success {
+  font-size: 12px;
+  color: var(--emerald);
+  background: var(--emerald-pale);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin-bottom: 14px;
+  display: none;
+}
+.modal-success.visible { display: block; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--ink);
+  color: var(--white);
+  padding: 11px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  z-index: 300;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ── ANIMATE IN ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.view.active > * { animation: fadeUp 0.35s ease both; }
+.view.active > *:nth-child(2) { animation-delay: 0.05s; }
+.view.active > *:nth-child(3) { animation-delay: 0.1s; }
+.view.active > *:nth-child(4) { animation-delay: 0.15s; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     AUTH SCREEN
+═══════════════════════════════════════════ -->
+<div class="screen active" id="screen-auth">
+  <div class="auth-left">
+    <div class="auth-left-pattern"></div>
+    <div class="auth-left-geo"></div>
+    <div class="auth-logo">
+      <div class="auth-logo-arabic">قرآن فاؤنڈیشن</div>
+      <div class="auth-logo-en">Quran Foundation LMS</div>
+    </div>
+    <div class="auth-left-content">
+      <div class="auth-left-headline">Nurturing Hearts<br/>Through Knowledge</div>
+      <div class="auth-left-sub">A learning management system built for Quran schools — tracking progress, attendance, and homework across every center and class.</div>
+    </div>
+    <div class="auth-left-stats">
+      <div class="auth-stat">
+        <div class="auth-stat-num">7</div>
+        <div class="auth-stat-label">Centers</div>
+      </div>
+      <div class="auth-stat">
+        <div class="auth-stat-num">1,284</div>
+        <div class="auth-stat-label">Students</div>
+      </div>
+      <div class="auth-stat">
+        <div class="auth-stat-num">64</div>
+        <div class="auth-stat-label">Teachers</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-box">
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="authTab('signin')">Sign in</div>
+        <div class="auth-tab" onclick="authTab('signup')">Sign up</div>
+      </div>
+
+      <!-- SIGN IN -->
+      <div class="auth-form active" id="form-signin">
+        <div class="auth-title">Welcome back</div>
+        <div class="auth-subtitle">Sign in to your Quran Foundation account</div>
+        <form onsubmit="handleLogin(event)">
+          <div class="field">
+            <label for="login-phone">Phone number</label>
+            <input id="login-phone" type="tel" placeholder="+92 3xx xxxxxxx" autocomplete="tel" required/>
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required/>
+          </div>
+          <button id="login-btn" class="btn-auth" type="submit">Sign in</button>
+          <div class="auth-error" id="login-error"></div>
+        </form>
+        <div class="auth-divider">or try a demo role</div>
+        <div class="demo-label">Click any role to preview that dashboard</div>
+        <div class="role-demo">
+          <div class="role-card" onclick="previewRole('admin')">
+            <div class="role-dot" style="background:#ede9fe;color:#5b21b6;">SA</div>
+            <div><div class="role-info-name">Super Admin</div><div class="role-info-sub">All centers</div></div>
+          </div>
+          <div class="role-card" onclick="previewRole('manager')">
+            <div class="role-dot" style="background:var(--emerald-light);color:var(--emerald);">CM</div>
+            <div><div class="role-info-name">Center Manager</div><div class="role-info-sub">Gulshan</div></div>
+          </div>
+          <div class="role-card" onclick="previewRole('teacher')">
+            <div class="role-dot" style="background:var(--blue-light);color:var(--blue);">T</div>
+            <div><div class="role-info-name">Teacher</div><div class="role-info-sub">Ustad Tariq</div></div>
+          </div>
+          <div class="role-card" onclick="previewRole('student')">
+            <div class="role-dot" style="background:var(--gold-light);color:var(--gold);">S</div>
+            <div><div class="role-info-name">Student</div><div class="role-info-sub">Fatima Ahmed</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIGN UP -->
+      <div class="auth-form" id="form-signup">
+        <div class="auth-title">Create account</div>
+        <div class="auth-subtitle">Register with your center manager's approval code</div>
+        <div class="field-row">
+          <div class="field"><label>First name</label><input type="text" placeholder="e.g. Hamza"/></div>
+          <div class="field"><label>Last name</label><input type="text" placeholder="e.g. Rauf"/></div>
+        </div>
+        <div class="field">
+          <label>Full name (Urdu) — اردو نام</label>
+          <input type="text" placeholder="حمزہ رؤف" dir="rtl" style="font-family: 'Amiri', serif; font-size:16px;"/>
+        </div>
+        <div class="field">
+          <label>Phone number</label>
+          <input type="tel" placeholder="+92 3xx xxxxxxx"/>
+        </div>
+        <div class="field">
+          <label>Center approval code</label>
+          <input type="text" placeholder="e.g. GUL-2026"/>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" placeholder="Min. 8 characters"/>
+        </div>
+        <button class="btn-auth">Create account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     APP SHELL
+═══════════════════════════════════════════ -->
+<div class="screen" id="screen-app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-arabic">قرآن فاؤنڈیشن</div>
+      <div class="sidebar-logo-en">Quran Foundation LMS</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="sb-avatar">SA</div>
+      <div>
+        <div class="sidebar-user-name" id="sb-name">Super Admin</div>
+        <div class="sidebar-user-role" id="sb-role">All centers</div>
+      </div>
+    </div>
+    <div class="sidebar-nav" id="sidebar-nav">
+      <!-- injected by JS -->
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-signout" onclick="signOut()">Sign out</button>
+      <button class="btn-changepw" onclick="openChangePw()">Change password</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="app-main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-right">
+        <span class="topbar-badge" id="topbar-badge">Super Admin</span>
+      </div>
+    </div>
+    <div class="content-area" id="content-area">
+      <!-- views injected here -->
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     CHANGE PASSWORD MODAL
+═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-changepw" onclick="handleModalBackdrop(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Change password</div>
+      <button class="modal-close" onclick="closeChangePw()" aria-label="Close">&times;</button>
+    </div>
+    <form onsubmit="handleChangePw(event)">
+      <div class="modal-error" id="cp-error"></div>
+      <div class="modal-success" id="cp-success"></div>
+      <div class="modal-field">
+        <label for="cp-current">Current password</label>
+        <input id="cp-current" type="password" placeholder="••••••••" autocomplete="current-password" required/>
+      </div>
+      <div class="modal-field">
+        <label for="cp-new">New password</label>
+        <input id="cp-new" type="password" placeholder="Min. 8 characters" autocomplete="new-password" required minlength="8"/>
+      </div>
+      <div class="modal-field" style="margin-bottom:22px;">
+        <label for="cp-confirm">Confirm new password</label>
+        <input id="cp-confirm" type="password" placeholder="Repeat new password" autocomplete="new-password" required/>
+      </div>
+      <button id="cp-btn" class="btn-auth" type="submit">Update password</button>
+    </form>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── TOKEN STORAGE ──────────────────────────────
+const Token = {
+  save(access, refresh) {
+    localStorage.setItem('qf_access', access);
+    localStorage.setItem('qf_refresh', refresh);
+  },
+  getAccess()  { return localStorage.getItem('qf_access'); },
+  getRefresh() { return localStorage.getItem('qf_refresh'); },
+  saveUser(user) { localStorage.setItem('qf_user', JSON.stringify(user)); },
+  getUser() {
+    try { return JSON.parse(localStorage.getItem('qf_user')); } catch { return null; }
+  },
+  clear() {
+    localStorage.removeItem('qf_access');
+    localStorage.removeItem('qf_refresh');
+    localStorage.removeItem('qf_user');
+  },
+};
+
+// ── API CLIENT ─────────────────────────────────
+const API = {
+  async request(method, path, body, retry = true) {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = Token.getAccess();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`/api/v1${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+
+    if (res.status === 401 && retry) {
+      const refreshed = await API.tryRefresh();
+      if (refreshed) return API.request(method, path, body, false);
+      Token.clear();
+      showScreen('auth');
+      return null;
+    }
+
+    return res;
+  },
+
+  async tryRefresh() {
+    const refreshToken = Token.getRefresh();
+    if (!refreshToken) return false;
+    try {
+      const res = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      Token.save(data.access_token, data.refresh_token);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async login(phone, password) {
+    return fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password }),
+    });
+  },
+
+  async logout() {
+    const refreshToken = Token.getRefresh();
+    if (!refreshToken) return;
+    try {
+      await API.request('POST', '/auth/logout', { refresh_token: refreshToken });
+    } catch { /* fire-and-forget */ }
+  },
+
+  async changePassword(current_password, new_password) {
+    return API.request('POST', '/auth/change-password', { current_password, new_password });
+  },
+};
+
+// ── STATE ──────────────────────────────────────
+let currentRole = 'admin';
+let currentView = '';
+let isPreviewMode = false;
+
+// ── ROLE → APP VIEW MAPPING ────────────────────
+const roleMap = {
+  super_admin:    'admin',
+  center_manager: 'manager',
+  teacher:        'teacher',
+  student:        'student',
+  guardian:       'student',
+};
+
+// ── ROLE CONFIGS ──────────────────────────────
+const roles = {
+  admin: {
+    label: 'Super Admin',
+    sub: 'All centers',
+    initials: 'SA',
+    badgeClass: 'badge-superadmin',
+    defaultView: 'admin-dashboard',
+    nav: [
+      { section: 'Overview', items: [
+        { id: 'admin-dashboard', label: 'Dashboard', icon: '⊞' },
+        { id: 'admin-centers',   label: 'Centers',   icon: '⊙' },
+      ]},
+      { section: 'Academic', items: [
+        { id: 'admin-courses',  label: 'Courses',  icon: '◈' },
+        { id: 'admin-teachers', label: 'Teachers', icon: '◉' },
+        { id: 'admin-students', label: 'Students', icon: '○' },
+      ]},
+      { section: 'Reports', items: [
+        { id: 'admin-reports',   label: 'Reports',  icon: '▦' },
+        { id: 'admin-settings',  label: 'Settings', icon: '⚙' },
+      ]},
+    ],
+  },
+  manager: {
+    label: 'Center Manager',
+    sub: 'Gulshan Center',
+    initials: 'CM',
+    badgeClass: 'badge-manager',
+    defaultView: 'manager-dashboard',
+    nav: [
+      { section: 'Gulshan Center', items: [
+        { id: 'manager-dashboard',  label: 'Dashboard',  icon: '⊞' },
+        { id: 'manager-classes',    label: 'Classes',    icon: '◈' },
+        { id: 'manager-enroll',     label: 'Enrollment', icon: '○' },
+        { id: 'manager-attendance', label: 'Attendance', icon: '☑' },
+      ]},
+      { section: 'Admin', items: [
+        { id: 'manager-reports', label: 'Reports', icon: '▦' },
+      ]},
+    ],
+  },
+  teacher: {
+    label: 'Ustad Tariq',
+    sub: 'Gulshan · Teacher',
+    initials: 'UT',
+    badgeClass: 'badge-teacher',
+    defaultView: 'teacher-dashboard',
+    nav: [
+      { section: 'My Classes', items: [
+        { id: 'teacher-dashboard',   label: 'Dashboard',    icon: '⊞' },
+        { id: 'teacher-attendance',  label: 'Attendance',   icon: '☑' },
+        { id: 'teacher-progress',    label: 'Log Progress', icon: '◈' },
+        { id: 'teacher-assessments', label: 'Assessments',  icon: '▦' },
+      ]},
+    ],
+  },
+  student: {
+    label: 'Fatima Ahmed',
+    sub: 'Gulshan · Student',
+    initials: 'FA',
+    badgeClass: 'badge-student',
+    defaultView: 'student-dashboard',
+    nav: [
+      { section: 'My Learning', items: [
+        { id: 'student-dashboard',  label: 'My Progress', icon: '⊞' },
+        { id: 'student-attendance', label: 'Attendance',  icon: '☑' },
+        { id: 'student-schedule',   label: 'Schedule',    icon: '◉' },
+        { id: 'student-results',    label: 'Results',     icon: '▦' },
+      ]},
+    ],
+  },
+};
+
+// ── AUTH HANDLERS ──────────────────────────────
+
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const phone    = document.getElementById('login-phone').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorEl  = document.getElementById('login-error');
+  const btn      = document.getElementById('login-btn');
+
+  errorEl.textContent = '';
+  errorEl.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const res  = await API.login(phone, password);
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error?.message || 'Sign-in failed. Please check your credentials.';
+      errorEl.classList.add('visible');
+      return;
+    }
+
+    Token.save(data.access_token, data.refresh_token);
+    Token.saveUser(data.user);
+
+    const primaryRole = data.user.roles?.[0] || 'student';
+    const appRole     = roleMap[primaryRole] || 'student';
+    showApp(appRole, data.user);
+
+  } catch {
+    errorEl.textContent = 'Network error. Please try again.';
+    errorEl.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+async function signOut() {
+  await API.logout();
+  Token.clear();
+  isPreviewMode = false;
+  showScreen('auth');
+}
+
+// ── CHANGE PASSWORD ────────────────────────────
+
+function openChangePw() {
+  const modal = document.getElementById('modal-changepw');
+  modal.classList.add('open');
+  document.getElementById('cp-current').value  = '';
+  document.getElementById('cp-new').value      = '';
+  document.getElementById('cp-confirm').value  = '';
+  document.getElementById('cp-error').textContent   = '';
+  document.getElementById('cp-error').classList.remove('visible');
+  document.getElementById('cp-success').textContent = '';
+  document.getElementById('cp-success').classList.remove('visible');
+  document.getElementById('cp-btn').disabled   = false;
+  document.getElementById('cp-btn').textContent = 'Update password';
+  setTimeout(() => document.getElementById('cp-current').focus(), 50);
+}
+
+function closeChangePw() {
+  document.getElementById('modal-changepw').classList.remove('open');
+}
+
+function handleModalBackdrop(e) {
+  if (e.target === document.getElementById('modal-changepw')) closeChangePw();
+}
+
+async function handleChangePw(e) {
+  e.preventDefault();
+
+  const current  = document.getElementById('cp-current').value;
+  const newPw    = document.getElementById('cp-new').value;
+  const confirm  = document.getElementById('cp-confirm').value;
+  const errorEl  = document.getElementById('cp-error');
+  const successEl= document.getElementById('cp-success');
+  const btn      = document.getElementById('cp-btn');
+
+  errorEl.textContent = '';
+  errorEl.classList.remove('visible');
+  successEl.textContent = '';
+  successEl.classList.remove('visible');
+
+  if (newPw !== confirm) {
+    errorEl.textContent = 'New passwords do not match.';
+    errorEl.classList.add('visible');
+    return;
+  }
+
+  if (newPw.length < 8) {
+    errorEl.textContent = 'New password must be at least 8 characters.';
+    errorEl.classList.add('visible');
+    return;
+  }
+
+  if (isPreviewMode) {
+    errorEl.textContent = 'Sign in with a real account to change your password.';
+    errorEl.classList.add('visible');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Updating…';
+
+  try {
+    const res = await API.changePassword(current, newPw);
+    if (!res) return; // auto-redirected to auth screen
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error?.message || 'Failed to update password.';
+      errorEl.classList.add('visible');
+      return;
+    }
+
+    successEl.textContent = 'Password updated successfully.';
+    successEl.classList.add('visible');
+    setTimeout(closeChangePw, 1400);
+
+  } catch {
+    errorEl.textContent = 'Network error. Please try again.';
+    errorEl.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Update password';
+  }
+}
+
+// ── TOAST ──────────────────────────────────────
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── SCREEN HELPERS ─────────────────────────────
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+}
+
+function authTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+  document.querySelector(`.auth-tab:${tab === 'signin' ? 'first-child' : 'last-child'}`).classList.add('active');
+  document.getElementById(`form-${tab}`).classList.add('active');
+}
+
+// Preview a role without authentication
+function previewRole(role) {
+  isPreviewMode = true;
+  showApp(role, null);
+}
+
+// ── APP SHELL ──────────────────────────────────
+
+function showApp(role, user) {
+  currentRole = role;
+  const r = roles[role];
+
+  // Prefer real user data when available
+  let displayName = r.label;
+  let displaySub  = r.sub;
+  let initials    = r.initials;
+
+  if (user) {
+    displayName = user.display_name || user.full_name || r.label;
+    initials    = displayName.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const primaryRole = user.roles?.[0] || role;
+    displaySub  = primaryRole.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  document.getElementById('sb-avatar').textContent   = initials;
+  document.getElementById('sb-name').textContent     = displayName;
+  document.getElementById('sb-role').textContent     = displaySub;
+  document.getElementById('topbar-badge').textContent = r.label;
+  document.getElementById('topbar-badge').className   = 'topbar-badge ' + r.badgeClass;
+
+  // Build nav
+  const nav = document.getElementById('sidebar-nav');
+  nav.innerHTML = r.nav.map(sec => `
+    <div class="nav-section-title">${sec.section}</div>
+    ${sec.items.map(item => `
+      <div class="nav-item" id="nav-${item.id}" onclick="showView('${item.id}')">
+        <span class="nav-icon">${item.icon}</span>
+        <span>${item.label}</span>
+      </div>`).join('')}
+  `).join('');
+
+  showScreen('app');
+  showView(r.defaultView);
+}
+
+function showView(viewId) {
+  currentView = viewId;
+
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navItem = document.getElementById('nav-' + viewId);
+  if (navItem) navItem.classList.add('active');
+
+  document.getElementById('topbar-title').textContent = titleMap[viewId] || viewId;
+
+  const fn = viewMap[viewId];
+  const content = fn ? fn() : viewGeneric(viewId, '');
+  document.getElementById('content-area').innerHTML = `<div class="view active">${content}</div>`;
+}
+
+// ── VIEW HTML ─────────────────────────────────
+function viewAdminDashboard() {
+  return `
+  <div class="page-header">
+    <h2>Overview</h2>
+    <p>All centers — April 2026</p>
+  </div>
+  <div class="metrics-grid cols-4" style="margin-bottom:22px;">
+    <div class="metric-card green"><div class="metric-label">Total students</div><div class="metric-value green">1,284</div><div class="metric-sub">↑ 48 this month</div></div>
+    <div class="metric-card blue"><div class="metric-label">Active centers</div><div class="metric-value blue">7</div><div class="metric-sub">All operational</div></div>
+    <div class="metric-card neutral"><div class="metric-label">Teachers</div><div class="metric-value neutral">64</div><div class="metric-sub">3 new this month</div></div>
+    <div class="metric-card gold"><div class="metric-label">Avg. attendance</div><div class="metric-value gold">78%</div><div class="metric-sub">↓ 2% vs last month</div></div>
+  </div>
+  <div class="col-63" style="margin-bottom:22px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Centers performance</div><div class="card-action">View all</div></div>
+      <div class="card-body">
+        <table class="tbl">
+          <thead><tr><th>Center</th><th>Students</th><th>Teachers</th><th>Attendance</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><b>Gulshan</b></td><td>312</td><td>11</td><td><div class="prog-bar" style="min-width:80px;"><div class="prog-fill" style="width:85%;"></div></div></td><td><span class="chip chip-green">Active</span></td></tr>
+            <tr><td><b>Clifton</b></td><td>278</td><td>9</td><td><div class="prog-bar" style="min-width:80px;"><div class="prog-fill" style="width:72%;"></div></div></td><td><span class="chip chip-green">Active</span></td></tr>
+            <tr><td><b>PECHS</b></td><td>201</td><td>8</td><td><div class="prog-bar" style="min-width:80px;"><div class="prog-fill" style="width:91%;"></div></div></td><td><span class="chip chip-green">Active</span></td></tr>
+            <tr><td><b>North Karachi</b></td><td>189</td><td>7</td><td><div class="prog-bar" style="min-width:80px;"><div class="prog-fill" style="width:62%;"></div></div></td><td><span class="chip chip-gold">Review</span></td></tr>
+            <tr><td><b>Korangi</b></td><td>156</td><td>6</td><td><div class="prog-bar" style="min-width:80px;"><div class="prog-fill" style="width:80%;"></div></div></td><td><span class="chip chip-green">Active</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Activity</div></div>
+      <div class="card-body">
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text">Ahmed K. completed topic — Gulshan</div><div class="feed-time">2h ago</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-gold"></div><div class="feed-text">Attendance below 60% — North Karachi, Class 3B</div><div class="feed-time">5h ago</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text">12 new enrollments — PECHS Center</div><div class="feed-time">Yesterday</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-red"></div><div class="feed-text">Teacher absent — Clifton, Tajweed class</div><div class="feed-time">Yesterday</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text">New course created: Arabic Basics</div><div class="feed-time">2 days ago</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="three-col">
+    <div class="card"><div class="card-header"><div class="card-title">Hifz ul Quran</div><span class="chip chip-green">342 students</span></div><div class="card-body"><div class="metric-value green" style="font-size:24px;margin-bottom:4px;">342</div><div class="metric-sub">Across 4 centers</div><hr class="section-divider"/><div style="font-size:12px;color:var(--ink-soft);">Avg. progress: <b>38%</b> of curriculum</div></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Nazra</div><span class="chip chip-blue">519 students</span></div><div class="card-body"><div class="metric-value blue" style="font-size:24px;margin-bottom:4px;">519</div><div class="metric-sub">Across 7 centers</div><hr class="section-divider"/><div style="font-size:12px;color:var(--ink-soft);">Avg. progress: <b>55%</b> of curriculum</div></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Tajweed</div><span class="chip chip-gold">423 students</span></div><div class="card-body"><div class="metric-value gold" style="font-size:24px;margin-bottom:4px;">423</div><div class="metric-sub">Across 6 centers</div><hr class="section-divider"/><div style="font-size:12px;color:var(--ink-soft);">Avg. progress: <b>44%</b> of curriculum</div></div></div>
+  </div>`;
+}
+
+function viewManagerDashboard() {
+  return `
+  <div class="page-header"><h2>Gulshan Center</h2><p>Center manager dashboard — April 2026</p></div>
+  <div class="metrics-grid cols-3" style="margin-bottom:22px;">
+    <div class="metric-card green"><div class="metric-label">Students</div><div class="metric-value green">312</div><div class="metric-sub">18 enrolled this month</div></div>
+    <div class="metric-card blue"><div class="metric-label">Active classes</div><div class="metric-value blue">14</div><div class="metric-sub">Across 4 courses</div></div>
+    <div class="metric-card gold"><div class="metric-label">Today's attendance</div><div class="metric-value gold">84%</div><div class="metric-sub">263 of 312 present</div></div>
+  </div>
+  <div class="two-col" style="margin-bottom:22px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Classes today</div><div class="card-action">View schedule</div></div>
+      <div class="card-body">
+        <table class="tbl">
+          <thead><tr><th>Class</th><th>Teacher</th><th>Course</th><th>Attendance</th></tr></thead>
+          <tbody>
+            <tr><td><b>Hifz A</b></td><td>Ustad Tariq</td><td><span class="chip chip-green">Hifz</span></td><td><span class="chip chip-green">Marked</span></td></tr>
+            <tr><td><b>Tajweed B</b></td><td>Ustad Tariq</td><td><span class="chip chip-gold">Tajweed</span></td><td><span class="chip chip-gold">Pending</span></td></tr>
+            <tr><td><b>Nazra C</b></td><td>Ustaza Sana</td><td><span class="chip chip-blue">Nazra</span></td><td><span class="chip chip-gold">Pending</span></td></tr>
+            <tr><td><b>Arabic 1</b></td><td>Ustad Bilal</td><td><span class="chip chip-sand">Arabic</span></td><td><span class="chip chip-green">Marked</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Recent enrollments</div><div class="card-action">Enroll student</div></div>
+      <div class="card-body">
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text"><b>Sara Hussain</b> enrolled in Tajweed B</div><div class="feed-time">Today</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text"><b>Ali Raza</b> enrolled in Hifz A</div><div class="feed-time">Today</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-gold"></div><div class="feed-text"><b>Maria K.</b> transferred from PECHS</div><div class="feed-time">Yesterday</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-red"></div><div class="feed-text"><b>Ibrahim S.</b> withdrawn — relocated</div><div class="feed-time">2 days ago</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewTeacherDashboard() {
+  return `
+  <div class="page-header"><h2>My Classes</h2><p>Gulshan Center — Tuesday, 21 Apr 2026</p></div>
+  <div class="metrics-grid cols-3" style="margin-bottom:22px;">
+    <div class="metric-card green"><div class="metric-label">My students</div><div class="metric-value green">38</div><div class="metric-sub">Across 3 classes</div></div>
+    <div class="metric-card neutral"><div class="metric-label">Today present</div><div class="metric-value neutral">31</div><div class="metric-sub">81.6% attendance</div></div>
+    <div class="metric-card gold"><div class="metric-label">Pending logs</div><div class="metric-value gold">4</div><div class="metric-sub">Progress to log today</div></div>
+  </div>
+  <div class="col-63" style="margin-bottom:22px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Today's schedule</div></div>
+      <div class="card-body">
+        <table class="tbl">
+          <thead><tr><th>Class</th><th>Course</th><th>Time</th><th>Students</th><th>Attendance</th><th>Progress</th></tr></thead>
+          <tbody>
+            <tr><td><b>Hifz A</b></td><td><span class="chip chip-green">Hifz</span></td><td>8:00 AM</td><td>14</td><td><span class="chip chip-green">Marked</span></td><td><span class="chip chip-green">Logged</span></td></tr>
+            <tr><td><b>Tajweed B</b></td><td><span class="chip chip-gold">Tajweed</span></td><td>10:00 AM</td><td>18</td><td><span class="chip chip-gold">Pending</span></td><td><span class="chip chip-gold">Pending</span></td></tr>
+            <tr><td><b>Nazra C</b></td><td><span class="chip chip-blue">Nazra</span></td><td>2:00 PM</td><td>6</td><td><span class="chip chip-gold">Pending</span></td><td><span class="chip chip-gold">Pending</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Recent progress</div><div class="card-action">View all</div></div>
+      <div class="card-body">
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text"><b>Fatima A.</b> — Waqf rules, Lesson 6 <span class="chip chip-green" style="margin-left:4px;">Excellent</span></div><div class="feed-time">Today</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-green"></div><div class="feed-text"><b>Hamza R.</b> — Makharij, Lesson 3 <span class="chip chip-blue" style="margin-left:4px;">Good</span></div><div class="feed-time">Today</div></div>
+        <div class="feed-item"><div class="feed-dot feed-dot-gold"></div><div class="feed-text"><b>Aisha M.</b> — Sifaat, Lesson 2 <span class="chip chip-gold" style="margin-left:4px;">Average</span></div><div class="feed-time">Yesterday</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewStudentDashboard() {
+  return `
+  <div class="page-header"><h2>My Progress</h2><p>Tajweed · Gulshan Center · Ustad Tariq</p></div>
+  <div class="metrics-grid cols-3" style="margin-bottom:22px;">
+    <div class="metric-card green"><div class="metric-label">Topics covered</div><div class="metric-value green">8</div><div class="metric-sub">of 18 total</div></div>
+    <div class="metric-card neutral"><div class="metric-label">Attendance</div><div class="metric-value neutral">88%</div><div class="metric-sub">42 of 48 sessions</div></div>
+    <div class="metric-card gold"><div class="metric-label">Homework avg.</div><div class="metric-value gold">76%</div><div class="metric-sub">Last 30 days</div></div>
+  </div>
+  <div class="col-63" style="margin-bottom:22px;">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Topic progress</div></div>
+      <div class="card-body">
+        ${[
+          ['Makharij al-Huruf', 100, 'green'],
+          ['Sifaat al-Huruf', 100, 'green'],
+          ['Noon Sakinah & Tanween', 100, 'green'],
+          ['Meem Sakinah', 80, 'green'],
+          ['Waqf rules', 62, 'gold'],
+          ['Madd rules', 10, 'gold'],
+          ['Qalqalah', 0, 'sand'],
+        ].map(([t, p, c]) => `
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;font-size:13px;">
+            <span style="min-width:180px;color:var(--ink-soft);">${t}</span>
+            <div class="prog-bar" style="flex:1;">
+              <div class="prog-fill" style="width:${p}%;${p === 0 ? 'background:var(--sand-deep);' : ''}"></div>
+            </div>
+            <span style="min-width:36px;text-align:right;font-size:12px;font-weight:500;color:var(--${c === 'green' ? 'emerald' : c === 'gold' ? 'amber' : 'ink-pale'});">${p}%</span>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Recent lessons</div></div>
+      <div class="card-body">
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Topic</th><th>Grade</th></tr></thead>
+          <tbody>
+            <tr><td>21 Apr</td><td>Waqf rules, L6</td><td><span class="chip chip-green">Excellent</span></td></tr>
+            <tr><td>19 Apr</td><td>Waqf rules, L5</td><td><span class="chip chip-green">Excellent</span></td></tr>
+            <tr><td>17 Apr</td><td>Waqf rules, L4</td><td><span class="chip chip-blue">Good</span></td></tr>
+            <tr><td>15 Apr</td><td>Meem Sakinah, L4</td><td><span class="chip chip-gold">Average</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewAttendance() {
+  const isTeacher = currentRole === 'teacher' || currentRole === 'manager';
+  if (!isTeacher) {
+    return `
+    <div class="page-header"><h2>My Attendance</h2><p>Tajweed B · April 2026</p></div>
+    <div class="metrics-grid cols-3" style="margin-bottom:22px;">
+      <div class="metric-card green"><div class="metric-label">Present</div><div class="metric-value green">42</div></div>
+      <div class="metric-card neutral"><div class="metric-label">Absent</div><div class="metric-value neutral">4</div></div>
+      <div class="metric-card gold"><div class="metric-label">Late</div><div class="metric-value gold">2</div></div>
+    </div>
+    <div class="card"><div class="card-body" style="font-size:13px;color:var(--ink-soft);">Full monthly attendance calendar coming soon.</div></div>`;
+  }
+  return `
+  <div class="page-header"><h2>Attendance</h2><p>Tajweed Class B — week of 14–20 Apr 2026</p></div>
+  <div class="card">
+    <div class="card-header" style="padding-bottom:16px;">
+      <div class="card-title">Weekly sheet</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 14px;">Export</button>
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;">Save today</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="att-grid">
+        <div class="att-cell att-hd att-name">Student</div>
+        <div class="att-cell att-hd">Mon</div><div class="att-cell att-hd">Tue</div>
+        <div class="att-cell att-hd">Wed</div><div class="att-cell att-hd">Thu</div>
+        <div class="att-cell att-hd">Fri</div><div class="att-cell att-hd">Sat</div>
+        <div class="att-cell att-hd">Sun</div>
+        ${[
+          ['Fatima Ahmed', ['p','p','p','p','p','a','p']],
+          ['Hamza Rauf',   ['p','a','p','p','l','p','p']],
+          ['Zainab Malik', ['p','p','a','a','p','p','p']],
+          ['Omar Farooq',  ['l','p','p','p','p','p','a']],
+          ['Sara Hussain', ['a','a','a','p','p','p','p']],
+          ['Yusuf Khan',   ['p','p','p','l','p','p','p']],
+        ].map(([n, days]) => `
+          <div class="att-cell att-name">${n}</div>
+          ${days.map(d => `<div class="att-cell att-${d}">${d.toUpperCase()}</div>`).join('')}
+        `).join('')}
+      </div>
+      <div style="display:flex;gap:16px;margin-top:14px;">
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;"><span class="att-cell att-p" style="padding:3px 8px;border-radius:4px;">P</span> Present</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;"><span class="att-cell att-a" style="padding:3px 8px;border-radius:4px;">A</span> Absent</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;"><span class="att-cell att-l" style="padding:3px 8px;border-radius:4px;">L</span> Late</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewProgress() {
+  return `
+  <div class="page-header"><h2>Log Progress</h2><p>Hamza Rauf · Tajweed Class B</p></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Today's session</div></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="f-group">
+            <label class="f-label">Topic</label>
+            <select class="f-select"><option>Waqf rules</option><option>Makharij al-Huruf</option><option>Sifaat al-Huruf</option><option>Madd rules</option></select>
+          </div>
+          <div class="f-group">
+            <label class="f-label">Subtopic (optional)</label>
+            <select class="f-select"><option>— none —</option><option>Waqf Laazim</option><option>Waqf Jaiz</option><option>Waqf Mamnu</option></select>
+          </div>
+        </div>
+        <div class="f-group" style="margin-top:14px;">
+          <label class="f-label">Classwork grade</label>
+          <select class="f-select"><option>Excellent</option><option selected>Good</option><option>Average</option><option>Needs revision</option></select>
+        </div>
+        <div class="f-group" style="margin-top:14px;">
+          <label class="f-label">Teacher note — اردو</label>
+          <textarea class="f-textarea f-urdu" rows="3" dir="rtl" style="font-size:16px;">وقف کے اصول بہتر ہو رہے ہیں۔</textarea>
+        </div>
+        <hr class="section-divider"/>
+        <div class="card-title" style="margin-bottom:12px;">Homework scores</div>
+        <div class="score-row"><div class="score-label" dir="rtl" style="font-family:'Amiri',serif;">تلاوت کی درستی</div><div class="score-input-wrap"><input class="score-input" type="number" value="8"/><span class="score-max">/ 10</span></div></div>
+        <div class="score-row"><div class="score-label" dir="rtl" style="font-family:'Amiri',serif;">تجوید قواعد</div><div class="score-input-wrap"><input class="score-input" type="number" value="7"/><span class="score-max">/ 10</span></div></div>
+        <div class="score-row"><div class="score-label" dir="rtl" style="font-family:'Amiri',serif;">روانی</div><div class="score-input-wrap"><input class="score-input" type="number" value="4"/><span class="score-max">/ 5</span></div></div>
+        <div style="margin-top:10px;padding:10px 0;border-top:1px solid var(--sand);display:flex;justify-content:space-between;font-size:13px;">
+          <span style="color:var(--ink-soft);">Total</span>
+          <span style="font-weight:600;color:var(--emerald);">19 / 25 (76%)</span>
+        </div>
+        <div class="f-group" style="margin-top:8px;">
+          <label class="f-label">Homework due date</label>
+          <input class="f-input" type="date" value="2026-04-23"/>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:16px;">Save progress log</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Progress history</div><div class="card-action">View all</div></div>
+      <div class="card-body">
+        ${[
+          ['Waqf rules',    'Lesson 5', 100, 'Excellent', 'green'],
+          ['Waqf rules',    'Lesson 4', 85,  'Good',      'green'],
+          ['Sifaat al-Huruf','Lesson 8', 100, 'Excellent', 'green'],
+          ['Sifaat al-Huruf','Lesson 7', 70,  'Good',      'blue'],
+          ['Makharij',      'Lesson 6', 60,  'Average',   'gold'],
+        ].map(([t, l, p, g, c]) => `
+          <div class="prog-row">
+            <div class="prog-topic"><span class="chip chip-${c}" style="font-size:11px;">${t}</span></div>
+            <div class="prog-lesson">${l}</div>
+            <div style="flex:1;"><div class="prog-bar"><div class="prog-fill" style="width:${p}%;"></div></div></div>
+            <span class="chip chip-${c}" style="font-size:11px;">${g}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewEnroll() {
+  return `
+  <div class="page-header"><h2>Enroll Student</h2><p>Gulshan Center — new enrollment</p></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Student details</div></div>
+      <div class="card-body">
+        <div class="form-grid cols-2" style="margin-bottom:14px;">
+          <div class="f-group"><label class="f-label">First name</label><input class="f-input" type="text" placeholder="e.g. Hamza"/></div>
+          <div class="f-group"><label class="f-label">Last name</label><input class="f-input" type="text" placeholder="e.g. Rauf"/></div>
+        </div>
+        <div class="f-group" style="margin-bottom:14px;">
+          <label class="f-label">Full name — اردو</label>
+          <input class="f-input f-urdu" type="text" placeholder="حمزہ رؤف" dir="rtl" style="font-size:16px;"/>
+        </div>
+        <div class="form-grid cols-2" style="margin-bottom:14px;">
+          <div class="f-group"><label class="f-label">Date of birth</label><input class="f-input" type="date"/></div>
+          <div class="f-group"><label class="f-label">Gender</label><select class="f-select"><option>Male</option><option>Female</option></select></div>
+        </div>
+        <div class="f-group" style="margin-bottom:14px;">
+          <label class="f-label">Guardian name</label>
+          <input class="f-input" type="text" placeholder="Parent or guardian"/>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="f-group"><label class="f-label">Phone</label><input class="f-input" type="tel" placeholder="+92 3xx…"/></div>
+          <div class="f-group"><label class="f-label">WhatsApp</label><input class="f-input" type="tel" placeholder="+92 3xx…"/></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><div class="card-title">Course &amp; class</div></div>
+        <div class="card-body">
+          <div class="f-group" style="margin-bottom:12px;"><label class="f-label">Center</label><select class="f-select"><option>Gulshan Center</option><option>Clifton Center</option><option>PECHS Center</option></select></div>
+          <div class="f-group" style="margin-bottom:12px;"><label class="f-label">Course</label><select class="f-select"><option>Hifz ul Quran</option><option>Nazra</option><option selected>Tajweed</option><option>Islamic Studies</option></select></div>
+          <div class="f-group" style="margin-bottom:12px;"><label class="f-label">Class</label><select class="f-select"><option>Tajweed A (Ustad Tariq) — 14/18</option><option>Tajweed B (Ustad Bilal) — 12/18</option></select></div>
+          <div class="f-group"><label class="f-label">Enrollment date</label><input class="f-input" type="date" value="2026-04-21"/></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><div class="card-title">Prior knowledge</div></div>
+        <div class="card-body">
+          <div class="f-group" style="margin-bottom:12px;"><label class="f-label">Level</label><select class="f-select"><option>Beginner</option><option>Can read with harakat</option><option>Fluent reader</option><option>Partial hifz</option></select></div>
+          <div class="f-group"><label class="f-label">Notes — اردو</label><textarea class="f-textarea f-urdu" rows="2" dir="rtl" placeholder="کوئی متعلقہ معلومات…" style="font-size:15px;"></textarea></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px;">Enroll student</button>
+    </div>
+  </div>`;
+}
+
+function viewGeneric(title, sub) {
+  return `
+  <div class="page-header"><h2>${title}</h2><p>${sub}</p></div>
+  <div class="card"><div class="card-body" style="padding:40px;text-align:center;color:var(--ink-pale);font-size:14px;">This section is under construction.<br/>Coming in the next iteration.</div></div>`;
+}
+
+const viewMap = {
+  'admin-dashboard':  viewAdminDashboard,
+  'admin-centers':    () => viewGeneric('Centers', 'Manage all centers'),
+  'admin-courses':    () => viewGeneric('Courses & Topics', 'Manage curriculum'),
+  'admin-teachers':   () => viewGeneric('Teachers', 'All teachers across centers'),
+  'admin-students':   () => viewGeneric('Students', 'All students across centers'),
+  'admin-reports':    () => viewGeneric('Reports', 'Organisation-wide analytics'),
+  'admin-settings':   () => viewGeneric('Settings', 'System settings'),
+  'manager-dashboard':  viewManagerDashboard,
+  'manager-classes':    () => viewGeneric('Classes', 'Manage classes at Gulshan'),
+  'manager-enroll':     viewEnroll,
+  'manager-attendance': viewAttendance,
+  'manager-reports':    () => viewGeneric('Reports', 'Gulshan Center analytics'),
+  'teacher-dashboard':  viewTeacherDashboard,
+  'teacher-attendance': viewAttendance,
+  'teacher-progress':   viewProgress,
+  'teacher-assessments':() => viewGeneric('Assessments', 'Create and record tests'),
+  'student-dashboard':  viewStudentDashboard,
+  'student-attendance': viewAttendance,
+  'student-schedule':   () => viewGeneric('Schedule', 'My class timetable'),
+  'student-results':    () => viewGeneric('Results', 'Assessment results'),
+};
+
+const titleMap = {
+  'admin-dashboard':'Dashboard','admin-centers':'Centers','admin-courses':'Courses & Topics',
+  'admin-teachers':'Teachers','admin-students':'Students','admin-reports':'Reports','admin-settings':'Settings',
+  'manager-dashboard':'Dashboard','manager-classes':'Classes','manager-enroll':'Enrollment',
+  'manager-attendance':'Attendance','manager-reports':'Reports',
+  'teacher-dashboard':'Dashboard','teacher-attendance':'Attendance',
+  'teacher-progress':'Log Progress','teacher-assessments':'Assessments',
+  'student-dashboard':'My Progress','student-attendance':'Attendance',
+  'student-schedule':'Schedule','student-results':'Results',
+};
+
+// ── SESSION RESTORE ────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const user   = Token.getUser();
+  const access = Token.getAccess();
+  if (user && access) {
+    isPreviewMode = false;
+    const primaryRole = user.roles?.[0] || 'student';
+    const appRole     = roleMap[primaryRole] || 'student';
+    showApp(appRole, user);
+  }
+});
+</script>
+</body>
+</html>

@@ -2,11 +2,13 @@
 
 - Full API spec: docs/api-reference.html
 - Database schema (ERD): docs/database-schema.html
+- Design File: docs/design.html
 
-Read both of these before writing any route, migration, or repository. The API
+Read all of these before writing any route, migration, or repository. The API
 reference defines every endpoint, its request/response shape, and required
 roles. The schema defines every table and column including all bilingual
-\_ur/\_ar fields.
+\_ur/\_ar fields. The design file references how the desin of the LMS should
+look like
 
 # Quran Foundation LMS — Quran School
 

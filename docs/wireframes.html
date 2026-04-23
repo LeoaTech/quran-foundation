@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Quran Foundation LMS — UI Wireframes</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f4f0;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #6b6a63;
+    --color-border-tertiary: rgba(0,0,0,0.12);
+    --color-border-secondary: rgba(0,0,0,0.22);
+    --color-border-primary: rgba(0,0,0,0.35);
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --font-mono: ui-monospace, monospace;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1c1c1a;
+      --color-background-secondary: #242422;
+      --color-text-primary: #e8e6dc;
+      --color-text-secondary: #9c9a92;
+      --color-border-tertiary: rgba(255,255,255,0.1);
+      --color-border-secondary: rgba(255,255,255,0.18);
+      --color-border-primary: rgba(255,255,255,0.28);
+    }
+  }
+  body { font-family: var(--font-sans); background: var(--color-background-secondary); color: var(--color-text-primary); padding: 1.5rem; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 2px; }
+  .subtitle { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 1.5rem; }
+  * { box-sizing: border-box; }
+  .tab-bar { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 1.5rem; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 1.5rem; }
+  .tab { padding: 7px 16px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); font-size: 13px; cursor: pointer; background: var(--color-background-primary); color: var(--color-text-secondary); font-family: var(--font-sans); }
+  .tab.active { background: var(--color-background-secondary); color: var(--color-text-primary); font-weight: 500; border-color: var(--color-border-primary); }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+  .logo span { color: #1D9E75; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: #E1F5EE; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: #0F6E56; }
+  .user-info { font-size: 13px; color: var(--color-text-secondary); }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+  .badge-teal { background: #E1F5EE; color: #0F6E56; }
+  .badge-amber { background: #FAEEDA; color: #854F0B; }
+  .badge-blue { background: #E6F1FB; color: #185FA5; }
+  .badge-red { background: #FCEBEB; color: #A32D2D; }
+  .badge-green { background: #EAF3DE; color: #3B6D11; }
+  .layout { display: flex; min-height: 500px; }
+  .sidebar { width: 200px; min-width: 200px; border-right: 0.5px solid var(--color-border-tertiary); padding: 16px 0; background: var(--color-background-primary); }
+  .nav-item { padding: 8px 20px; font-size: 13px; cursor: pointer; color: var(--color-text-secondary); display: flex; align-items: center; gap: 10px; }
+  .nav-item.active { background: var(--color-background-secondary); color: var(--color-text-primary); font-weight: 500; border-left: 2px solid #1D9E75; }
+  .nav-icon { width: 16px; height: 16px; border-radius: 3px; background: var(--color-border-tertiary); flex-shrink: 0; }
+  .main { flex: 1; padding: 20px; background: var(--color-background-secondary); overflow: auto; }
+  .page-title { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+  .page-sub { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 20px; }
+  .metric-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric-card { background: var(--color-background-primary); border-radius: var(--border-radius-md); padding: 14px 16px; border: 0.5px solid var(--color-border-tertiary); }
+  .metric-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .metric-val { font-size: 22px; font-weight: 500; }
+  .metric-val.teal { color: #1D9E75; }
+  .metric-val.amber { color: #BA7517; }
+  .metric-val.blue { color: #185FA5; }
+  .metric-val.red { color: #A32D2D; }
+  .card { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); padding: 16px; margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 500; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .card-link { font-size: 12px; color: #1D9E75; cursor: pointer; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; font-weight: 500; color: var(--color-text-secondary); padding: 0 12px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 10px 12px; border-top: 0.5px solid var(--color-border-tertiary); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .progress-bar { height: 6px; background: var(--color-background-secondary); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 99px; background: #1D9E75; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
+  .form-input { padding: 8px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); font-size: 13px; color: var(--color-text-primary); font-family: var(--font-sans); }
+  .form-select { padding: 8px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); font-size: 13px; color: var(--color-text-primary); font-family: var(--font-sans); }
+  .btn { padding: 8px 16px; border-radius: var(--border-radius-md); font-size: 13px; cursor: pointer; font-family: var(--font-sans); font-weight: 500; }
+  .btn-primary { background: #1D9E75; border: none; color: white; }
+  .btn-outline { background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); color: var(--color-text-primary); }
+  .att-grid { display: grid; grid-template-columns: 160px repeat(7, 1fr); gap: 4px; font-size: 12px; }
+  .att-cell { padding: 6px 4px; text-align: center; border-radius: 4px; }
+  .att-header { font-size: 11px; color: var(--color-text-secondary); font-weight: 500; }
+  .att-present { background: #E1F5EE; color: #0F6E56; }
+  .att-absent { background: #FCEBEB; color: #A32D2D; }
+  .att-late { background: #FAEEDA; color: #854F0B; }
+  .att-name { text-align: left; color: var(--color-text-primary); padding-left: 0; }
+  .progress-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .surah-badge { min-width: 80px; font-size: 12px; font-weight: 500; }
+  .ayah-tag { font-size: 11px; color: var(--color-text-secondary); min-width: 90px; }
+  .notif { display: flex; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 13px; }
+  .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; margin-top: 5px; flex-shrink: 0; }
+  .notif-dot.amber { background: #EF9F27; }
+  .notif-dot.red { background: #E24B4A; }
+</style>
+</head>
+<body>
+
+<h1>Quran Foundation LMS — UI Wireframes</h1>
+<p class="subtitle">6 screens: Admin dashboard · Teacher view · Student view · Attendance · Progress tracker · Enrollment</p>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="show('admin')">Admin dashboard</div>
+  <div class="tab" onclick="show('teacher')">Teacher view</div>
+  <div class="tab" onclick="show('student')">Student view</div>
+  <div class="tab" onclick="show('attendance')">Attendance</div>
+  <div class="tab" onclick="show('progress')">Progress tracker</div>
+  <div class="tab" onclick="show('enroll')">Enrollment</div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div class="screen active" id="s-admin">
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo"><span>Quran Foundation</span> LMS</div>
+        <span class="badge badge-teal">Super Admin</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-info">Quran Foundation</div>
+        <div class="avatar">SA</div>
+      </div>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <div class="nav-item active"><div class="nav-icon"></div> Dashboard</div>
+        <div class="nav-item"><div class="nav-icon"></div> Centers</div>
+        <div class="nav-item"><div class="nav-icon"></div> Courses</div>
+        <div class="nav-item"><div class="nav-icon"></div> Students</div>
+        <div class="nav-item"><div class="nav-icon"></div> Teachers</div>
+        <div class="nav-item"><div class="nav-icon"></div> Attendance</div>
+        <div class="nav-item"><div class="nav-icon"></div> Reports</div>
+        <div class="nav-item"><div class="nav-icon"></div> Settings</div>
+      </div>
+      <div class="main">
+        <div class="page-title">Overview</div>
+        <div class="page-sub">All centers — April 2026</div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">Total students</div><div class="metric-val teal">1,284</div></div>
+          <div class="metric-card"><div class="metric-label">Active centers</div><div class="metric-val blue">7</div></div>
+          <div class="metric-card"><div class="metric-label">Teachers</div><div class="metric-val">64</div></div>
+          <div class="metric-card"><div class="metric-label">Avg. attendance</div><div class="metric-val amber">78%</div></div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Centers <span class="card-link">View all</span></div>
+            <table>
+              <thead><tr><th>Center</th><th>Students</th><th>Attendance</th></tr></thead>
+              <tbody>
+                <tr><td>Gulshan Center</td><td>312</td><td><div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div></td></tr>
+                <tr><td>Clifton Center</td><td>278</td><td><div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div></td></tr>
+                <tr><td>PECHS Center</td><td>201</td><td><div class="progress-bar"><div class="progress-fill" style="width:91%"></div></div></td></tr>
+                <tr><td>North Karachi</td><td>189</td><td><div class="progress-bar"><div class="progress-fill" style="width:68%"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-title">Recent activity</div>
+            <div class="notif"><div class="notif-dot"></div><div><div>Ahmed K. completed topic — Gulshan</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">2 hours ago</div></div></div>
+            <div class="notif"><div class="notif-dot amber"></div><div><div>Attendance below 60% — North Karachi, Class 3B</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">5 hours ago</div></div></div>
+            <div class="notif"><div class="notif-dot"></div><div><div>12 new enrollments — PECHS Center</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">Yesterday</div></div></div>
+            <div class="notif"><div class="notif-dot red"></div><div><div>Teacher absent — Clifton Center, Tajweed class</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">Yesterday</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Courses overview</div>
+          <div class="three-col">
+            <div style="padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+              <div class="metric-label">Hifz ul Quran</div>
+              <div style="font-size:20px;font-weight:500;color:#1D9E75;margin:4px 0;">342</div>
+              <div style="font-size:11px;color:var(--color-text-secondary);">students enrolled</div>
+            </div>
+            <div style="padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+              <div class="metric-label">Nazra</div>
+              <div style="font-size:20px;font-weight:500;color:#185FA5;margin:4px 0;">519</div>
+              <div style="font-size:11px;color:var(--color-text-secondary);">students enrolled</div>
+            </div>
+            <div style="padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+              <div class="metric-label">Tajweed</div>
+              <div style="font-size:20px;font-weight:500;color:#BA7517;margin:4px 0;">423</div>
+              <div style="font-size:11px;color:var(--color-text-secondary);">students enrolled</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TEACHER VIEW -->
+<div class="screen" id="s-teacher">
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo"><span>Quran Foundation</span> LMS</div>
+        <span class="badge badge-blue">Teacher</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-info">Ustad Tariq — Gulshan Center</div>
+        <div class="avatar" style="background:#E6F1FB;color:#185FA5;">UT</div>
+      </div>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <div class="nav-item active"><div class="nav-icon"></div> My classes</div>
+        <div class="nav-item"><div class="nav-icon"></div> Attendance</div>
+        <div class="nav-item"><div class="nav-icon"></div> Progress</div>
+        <div class="nav-item"><div class="nav-icon"></div> Assessments</div>
+        <div class="nav-item"><div class="nav-icon"></div> Reports</div>
+      </div>
+      <div class="main">
+        <div class="page-title">My classes</div>
+        <div class="page-sub">Gulshan Center — Sunday, 12 Apr 2026</div>
+        <div class="metric-row" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <div class="metric-card"><div class="metric-label">My students</div><div class="metric-val teal">38</div></div>
+          <div class="metric-card"><div class="metric-label">Today present</div><div class="metric-val">31</div></div>
+          <div class="metric-card"><div class="metric-label">Pending assessments</div><div class="metric-val amber">4</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Today's classes</div>
+          <table>
+            <thead><tr><th>Class</th><th>Course</th><th>Time</th><th>Students</th><th>Attendance</th></tr></thead>
+            <tbody>
+              <tr><td>Hifz A</td><td><span class="badge badge-teal">Hifz ul Quran</span></td><td>8:00 AM</td><td>14</td><td><span class="badge badge-green">Marked</span></td></tr>
+              <tr><td>Tajweed B</td><td><span class="badge badge-amber">Tajweed</span></td><td>10:00 AM</td><td>18</td><td><span class="badge badge-amber">Pending</span></td></tr>
+              <tr><td>Nazra C</td><td><span class="badge badge-blue">Nazra</span></td><td>2:00 PM</td><td>6</td><td><span class="badge badge-amber">Pending</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Recent student progress <span class="card-link">View all</span></div>
+          <table>
+            <thead><tr><th>Student</th><th>Course</th><th>Last lesson</th><th>Grade</th></tr></thead>
+            <tbody>
+              <tr><td>Fatima A.</td><td>Hifz</td><td>Makharij — Lesson 6</td><td><span class="badge badge-green">Excellent</span></td></tr>
+              <tr><td>Hamza R.</td><td>Hifz</td><td>Sifaat al-Huruf — Lesson 3</td><td><span class="badge badge-teal">Good</span></td></tr>
+              <tr><td>Aisha M.</td><td>Tajweed</td><td>Waqf rules — Lesson 2</td><td><span class="badge badge-amber">Needs work</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT VIEW -->
+<div class="screen" id="s-student">
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo"><span>Quran Foundation</span> LMS</div>
+        <span class="badge badge-green">Student</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-info">Fatima Ahmed</div>
+        <div class="avatar" style="background:#EAF3DE;color:#3B6D11;">FA</div>
+      </div>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <div class="nav-item active"><div class="nav-icon"></div> My progress</div>
+        <div class="nav-item"><div class="nav-icon"></div> Attendance</div>
+        <div class="nav-item"><div class="nav-icon"></div> Schedule</div>
+        <div class="nav-item"><div class="nav-icon"></div> Results</div>
+      </div>
+      <div class="main">
+        <div class="page-title">My progress</div>
+        <div class="page-sub">Tajweed · Gulshan Center · Ustad Tariq</div>
+        <div class="metric-row" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <div class="metric-card"><div class="metric-label">Topics covered</div><div class="metric-val teal">8</div></div>
+          <div class="metric-card"><div class="metric-label">Attendance</div><div class="metric-val">88%</div></div>
+          <div class="metric-card"><div class="metric-label">Overall grade</div><div class="metric-val amber">A</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Topic progress</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px;"><span style="min-width:160px;color:var(--color-text-secondary);">Makharij al-Huruf</span><div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:100%"></div></div><span style="color:#1D9E75;font-weight:500;min-width:48px;text-align:right;">Complete</span></div>
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px;"><span style="min-width:160px;color:var(--color-text-secondary);">Sifaat al-Huruf</span><div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:100%"></div></div><span style="color:#1D9E75;font-weight:500;min-width:48px;text-align:right;">Complete</span></div>
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px;"><span style="min-width:160px;color:var(--color-text-secondary);">Waqf rules</span><div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:62%"></div></div><span style="color:#BA7517;font-weight:500;min-width:48px;text-align:right;">62%</span></div>
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px;"><span style="min-width:160px;color:var(--color-text-secondary);">Madd rules</span><div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:0%"></div></div><span style="color:var(--color-text-secondary);min-width:48px;text-align:right;">0%</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Recent lessons</div>
+          <table>
+            <thead><tr><th>Date</th><th>Topic</th><th>Teacher note</th><th>Grade</th></tr></thead>
+            <tbody>
+              <tr><td>11 Apr</td><td>Waqf rules — Lesson 3</td><td>Very strong understanding</td><td><span class="badge badge-green">Excellent</span></td></tr>
+              <tr><td>9 Apr</td><td>Waqf rules — Lesson 2</td><td>Good progress</td><td><span class="badge badge-teal">Good</span></td></tr>
+              <tr><td>7 Apr</td><td>Waqf rules — Lesson 1</td><td>Review stopping signs</td><td><span class="badge badge-amber">Average</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ATTENDANCE -->
+<div class="screen" id="s-attendance">
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo"><span>Quran Foundation</span> LMS</div>
+        <span class="badge badge-blue">Teacher</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-info">Ustad Tariq — Gulshan Center</div>
+        <div class="avatar" style="background:#E6F1FB;color:#185FA5;">UT</div>
+      </div>
+    </div>
+    <div class="main" style="background:var(--color-background-secondary);padding:20px;">
+      <div class="page-title">Attendance — Tajweed Class B</div>
+      <div class="page-sub">Week of 7–12 April 2026 · 18 students</div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">
+          <span>Weekly attendance sheet</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" style="font-size:12px;padding:5px 12px;">Export</button>
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px;">Save today</button>
+          </div>
+        </div>
+        <div class="att-grid">
+          <div class="att-cell att-header att-name">Student</div>
+          <div class="att-cell att-header">Mon</div>
+          <div class="att-cell att-header">Tue</div>
+          <div class="att-cell att-header">Wed</div>
+          <div class="att-cell att-header">Thu</div>
+          <div class="att-cell att-header">Fri</div>
+          <div class="att-cell att-header">Sat</div>
+          <div class="att-cell att-header">Sun</div>
+          <div class="att-cell att-name">Fatima Ahmed</div>
+          <div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-absent">A</div><div class="att-cell att-present">P</div>
+          <div class="att-cell att-name">Hamza Rauf</div>
+          <div class="att-cell att-present">P</div><div class="att-cell att-absent">A</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-late">L</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div>
+          <div class="att-cell att-name">Zainab Malik</div>
+          <div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-absent">A</div><div class="att-cell att-absent">A</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div>
+          <div class="att-cell att-name">Omar Farooq</div>
+          <div class="att-cell att-late">L</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-absent">A</div>
+          <div class="att-cell att-name">Sara Hussain</div>
+          <div class="att-cell att-absent">A</div><div class="att-cell att-absent">A</div><div class="att-cell att-absent">A</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div><div class="att-cell att-present">P</div>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:14px;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;"><span class="att-cell att-present" style="padding:3px 8px;border-radius:4px;">P</span> Present</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;"><span class="att-cell att-absent" style="padding:3px 8px;border-radius:4px;">A</span> Absent</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;"><span class="att-cell att-late" style="padding:3px 8px;border-radius:4px;">L</span> Late</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS TRACKER -->
+<div class="screen" id="s-progress">
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo"><span>Quran Foundation</span> LMS</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-info">Ustad Tariq</div>
+        <div class="avatar" style="background:#E6F1FB;color:#185FA5;">UT</div>
+      </div>
+    </div>
+    <div class="main" style="background:var(--color-background-secondary);padding:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div class="page-title">Log progress — Hamza Rauf</div>
+        <span class="badge badge-teal">Tajweed</span>
+      </div>
+      <div class="page-sub">Gulshan Center · Tajweed Class B · Ustad Tariq</div>
+      <div class="two-col">
+        <div>
+          <div class="card">
+            <div class="card-title">Log today's lesson</div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Topic</div>
+              <select class="form-select"><option>Waqf rules</option><option>Makharij al-Huruf</option><option>Sifaat al-Huruf</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Subtopic (optional)</div>
+              <select class="form-select"><option>Waqf Laazim</option><option>Waqf Jaiz</option><option>Waqf Mamnu</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Classwork grade</div>
+              <select class="form-select"><option>Excellent</option><option selected>Good</option><option>Average</option><option>Needs revision</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+              <div class="form-label">Teacher note (Urdu)</div>
+              <textarea class="form-input" style="height:64px;resize:none;" dir="rtl">وقف کے اصول سمجھ آ گئے ہیں۔</textarea>
+            </div>
+            <div class="card-title" style="margin-bottom:10px;">Homework scores</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><span style="flex:1;color:var(--color-text-secondary);">تلاوت کی درستی</span><input type="number" class="form-input" value="8" style="width:60px;padding:4px 8px;"/><span style="color:var(--color-text-secondary);font-size:12px;">/ 10</span></div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><span style="flex:1;color:var(--color-text-secondary);">تجوید قواعد</span><input type="number" class="form-input" value="7" style="width:60px;padding:4px 8px;"/><span style="color:var(--color-text-secondary);font-size:12px;">/ 10</span></div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><span style="flex:1;color:var(--color-text-secondary);">روانی</span><input type="number" class="form-input" value="4" style="width:60px;padding:4px 8px;"/><span style="color:var(--color-text-secondary);font-size:12px;">/ 5</span></div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;">Save progress log</button>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">Progress history</div>
+            <div class="progress-row">
+              <div class="surah-badge"><span class="badge badge-teal">Waqf rules</span></div>
+              <div class="ayah-tag">Lesson 3</div>
+              <div style="flex:1"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div></div>
+              <span class="badge badge-green" style="font-size:11px;">Excellent</span>
+            </div>
+            <div class="progress-row">
+              <div class="surah-badge"><span class="badge badge-teal">Waqf rules</span></div>
+              <div class="ayah-tag">Lesson 2</div>
+              <div style="flex:1"><div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div></div>
+              <span class="badge badge-teal" style="font-size:11px;">Good</span>
+            </div>
+            <div class="progress-row">
+              <div class="surah-badge"><span class="badge badge-blue">Sifaat</span></div>
+              <div class="ayah-tag">Lesson 5</div>
+              <div style="flex:1"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div></div>
+              <span class="badge badge-green" style="font-size:11px;">Excellent</span>
+            </div>
+            <div class="progress-row" style="border-bottom:none;">
+              <div class="surah-badge"><span class="badge badge-blue">Sifaat</span></div>
+              <div class="ayah-tag">Lesson 4</div>
+              <div style="flex:1"><div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div></div>
+              <span class="badge badge-amber" style="font-size:11px;">Average</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ENROLLMENT -->
+<div class="screen" id="s-enroll">
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo"><span>Quran Foundation</span> LMS</div>
+        <span class="badge badge-teal">Center Manager</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-info">Gulshan Center</div>
+        <div class="avatar">CM</div>
+      </div>
+    </div>
+    <div class="main" style="background:var(--color-background-secondary);padding:20px;">
+      <div class="page-title">Enroll student</div>
+      <div class="page-sub">Gulshan Center — new enrollment form</div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">Student details</div>
+          <div class="form-row">
+            <div class="form-group"><div class="form-label">First name</div><input class="form-input" type="text" placeholder="e.g. Hamza" /></div>
+            <div class="form-group"><div class="form-label">Last name</div><input class="form-input" type="text" placeholder="e.g. Rauf" /></div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <div class="form-label">Full name (Urdu)</div>
+            <input class="form-input" type="text" placeholder="اردو میں نام" dir="rtl" />
+          </div>
+          <div class="form-row">
+            <div class="form-group"><div class="form-label">Date of birth</div><input class="form-input" type="date" /></div>
+            <div class="form-group"><div class="form-label">Gender</div><select class="form-select"><option>Male</option><option>Female</option></select></div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <div class="form-label">Guardian name</div>
+            <input class="form-input" type="text" placeholder="Parent or guardian full name" />
+          </div>
+          <div class="form-row">
+            <div class="form-group"><div class="form-label">Guardian phone</div><input class="form-input" type="text" placeholder="+92 3xx xxxxxxx" /></div>
+            <div class="form-group"><div class="form-label">WhatsApp number</div><input class="form-input" type="text" placeholder="+92 3xx xxxxxxx" /></div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">Course & class</div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Center</div>
+              <select class="form-select"><option>Gulshan Center</option><option>Clifton Center</option><option>PECHS Center</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Course</div>
+              <select class="form-select"><option>Hifz ul Quran</option><option>Nazra</option><option>Tajweed</option><option>Islamic Studies</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Assign class</div>
+              <select class="form-select"><option>Tajweed Class A (Ustad Tariq) — 14/18</option><option>Tajweed Class B (Ustad Bilal) — 12/18</option></select>
+            </div>
+            <div class="form-group">
+              <div class="form-label">Enrollment date</div>
+              <input class="form-input" type="date" />
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Prior knowledge</div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <div class="form-label">Level</div>
+              <select class="form-select"><option>Beginner — no prior reading</option><option>Can read with harakat</option><option>Fluent reader</option><option>Partial hifz</option></select>
+            </div>
+            <div class="form-group">
+              <div class="form-label">Notes (Urdu)</div>
+              <textarea class="form-input" style="height:52px;resize:none;" placeholder="کوئی متعلقہ معلومات..." dir="rtl"></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px;padding:10px;">Enroll student</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
