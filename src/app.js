@@ -8,8 +8,21 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Security headers
-app.use(helmet());
+// Security headers —  for development (inline scripts )
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "script-src":      ["'self'", "'unsafe-inline'"],
+        "script-src-attr": ["'unsafe-inline'"],           
+        "style-src":       ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src":        ["'self'", "https://fonts.gstatic.com"],
+      },
+    },
+  })
+);
+
 
 // CORS
 app.use(cors({
@@ -47,11 +60,11 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/v1/auth',              require('./routes/auth'));
-app.use('/api/v1',                   require('./routes/centers'));
-app.use('/api/v1',                   require('./routes/users'));
-app.use('/api/v1',                   require('./routes/courses'));
-app.use('/api/v1',                   require('./routes/classes'));
+app.use('/api/v1/auth', require('./routes/auth'));
+app.use('/api/v1', require('./routes/centers'));
+app.use('/api/v1', require('./routes/users'));
+app.use('/api/v1', require('./routes/courses'));
+app.use('/api/v1', require('./routes/classes'));
 app.use('/api/v1/progress-sessions', require('./routes/progress'));
 
 // 404 handler
