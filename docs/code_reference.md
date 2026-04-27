@@ -16,10 +16,11 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 8. [Users & Roles Module](#users--roles-module)
 9. [Courses & Topics Module](#courses--topics-module)
 10. [Classes Module](#classes-module)
-11. [Progress Sessions Module](#progress-sessions-module)
-12. [Jobs & Workers](#jobs--workers)
-13. [Error Codes Reference](#error-codes-reference)
-14. [RBAC Summary](#rbac-summary)
+11. [Enrollments Module](#enrollments-module)
+12. [Progress Sessions Module](#progress-sessions-module)
+13. [Jobs & Workers](#jobs--workers)
+14. [Error Codes Reference](#error-codes-reference)
+15. [RBAC Summary](#rbac-summary)
 
 ---
 
@@ -698,6 +699,88 @@ Soft deletes (`DELETE` endpoints) call `deactivateTopic` / `deactivateSubtopic` 
 **Homework criteria ownership:** for `teacher` role, all criteria write operations (`createCriteria`, `updateCriteria`, `deleteCriteria`) require the teacher to have an active `class_teachers` row for the class — checked via `getClassTeacherEntry` before any mutation.
 
 **Critical constraint — criteria soft-delete:** `deleteCriteria` calls `deactivateCriteria` which sets `is_active=false`. The `homework_scores` rows referencing a deactivated `criteria_id` are **never touched** — they remain intact so historical reports remain accurate. The `progress.service.js` `getActiveHomeworkCriteria` query already filters `is_active=true`, so deactivated criteria are excluded from future session validation automatically.
+
+---
+
+## Enrollments Module
+
+**Route prefix:** `/api/v1`  
+**Mount:** `app.use('/api/v1', require('./routes/enrollments'))`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| POST | `/enrollments` | super_admin, center_manager | Enroll a student into a class |
+| GET | `/classes/:class_id/enrollments` | super_admin, center_manager, teacher | List enrollments for a class |
+| GET | `/students/:user_id/enrollments` | any authenticated | List all enrollments for a student |
+| PATCH | `/enrollments/:enrollment_id` | super_admin, center_manager | Update enrollment (withdraw, etc.) |
+
+### Zod schemas (`src/routes/enrollments.js`)
+
+**createEnrollmentSchema**
+```js
+{
+  student_user_id: z.string().uuid(),           // required
+  class_id:        z.string().uuid(),           // required
+  enrolled_on:     z.string().date().optional(),// defaults to today
+  prior_level:     z.string().max(100).optional(),
+  notes_ur:        z.string().optional(),
+}
+```
+
+**updateEnrollmentSchema**
+```js
+{
+  status:       z.enum(['active', 'withdrawn']).optional(),
+  withdrawn_on: z.string().date().optional(),   // auto-set to today if not provided
+  prior_level:  z.string().max(100).optional(),
+  notes_ur:     z.string().optional(),
+}
+// .refine: at least one field required
+```
+
+### Repository (`src/repositories/enrollments.repository.js`)
+
+| Function | Description |
+|----------|-------------|
+| `getEnrollmentById(enrollmentId)` | Single row by PK |
+| `getActiveEnrollmentForStudent(classId, studentUserId)` | Returns active enrollment row for duplicate check |
+| `countActiveEnrollments(classId)` | Count of `status='active' AND is_active=true` rows — for capacity check |
+| `listEnrollmentsByClass(classId, { status })` | Joins `users` for student profile; optional `status` filter |
+| `listEnrollmentsByStudent(studentUserId)` | Joins `classes` for class name; ordered by `enrolled_on DESC` |
+| `createEnrollment(data)` | Insert + returning |
+| `updateEnrollment(enrollmentId, data)` | Update + `updated_at` + returning |
+
+### Service (`src/services/enrollments.service.js`)
+
+**`assertCenterAccess(user, centerId)`** — 403 if `center_manager`'s `center_id` does not match.
+
+**`createEnrollment({ user, body })`**
+1. Fetch class (404 if not found or inactive)
+2. `assertCenterAccess(user, cls.center_id)` — center_manager scoping
+3. `getActiveEnrollmentForStudent` → 409 `ENROLLMENT_CONFLICT` if found
+4. If `cls.max_capacity != null`: `countActiveEnrollments` → 409 `CLASS_FULL` if `count >= max_capacity`
+5. Inserts with `center_id` copied from the class row; `enrolled_on` defaults to today
+
+**`listEnrollmentsByClass({ user, classId, query })`**
+- Validates class exists (404); checks `user.center_id === cls.center_id` for non-super_admin
+- Passes `query.status` filter to repository
+
+**`listEnrollmentsByStudent({ user, studentUserId })`**
+- No additional access guard beyond authentication — all authenticated roles may list
+
+**`updateEnrollment({ user, enrollmentId, body })`**
+- Validates enrollment exists (404)
+- `assertCenterAccess(user, enrollment.center_id)`
+- If `body.status === 'withdrawn'` and no `body.withdrawn_on` supplied → injects today's date
+
+### Error codes specific to this module
+
+| Code | Status | Condition |
+|------|--------|-----------|
+| `ENROLLMENT_CONFLICT` | 409 | Student already has an active enrollment in the class |
+| `CLASS_FULL` | 409 | Active enrollment count ≥ `classes.max_capacity` |
 
 ---
 

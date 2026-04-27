@@ -52,6 +52,7 @@ app.use('/api/v1',                   require('./routes/centers'));
 app.use('/api/v1',                   require('./routes/users'));
 app.use('/api/v1',                   require('./routes/courses'));
 app.use('/api/v1',                   require('./routes/classes'));
+app.use('/api/v1',                   require('./routes/enrollments'));
 app.use('/api/v1/progress-sessions', require('./routes/progress'));
 
 // 404 handler
