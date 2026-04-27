@@ -17,10 +17,11 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 9. [Courses & Topics Module](#courses--topics-module)
 10. [Classes Module](#classes-module)
 11. [Enrollments Module](#enrollments-module)
-12. [Progress Sessions Module](#progress-sessions-module)
-13. [Jobs & Workers](#jobs--workers)
-14. [Error Codes Reference](#error-codes-reference)
-15. [RBAC Summary](#rbac-summary)
+12. [Attendance Module](#attendance-module)
+13. [Progress Sessions Module](#progress-sessions-module)
+14. [Jobs & Workers](#jobs--workers)
+15. [Error Codes Reference](#error-codes-reference)
+16. [RBAC Summary](#rbac-summary)
 
 ---
 
@@ -58,6 +59,8 @@ src/
     users.repository.js
     courses.repository.js
     classes.repository.js
+    enrollments.repository.js
+    attendance.repository.js
     progress.repository.js
 
   services/                     Business logic
@@ -66,6 +69,8 @@ src/
     users.service.js
     courses.service.js
     classes.service.js
+    enrollments.service.js
+    attendance.service.js
     progress.service.js
 
   controllers/                  Thin req/res wrappers — parse req, call service, send res
@@ -74,6 +79,8 @@ src/
     users.controller.js
     courses.controller.js
     classes.controller.js
+    enrollments.controller.js
+    attendance.controller.js
     progress.controller.js
 
   routes/                       Express routers with Zod schemas and RBAC
@@ -82,6 +89,8 @@ src/
     users.js                    → mounted at /api/v1
     courses.js                  → mounted at /api/v1
     classes.js                  → mounted at /api/v1
+    enrollments.js              → mounted at /api/v1
+    attendance.js               → mounted at /api/v1
     progress.js                 → mounted at /api/v1/progress-sessions
 
   jobs/
@@ -117,6 +126,8 @@ Express app configuration. Route mount order:
 /api/v1                   → routes/classes.js
 /api/v1/progress-sessions → routes/progress.js
 ```
+
+Also mounted: `app.use('/api/v1', require('./routes/enrollments'))` and `app.use('/api/v1', require('./routes/attendance'))`
 
 Middleware stack (in order): `helmet` → `cors` → `rateLimit` → `express.json` → `express.urlencoded` → `express.static(public/)`
 
@@ -784,6 +795,112 @@ Soft deletes (`DELETE` endpoints) call `deactivateTopic` / `deactivateSubtopic` 
 
 ---
 
+## Attendance Module
+
+**Route prefix:** `/api/v1`  
+**Mount:** `app.use('/api/v1', require('./routes/attendance'))`
+
+### Migration addendum — `009_attendance_corrections.js`
+
+Adds two columns to `attendance_records` to record post-hoc corrections:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `corrected_by` | `uuid FK → users` | User who made the correction |
+| `corrected_at` | `timestamp` | When the correction was made |
+
+Both are nullable; only set by `PATCH /attendance/sessions/:session_id/records/:record_id`.
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| POST | `/classes/:class_id/attendance` | super_admin, center_manager, teacher | Create session + bulk-mark records |
+| GET | `/classes/:class_id/attendance` | super_admin, center_manager, teacher | List sessions for a class |
+| PATCH | `/attendance/sessions/:session_id/records/:record_id` | super_admin, center_manager, teacher | Correct a single record |
+| GET | `/students/:user_id/attendance` | any authenticated | Get student's attendance summary |
+
+### Zod schemas (`src/routes/attendance.js`)
+
+**createSessionSchema**
+```js
+{
+  session_date: z.string().date(),            // required — YYYY-MM-DD
+  records: z.array({
+    student_user_id: z.string().uuid(),
+    status: z.enum(['present', 'absent', 'late']),
+    note_ur: z.string().optional(),
+  }).min(1),
+}
+```
+
+**correctRecordSchema**
+```js
+{
+  status:  z.enum(['present', 'absent', 'late']).optional(),
+  note_ur: z.string().optional(),
+}
+// .refine: at least one field required
+```
+
+### Repository (`src/repositories/attendance.repository.js`)
+
+| Function | Description |
+|----------|-------------|
+| `getSessionByClassAndDate(classId, sessionDate)` | Duplicate guard — returns existing session if one exists |
+| `getSessionById(sessionId)` | Single session row by PK |
+| `createAttendanceSession(trx, data)` | Insert session within transaction |
+| `bulkCreateAttendanceRecords(trx, rows)` | Bulk insert all records in same transaction |
+| `listSessionsByClass(classId, { from, to })` | Sessions ordered by `session_date DESC`; optional date-range filter |
+| `listRecordsBySession(sessionId)` | All active records for a session, joined with student profiles |
+| `getAttendanceRecordById(recordId)` | Single record row |
+| `updateAttendanceRecord(recordId, data)` | Patch + `updated_at` + returning |
+| `getStudentAttendanceRecords(studentUserId, { classId, from, to })` | All records for a student joined with session metadata |
+
+### Service (`src/services/attendance.service.js`)
+
+**`assertTeacherOwnership(user, classId)`** — super_admin and center_manager always pass; `teacher` must have an active row in `class_teachers` for the class (via `classRepo.getClassTeacherEntry`).
+
+**`createAttendanceSession({ user, classId, body })`**
+1. Fetch class (404); `assertCenterAccess`; `assertTeacherOwnership`
+2. `getSessionByClassAndDate` → 409 `SESSION_EXISTS` if found
+3. **Transaction:** `INSERT attendance_sessions` → bulk `INSERT attendance_records`
+4. Returns `{ session_id, session_date, total, present, absent, late }`
+
+**`listSessionsByClass({ user, classId, query })`**
+- Validates class (404); `assertCenterAccess`
+- Calls `listSessionsByClass` with `?from` and `?to` filters
+- For each session, fetches its records via `listRecordsBySession` and attaches them
+
+**`correctRecord({ user, sessionId, recordId, body })`**
+- Validates record exists and belongs to the session (404 otherwise)
+- Fetches session → class → `assertCenterAccess` + `assertTeacherOwnership`
+- Injects `corrected_by: user.id` and `corrected_at: new Date()` alongside the status/note update
+
+**`getStudentAttendance({ user, studentUserId, query })`**
+- Accepts `?class_id`, `?from`, `?to` filters
+- Counts `present`, `absent`, `late` in JS from the returned records array
+- `attendance_pct = (present / total_sessions) * 100` rounded to 1 decimal place
+- Returns:
+  ```json
+  {
+    "total_sessions": 48,
+    "present": 42,
+    "absent": 4,
+    "late": 2,
+    "attendance_pct": 87.5,
+    "records": [...]
+  }
+  ```
+
+### Error codes specific to this module
+
+| Code | Status | Condition |
+|------|--------|-----------|
+| `SESSION_EXISTS` | 409 | An attendance session already exists for this class on this date |
+
+---
+
 ## Progress Sessions Module
 
 **Route prefix:** `/api/v1/progress-sessions`
@@ -884,7 +1001,10 @@ Stub worker that registers a processor on the `notify-guardian` queue. Implement
 | `INVALID_CREDENTIALS` | 401 | Wrong phone/password (identical message prevents enumeration) |
 | `FORBIDDEN` | 403 | Authenticated but insufficient role or wrong center |
 | `NOT_FOUND` | 404 | Resource does not exist |
-| `CONFLICT` | 409 | Duplicate (session, role assignment, guardian link) |
+| `CONFLICT` | 409 | Duplicate (progress session, role assignment, guardian link) |
+| `ENROLLMENT_CONFLICT` | 409 | Student already has an active enrollment in the class |
+| `CLASS_FULL` | 409 | Active enrollment count ≥ `classes.max_capacity` |
+| `SESSION_EXISTS` | 409 | Attendance session already exists for this class on this date |
 | `VALIDATION_ERROR` | 400 | Zod schema failure; includes `field` |
 | `RATE_LIMIT_EXCEEDED` | 429 | Express rate-limiter triggered |
 | `INTERNAL_SERVER_ERROR` | 500 | Unhandled exception |
