@@ -20,9 +20,10 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 12. [Attendance Module](#attendance-module)
 13. [Progress Sessions Module](#progress-sessions-module)
 14. [Assessments Module](#assessments-module)
-15. [Jobs & Workers](#jobs--workers)
-16. [Error Codes Reference](#error-codes-reference)
-17. [RBAC Summary](#rbac-summary)
+15. [Reports Module](#reports-module)
+16. [Jobs & Workers](#jobs--workers)
+17. [Error Codes Reference](#error-codes-reference)
+18. [RBAC Summary](#rbac-summary)
 
 ---
 
@@ -64,6 +65,7 @@ src/
     attendance.repository.js
     progress.repository.js
     assessments.repository.js
+    reports.repository.js
 
   services/                     Business logic
     auth.service.js
@@ -75,6 +77,7 @@ src/
     attendance.service.js
     progress.service.js
     assessments.service.js
+    reports.service.js
 
   controllers/                  Thin req/res wrappers — parse req, call service, send res
     auth.controller.js
@@ -86,6 +89,7 @@ src/
     attendance.controller.js
     progress.controller.js
     assessments.controller.js
+    reports.controller.js
 
   routes/                       Express routers with Zod schemas and RBAC
     auth.js                     → mounted at /api/v1/auth
@@ -97,6 +101,7 @@ src/
     attendance.js               → mounted at /api/v1
     progress.js                 → mounted at /api/v1 (routes carry full paths: /progress-sessions, /homework-entries, etc.)
     assessments.js              → mounted at /api/v1
+    reports.js                  → mounted at /api/v1 (routes carry full paths: /reports/org/overview, etc.)
 
   jobs/
     notifyGuardian.js           Bull queue definition
@@ -132,7 +137,7 @@ Express app configuration. Route mount order:
 /api/v1/progress-sessions → routes/progress.js
 ```
 
-Also mounted at `/api/v1`: `enrollments`, `attendance`, `progress`, `assessments`
+Also mounted at `/api/v1`: `enrollments`, `attendance`, `progress`, `assessments`, `reports`
 
 Middleware stack (in order): `helmet` → `cors` → `rateLimit` → `express.json` → `express.urlencoded` → `express.static(public/)`
 
@@ -190,6 +195,23 @@ new AppError(code, message, message_ur, status = 400, field = null)
 | `field` | string \| null | Field name for validation errors only |
 
 All thrown `AppError` instances are caught by the global error handler in `app.js` and serialized to the standard error shape defined in `CLAUDE.md`.
+
+### `src/utils/reportCache.js`
+
+Redis-backed cache helpers for all report endpoints. Import path: `../utils/reportCache`.
+
+| Export | Signature | Description |
+|--------|-----------|-------------|
+| `TTL` | `{ ORG_OVERVIEW: 300, CENTER_OVERVIEW: 180, STUDENT_SUMMARY: 120 }` | TTL constants in seconds |
+| `keys.orgOverview()` | `() → string` | `'report:org:overview'` |
+| `keys.centerOverview(id, month)` | `(id, month?) → string` | `'report:center:{id}:{month|all}'` |
+| `keys.studentSummary(id)` | `(id) → string` | `'report:student:{id}'` |
+| `getCached(key)` | `async (key) → data \| null` | JSON.parse from Redis; returns null on miss or Redis error |
+| `setCached(key, data, ttl)` | `async (key, data, ttl)` | JSON.stringify + SET EX; swallows Redis errors |
+| `invalidateCenterReports(centerId)` | `async (centerId)` | Deletes `report:org:overview` + scans/deletes all `report:center:{id}:*` keys |
+| `invalidateStudentReport(studentUserId)` | `async (userId)` | Deletes `report:student:{id}` |
+
+Both invalidation functions are fire-and-forget (called with `.catch(console.error)`) — a Redis failure never blocks a write operation.
 
 ### `src/utils/redis.js` — `getRedis()`
 
@@ -1227,6 +1249,158 @@ Returns a flat array of assessment + result data joined together — no second q
 2. Merge proposed values with existing values → `assertTypeGradeConsistency` on merged object (prevents clearing `oral_grade` from an oral assessment)
 3. Score ceiling check if `score` is being updated
 4. `repo.updateResult`
+
+---
+
+## Reports Module
+
+**Route prefix:** `/api/v1`  
+**Mount:** `app.use('/api/v1', require('./routes/reports'))`  
+Read-only, no side effects. All responses may be served from Redis cache.
+
+### Endpoints
+
+| Method | Path | Roles | Cache TTL | Cache key |
+|--------|------|-------|-----------|-----------|
+| GET | `/reports/org/overview` | super_admin | 5 min | `report:org:overview` |
+| GET | `/reports/centers/:center_id/overview` | super_admin, center_manager | 3 min | `report:center:{id}:{month\|all}` |
+| GET | `/reports/students/:user_id/summary` | any authenticated | 2 min | `report:student:{id}` |
+| GET | `/reports/classes/:class_id/homework-performance` | super_admin, center_manager, teacher | none | — |
+
+### Cache invalidation triggers
+
+| Write event | Keys invalidated |
+|-------------|-----------------|
+| `POST /classes/:class_id/attendance` (new attendance session) | `report:org:overview` + all `report:center:{center_id}:*` |
+| `POST /progress-sessions` (new progress session) | `report:org:overview` + all `report:center:{center_id}:*` + `report:student:{student_user_id}` |
+
+Both calls are fire-and-forget in the respective write services, so a Redis failure never blocks attendance or progress creation.
+
+### Query params
+
+```
+GET /reports/centers/:center_id/overview?month=2026-04
+GET /reports/classes/:class_id/homework-performance?from=2026-04-01&to=2026-04-30
+```
+
+`month` is `YYYY-MM` format. The service expands it to `from=YYYY-MM-01`, `to=YYYY-MM-{last_day}` before querying.
+
+### Response shapes
+
+**GET /reports/org/overview — Response 200**
+```json
+{
+  "total_students": 1284,
+  "total_teachers": 64,
+  "active_centers": 7,
+  "avg_attendance_pct": 78.2,
+  "enrollments_by_course": [
+    { "course": "Hifz ul Quran", "course_ur": "حفظ القرآن", "count": 342 }
+  ]
+}
+```
+`avg_attendance_pct` = all-time present / all records × 100, rounded to 1 decimal.
+
+**GET /reports/centers/:center_id/overview?month=2026-04 — Response 200**
+```json
+{
+  "active_students": 142,
+  "active_teachers": 8,
+  "active_classes": 12,
+  "attendance_pct": 83.4,
+  "total_attendance_records": 1120,
+  "progress_sessions": 340,
+  "period": { "month": "2026-04", "from": "2026-04-01", "to": "2026-04-30" }
+}
+```
+Without `?month`: `"period": { "all_time": true }` and all counts are unfiltered.
+
+**GET /reports/students/:user_id/summary — Response 200**
+```json
+{
+  "student": {
+    "id": "uuid",
+    "full_name": "Hamza Rauf",
+    "full_name_ur": "حمزہ رؤف",
+    "display_name_ar": null,
+    "phone": "+923001234567",
+    "preferred_lang": "ur"
+  },
+  "attendance_pct": 88.0,
+  "classwork_grades": { "excellent": 12, "good": 8, "average": 3, "revision": 1 },
+  "homework_avg_pct": 76.4,
+  "topics_covered": [
+    { "id": "uuid", "title": "Makharij al-Huruf", "title_ur": "مخارج الحروف", "title_ar": "مخارج الحروف" }
+  ],
+  "assessment_scores": [
+    {
+      "assessment_id": "uuid", "title": "Monthly Test", "title_ur": "ماہانہ ٹیسٹ",
+      "type": "written", "assessment_date": "2026-04-20", "max_score": 50,
+      "score": 42, "oral_grade": null, "remarks_ur": "ممتاز"
+    }
+  ]
+}
+```
+`homework_avg_pct = sum(marks_obtained) / sum(max_marks) × 100` across all sessions. `classwork_grades` always includes all four keys (`excellent`, `good`, `average`, `revision`) even if zero.
+
+**GET /reports/classes/:class_id/homework-performance — Response 200**
+```json
+{
+  "criteria": [
+    {
+      "criteria_id": "uuid",
+      "label": "Recitation accuracy",
+      "label_ur": "تلاوت کی درستی",
+      "max_marks": 10,
+      "class_avg": 7.8,
+      "lowest": 4,
+      "highest": 10,
+      "submission_count": 56
+    }
+  ]
+}
+```
+Criteria ordered by `homework_criteria.display_order ASC`. `lowest`/`highest` are `null` if no scores exist.
+
+### `src/repositories/reports.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `countActiveStudents()` | Distinct users with `role='student'` and `is_active=true` |
+| `countActiveTeachers()` | Distinct users with `role='teacher'` and `is_active=true` |
+| `countActiveCenters()` | Count of `centers` where `is_active=true` |
+| `getOrgAttendanceStats()` | All-time `total` + `present_count` from `attendance_records` |
+| `getEnrollmentsByCourse()` | Active enrollments grouped by course name, ordered by count DESC |
+| `getCenterActiveStudentCount(centerId)` | Distinct `student_user_id` in active enrollments for this center |
+| `getCenterActiveTeacherCount(centerId)` | Distinct teachers with an active `class_teachers` row in this center |
+| `getCenterClassCount(centerId)` | Active classes for this center |
+| `getCenterAttendanceStats(centerId, { from, to })` | `total` + `present_count` filtered by `attendance_sessions.center_id` and optional date range |
+| `getCenterProgressSessionCount(centerId, { from, to })` | Count of progress sessions joined to classes → center |
+| `getStudentProfile(userId)` | User row for student profile object |
+| `getStudentAttendanceStats(userId)` | `total` + `present_count` for this student |
+| `getStudentClassworkGrades(userId)` | `[{ grade, cnt }]` grouped by `progress_sessions.cw_grade` |
+| `getStudentHomeworkStats(userId)` | `{ total_obtained, total_max }` summed across all homework |
+| `getStudentTopicsCovered(userId)` | Distinct topics from `progress_sessions.cw_topic_id` → `topics` join |
+| `getStudentAssessmentScores(userId)` | All result rows joined with assessment metadata |
+| `getHomeworkPerformanceByClass(classId, { from, to })` | Per-criterion `class_avg`, `lowest`, `highest`, `submission_count`; uses PostgreSQL `ROUND(AVG(...)::numeric, 1)` |
+
+### `src/services/reports.service.js`
+
+**`parseMonth(month)`** — converts `"YYYY-MM"` → `{ from: "YYYY-MM-01", to: "YYYY-MM-{lastDay}" }`. Uses `new Date(y, m, 0).getDate()` to find the last day of the month without any library.
+
+**Cache pattern (all cached endpoints):**
+```js
+const hit = await cache.getCached(cacheKey);
+if (hit) return hit;
+// ... run queries ...
+await cache.setCached(cacheKey, result, TTL.XYZ);
+return result;
+```
+`getCached`/`setCached` both swallow Redis errors — a Redis outage degrades to uncached (never throws).
+
+**`getStudentSummary`** — throws `404 NOT_FOUND` if the student profile row doesn't exist (after the cache miss path).
+
+**`getHomeworkPerformance`** — validates class exists + `assertCenterAccess` before querying. Not cached.
 
 ---
 

@@ -1,8 +1,9 @@
 const db = require('../db/knex');
-const progressRepo = require('../repositories/progress.repository');
-const classRepo    = require('../repositories/classes.repository');
+const progressRepo    = require('../repositories/progress.repository');
+const classRepo       = require('../repositories/classes.repository');
 const notifyGuardianQueue = require('../jobs/notifyGuardian');
-const { AppError } = require('../utils/errors');
+const reportCache     = require('../utils/reportCache');
+const { AppError }    = require('../utils/errors');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -213,7 +214,13 @@ async function createProgressSession({ teacherUserId, body }) {
     return { session, entry };
   });
 
-  // ── 7. Enqueue guardian notification (fire-and-forget) ────────────────────
+  // ── 7. Invalidate report caches (fire-and-forget) ─────────────────────────
+  reportCache.invalidateCenterReports(enrollment.center_id)
+    .catch((err) => console.error('[reportCache] center invalidation failed:', err.message));
+  reportCache.invalidateStudentReport(enrollment.student_user_id)
+    .catch((err) => console.error('[reportCache] student invalidation failed:', err.message));
+
+  // ── 8. Enqueue guardian notification (fire-and-forget) ────────────────────
   const [guardians, student] = await Promise.all([
     progressRepo.getGuardiansForStudent(enrollment.student_user_id),
     progressRepo.getStudentById(enrollment.student_user_id),
@@ -236,7 +243,7 @@ async function createProgressSession({ teacherUserId, body }) {
     })
     .catch((err) => console.error('[notify-guardian] Failed to enqueue:', err.message));
 
-  // ── 8. Response ────────────────────────────────────────────────────────────
+  // ── 9. Response ────────────────────────────────────────────────────────────
   return {
     session_id:        session.id,
     homework_entry_id: entry.id,
