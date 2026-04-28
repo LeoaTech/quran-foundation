@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+
+:root {
+  --emerald:        #1a6b52;
+  --emerald-mid:    #22876a;
+  --emerald-bright: #2aaa84;
+  --emerald-light:  #d4f0e8;
+  --emerald-pale:   #edf8f4;
+
+  --gold:           #c8922a;
+  --gold-light:     #faefd8;
+
+  --sand:           #f7f4ee;
+  --sand-mid:       #ede9e0;
+  --sand-deep:      #d8d3c8;
+
+  --ink:            #1a1a16;
+  --ink-mid:        #3a3a34;
+  --ink-soft:       #6b6860;
+  --ink-pale:       #a8a59e;
+
+  --white:          #ffffff;
+  --red:            #c0392b;
+  --red-light:      #fdecea;
+  --blue:           #1e5fa8;
+  --blue-light:     #e3eef9;
+  --amber:          #b07a1a;
+  --amber-light:    #fdf3dc;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.07);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.09);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.13);
+
+  --font-display: 'Amiri', serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  --sidebar-w: 220px;
+  --topbar-h:  56px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--sand);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}

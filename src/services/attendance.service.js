@@ -1,6 +1,7 @@
-const db   = require('../db/knex');
-const repo = require('../repositories/attendance.repository');
-const classRepo = require('../repositories/classes.repository');
+const db          = require('../db/knex');
+const repo        = require('../repositories/attendance.repository');
+const classRepo   = require('../repositories/classes.repository');
+const reportCache = require('../utils/reportCache');
 const { AppError } = require('../utils/errors');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,6 +90,10 @@ async function createAttendanceSession({ user, classId, body }) {
   const present = attendanceRecords.filter((r) => r.status === 'present').length;
   const absent  = attendanceRecords.filter((r) => r.status === 'absent').length;
   const late    = attendanceRecords.filter((r) => r.status === 'late').length;
+
+  // Invalidate report caches for this center (fire-and-forget).
+  reportCache.invalidateCenterReports(cls.center_id)
+    .catch((err) => console.error('[reportCache] invalidation failed:', err.message));
 
   return {
     session_id:   session.id,

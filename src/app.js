@@ -14,10 +14,10 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "script-src":      ["'self'", "'unsafe-inline'"],
-        "script-src-attr": ["'unsafe-inline'"],           
-        "style-src":       ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        "font-src":        ["'self'", "https://fonts.gstatic.com"],
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "script-src-attr": ["'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "https://fonts.gstatic.com"],
       },
     },
   })
@@ -65,7 +65,11 @@ app.use('/api/v1', require('./routes/centers'));
 app.use('/api/v1', require('./routes/users'));
 app.use('/api/v1', require('./routes/courses'));
 app.use('/api/v1', require('./routes/classes'));
-app.use('/api/v1/progress-sessions', require('./routes/progress'));
+app.use('/api/v1', require('./routes/enrollments'));
+app.use('/api/v1', require('./routes/attendance'));
+app.use('/api/v1', require('./routes/progress'));
+app.use('/api/v1', require('./routes/assessments'));
+app.use('/api/v1', require('./routes/reports'));
 
 // 404 handler
 app.use((_req, res) => {
