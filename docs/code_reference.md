@@ -24,6 +24,7 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 16. [Jobs & Workers](#jobs--workers)
 17. [Error Codes Reference](#error-codes-reference)
 18. [RBAC Summary](#rbac-summary)
+19. [Frontend Architecture](#frontend-architecture)
 
 ---
 
@@ -1490,3 +1491,99 @@ router.verb('/path', requireAuth, requireRoles('role1', 'role2'), validate(schem
 - `assertCenterAccess(user, centerId)` — centers module; checks `user.center_id === centerId`
 - `assertCenterScope(user, centerId)` — users module; same pattern, different name
 - Both: super_admin always passes; non-super_admin must match exactly
+
+---
+
+## Frontend Architecture
+
+React + Vite SPA located in `frontend/`. Connects to the backend REST API.
+
+### Tech stack
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| React | 18 | UI framework |
+| Vite | 5 | Build tool / dev server |
+| react-router-dom | 6 | Client-side routing |
+| @tanstack/react-query | 5 | Server state, caching, refetch |
+| axios | 1 | HTTP client with interceptors |
+
+### Folder structure
+
+```
+frontend/
+  src/
+    api/
+      client.js           Axios instance — base URL from VITE_API_URL, Bearer token injection
+      auth.js             signIn, signUp, refreshToken, getMe
+      centers.js          listCenters, getCenter, createCenter, updateCenter
+
+    context/
+      AuthContext.jsx     AuthProvider — user state, signIn, signOut stored in localStorage
+
+    hooks/
+      useAuth.js          useContext(AuthContext) wrapper
+
+    layouts/
+      AuthLayout.jsx      Redirects authenticated users to /; renders <Outlet> otherwise
+      AppShell.jsx        Sidebar + topbar shell; redirects unauthenticated to /signin
+                          Nav items are role-driven (super_admin / center_manager / teacher / student)
+
+    pages/
+      auth/
+        SignIn.jsx         Split-panel auth screen: sign-in form + demo role cards + sign-up form
+      admin/
+        Dashboard.jsx      Org overview metrics (calls GET /reports/org/overview)
+        Centers.jsx        Centers list table + create/edit modal (full CRUD)
+      Placeholder.jsx      Stub for routes not yet implemented
+
+    styles/
+      tokens.css          All CSS custom properties (colors, fonts, radii, shadows, sizing vars)
+      globals.css         All reusable component classes (auth, sidebar, topbar, cards, table,
+                          chips, progress bar, form controls, buttons, attendance grid)
+```
+
+### Environment variable
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_URL` | `http://localhost:3000/api/v1` | Backend base URL |
+
+Set in `frontend/.env`.
+
+### Auth flow
+
+1. `AuthProvider` reads `access_token` from `localStorage` on mount and calls `GET /auth/me` to rehydrate `user` state.
+2. Axios request interceptor injects `Authorization: Bearer <token>` on every request.
+3. Axios response interceptor clears tokens and redirects to `/signin` on 401.
+4. `signOut()` clears `localStorage` and nulls user state — react-router redirects follow automatically.
+
+### Routing
+
+| Path | Component | Guard |
+|------|-----------|-------|
+| `/` | `RootRedirect` | → `/dashboard` if authed, `/signin` otherwise |
+| `/signin` | `SignIn` | `AuthLayout` (redirects authed users away) |
+| `/dashboard` | `AdminDashboard` | `AppShell` (redirects unauthed to `/signin`) |
+| `/centers` | `Centers` | `AppShell` |
+| `/courses`, `/teachers`, etc. | `Placeholder` | `AppShell` |
+
+### Role-based sidebar nav
+
+`AppShell` reads `user.roles[0]` and selects a nav config object from `NAV_CONFIG`:
+
+| Role | Nav sections |
+|------|-------------|
+| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports |
+| `center_manager` | My Center (Dashboard, Classes, Enrollment, Attendance), Admin (Reports) |
+| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Assessments) |
+| `student` | My Learning (My Progress, Attendance, Schedule, Results) |
+
+### Design tokens (key values)
+
+Colors are defined as CSS variables in `tokens.css`:
+- `--emerald` / `--emerald-bright` — primary brand green (`#1a6b52` / `#2aaa84`)
+- `--gold` — secondary accent (`#c8922a`)
+- `--sand` — page background (`#f7f4ee`)
+- `--ink` — sidebar background and primary text (`#1a1a16`)
+- Fonts: `--font-display: 'Amiri', serif` (Arabic/Urdu headings), `--font-body: 'DM Sans', sans-serif`
