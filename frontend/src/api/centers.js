@@ -1,21 +1,38 @@
 import client from './client';
 
-export async function listCenters(params = {}) {
-  const { data } = await client.get('/centers', { params });
-  return data;
-}
+// ── Org ──────────────────────────────────────────────────────────────────────
+export const getOrg = () =>
+  client.get('/org').then((r) => r.data);
 
-export async function getCenter(id) {
-  const { data } = await client.get(`/centers/${id}`);
-  return data;
-}
+export const updateOrg = (payload) =>
+  client.patch('/org', payload).then((r) => r.data);
 
-export async function createCenter(payload) {
-  const { data } = await client.post('/centers', payload);
-  return data;
-}
+// ── Centers ───────────────────────────────────────────────────────────────────
+export const getCenters = (params = {}) =>
+  client.get('/centers', { params }).then((r) => r.data);
 
-export async function updateCenter(id, payload) {
-  const { data } = await client.patch(`/centers/${id}`, payload);
-  return data;
-}
+export const createCenter = (payload) =>
+  client.post('/centers', payload).then((r) => r.data);
+
+export const getCenter = (centerId) =>
+  client.get(`/centers/${centerId}`).then((r) => r.data);
+
+export const updateCenter = (centerId, payload) =>
+  client.patch(`/centers/${centerId}`, payload).then((r) => r.data);
+
+// ── Classrooms ────────────────────────────────────────────────────────────────
+export const getClassrooms = (centerId) =>
+  client.get(`/centers/${centerId}/classrooms`).then((r) => r.data);
+
+export const createClassroom = (centerId, payload) =>
+  client.post(`/centers/${centerId}/classrooms`, payload).then((r) => r.data);
+
+export const updateClassroom = (centerId, classroomId, payload) =>
+  client.patch(`/centers/${centerId}/classrooms/${classroomId}`, payload).then((r) => r.data);
+
+// ── Derived helpers (reports + classes endpoints) ─────────────────────────────
+export const getCenterOverview = (centerId, params = {}) =>
+  client.get(`/reports/centers/${centerId}/overview`, { params }).then((r) => r.data);
+
+export const getCenterClasses = (centerId, params = {}) =>
+  client.get(`/centers/${centerId}/classes`, { params }).then((r) => r.data);
