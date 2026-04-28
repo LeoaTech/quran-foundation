@@ -19,9 +19,10 @@ Complete technical reference for all implemented modules. Use this alongside `ap
 11. [Enrollments Module](#enrollments-module)
 12. [Attendance Module](#attendance-module)
 13. [Progress Sessions Module](#progress-sessions-module)
-14. [Jobs & Workers](#jobs--workers)
-15. [Error Codes Reference](#error-codes-reference)
-16. [RBAC Summary](#rbac-summary)
+14. [Assessments Module](#assessments-module)
+15. [Jobs & Workers](#jobs--workers)
+16. [Error Codes Reference](#error-codes-reference)
+17. [RBAC Summary](#rbac-summary)
 
 ---
 
@@ -62,6 +63,7 @@ src/
     enrollments.repository.js
     attendance.repository.js
     progress.repository.js
+    assessments.repository.js
 
   services/                     Business logic
     auth.service.js
@@ -72,6 +74,7 @@ src/
     enrollments.service.js
     attendance.service.js
     progress.service.js
+    assessments.service.js
 
   controllers/                  Thin req/res wrappers — parse req, call service, send res
     auth.controller.js
@@ -82,6 +85,7 @@ src/
     enrollments.controller.js
     attendance.controller.js
     progress.controller.js
+    assessments.controller.js
 
   routes/                       Express routers with Zod schemas and RBAC
     auth.js                     → mounted at /api/v1/auth
@@ -91,7 +95,8 @@ src/
     classes.js                  → mounted at /api/v1
     enrollments.js              → mounted at /api/v1
     attendance.js               → mounted at /api/v1
-    progress.js                 → mounted at /api/v1/progress-sessions
+    progress.js                 → mounted at /api/v1 (routes carry full paths: /progress-sessions, /homework-entries, etc.)
+    assessments.js              → mounted at /api/v1
 
   jobs/
     notifyGuardian.js           Bull queue definition
@@ -127,7 +132,7 @@ Express app configuration. Route mount order:
 /api/v1/progress-sessions → routes/progress.js
 ```
 
-Also mounted: `app.use('/api/v1', require('./routes/enrollments'))` and `app.use('/api/v1', require('./routes/attendance'))`
+Also mounted at `/api/v1`: `enrollments`, `attendance`, `progress`, `assessments`
 
 Middleware stack (in order): `helmet` → `cors` → `rateLimit` → `express.json` → `express.urlencoded` → `express.static(public/)`
 
@@ -901,61 +906,327 @@ Both are nullable; only set by `PATCH /attendance/sessions/:session_id/records/:
 
 ---
 
-## Progress Sessions Module
+## Progress & Homework Module
 
-**Route prefix:** `/api/v1/progress-sessions`
+**Route prefix:** `/api/v1`  
+**Mount:** `app.use('/api/v1', require('./routes/progress'))`  
+_(previously mounted at `/api/v1/progress-sessions`; remounted at `/api/v1` when remaining endpoints were added — `POST /api/v1/progress-sessions` is unchanged)_
 
 ### Endpoints
 
 | Method | Path | Roles | Description |
 |--------|------|-------|-------------|
-| POST | `/` | teacher, center_manager | Log a daily progress session |
+| POST | `/progress-sessions` | teacher, center_manager | Log a daily progress session |
+| GET | `/progress-sessions/:session_id` | super_admin, center_manager, teacher | Get session with homework entry + scores |
+| PATCH | `/progress-sessions/:session_id` | super_admin, center_manager, teacher | Correct classwork fields |
+| GET | `/students/:user_id/progress` | any authenticated | Student's full progress history |
+| PATCH | `/homework-entries/:entry_id` | super_admin, center_manager, teacher | Update submission status or overall note |
+| PATCH | `/homework-entries/:entry_id/scores/:score_id` | super_admin, center_manager, teacher | Correct a single score |
 
-### Request body — POST /
+### Zod schemas (`src/routes/progress.js`)
 
+**createProgressSessionSchema**
+```js
+{
+  enrollment_id: z.string().uuid(),
+  class_id:      z.string().uuid(),
+  session_date:  z.string().date(),
+  classwork: {
+    topic_id:    z.string().uuid().optional(),
+    subtopic_id: z.string().uuid().optional(),
+    grade:       z.enum(['excellent','good','average','revision']).optional(),
+    note_ur:     z.string().optional(),
+  },
+  homework: {
+    due_date:        z.string().date().optional(),
+    overall_note_ur: z.string().optional(),
+    scores: z.array({ criteria_id, marks_obtained: int ≥ 0, note_ur? }).min(1),
+  },
+}
+```
+
+**updateProgressSessionSchema** — any subset of `cw_topic_id`, `cw_subtopic_id`, `cw_grade`, `cw_note_ur`; at least one field required.
+
+**updateHomeworkEntrySchema** — any subset of `is_submitted` (bool), `due_date`, `overall_note_ur`; at least one field required.
+
+**updateHomeworkScoreSchema** — any subset of `marks_obtained` (int ≥ 0), `note_ur`; at least one field required.
+
+### Request / Response shapes
+
+**POST /progress-sessions — Request**
 ```json
 {
   "enrollment_id": "uuid",
   "class_id": "uuid",
-  "session_date": "2025-09-15",
-  "classwork": {
-    "topic_id": "uuid (optional)",
-    "subtopic_id": "uuid (optional)",
-    "grade": "excellent | good | average | revision (optional)",
-    "note_ur": "optional Urdu note"
-  },
+  "session_date": "2026-04-13",
+  "classwork": { "topic_id": "uuid", "grade": "good", "note_ur": "مخارج بہتر ہو رہے ہیں" },
   "homework": {
-    "due_date": "YYYY-MM-DD (optional)",
-    "overall_note_ur": "optional",
+    "due_date": "2026-04-15",
+    "overall_note_ur": "کل دوبارہ پڑھ کر آئیں",
     "scores": [
-      { "criteria_id": "uuid", "marks_obtained": 8, "note_ur": "optional" }
+      { "criteria_id": "uuid", "marks_obtained": 8, "note_ur": "اچھی تلاوت" }
     ]
   }
 }
 ```
 
-### Response 201
-
+**POST /progress-sessions — Response 201**
 ```json
 {
   "session_id": "uuid",
   "homework_entry_id": "uuid",
-  "homework_total": 8,
-  "homework_max": 10,
-  "homework_pct": 80
+  "homework_total": 19,
+  "homework_max": 25,
+  "homework_pct": 76.0
+}
+```
+`homework_pct = sum(marks_obtained) / sum(max_marks) × 100` rounded to 1 decimal place.
+
+**GET /progress-sessions/:session_id — Response 200**
+```json
+{
+  "id": "uuid", "enrollment_id": "uuid", "class_id": "uuid",
+  "teacher_user_id": "uuid", "session_date": "2026-04-13",
+  "cw_topic_id": "uuid", "cw_grade": "good", "cw_note_ur": "...",
+  "homework_entry": {
+    "id": "uuid", "is_submitted": false, "due_date": "2026-04-15",
+    "overall_note_ur": "...",
+    "homework_total": 19, "homework_max": 25, "homework_pct": 76.0,
+    "scores": [
+      { "id": "uuid", "criteria_id": "uuid", "label_ur": "تلاوت کی درستی",
+        "max_marks": 10, "marks_obtained": 8, "note_ur": "..." }
+    ]
+  }
 }
 ```
 
-### `src/services/progress.service.js` — 8-step flow
+**GET /students/:user_id/progress — Query params**
+```
+?class_id=uuid&from=2026-04-01&to=2026-04-30&include=homework_scores
+```
+Without `include=homework_scores` → returns sessions array without `homework_entry`. With it → each session includes a full `homework_entry` object with `scores` and computed totals (3 queries total, no N+1).
 
-1. **Teacher ownership check** — `class_teachers` row for `(class_id, teacher_user_id)` must exist
-2. **Enrollment validation** — enrollment exists, belongs to class, status = `active`
-3. **Duplicate guard** — one session per `(enrollment_id, session_date)`; throws `409 CONFLICT`
-4. **Criteria validation** — all `criteria_id` values must be active criteria for the class; `marks_obtained` ≤ `max_marks`; no duplicate `criteria_id` in the scores array
-5. **Pre-compute totals** — `homework_total`, `homework_max`, `homework_pct` calculated before DB write
-6. **Transaction** — `INSERT progress_sessions` → `INSERT homework_entries` → bulk `INSERT homework_scores` (all or nothing)
-7. **Enqueue notification** — fire-and-forget `notifyGuardianQueue.add(...)` after transaction commit
-8. **Return** computed totals + IDs
+**PATCH /homework-entries/:entry_id/scores/:score_id — Response 200**
+```json
+{
+  "id": "uuid", "criteria_id": "uuid", "label_ur": "...",
+  "max_marks": 10, "marks_obtained": 9, "note_ur": "...",
+  "homework_total": 20, "homework_max": 25, "homework_pct": 80.0
+}
+```
+Returns the updated score with recomputed entry-level totals.
+
+### `src/repositories/progress.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `getClassTeacher(classId, teacherUserId)` | Ownership check — active `class_teachers` row |
+| `getEnrollment(enrollmentId)` | Active enrollment row |
+| `getActiveHomeworkCriteria(classId)` | Active criteria ordered by `display_order` |
+| `getExistingSession(enrollmentId, sessionDate)` | Duplicate session guard |
+| `getStudentById(userId)` | User profile (for notification payload) |
+| `getGuardiansForStudent(studentUserId)` | Guardian contacts (for notification payload) |
+| `getSessionById(sessionId)` | Single active progress session |
+| `createProgressSession(trx, data)` | Insert within transaction |
+| `updateProgressSession(sessionId, data)` | Patch + `updated_at` + returning |
+| `listProgressByStudent(studentUserId, { classId, from, to })` | Sessions via enrollment join; filterable |
+| `getHomeworkEntryBySessionId(sessionId)` | 1-to-1 entry for a session |
+| `getHomeworkEntryById(entryId)` | Single entry row |
+| `getHomeworkEntriesForSessions(sessionIds)` | Bulk fetch entries for multiple sessions |
+| `createHomeworkEntry(trx, data)` | Insert within transaction |
+| `updateHomeworkEntry(entryId, data)` | Patch + `updated_at` + returning |
+| `getScoresByEntryId(entryId)` | Scores joined with criteria labels + max_marks; ordered by `display_order` |
+| `getScoresForEntries(entryIds)` | Bulk fetch scores for multiple entries |
+| `getHomeworkScoreById(scoreId)` | Single score joined with criteria (for bounds check) |
+| `updateHomeworkScore(scoreId, data)` | Patch + `updated_at` + returning |
+| `createHomeworkScores(trx, rows)` | Bulk insert within transaction |
+
+### `src/services/progress.service.js`
+
+**`computeTotals(scores)`** — internal helper. `homework_pct = Math.round((total / max) * 1000) / 10` (1 decimal).
+
+**`assertWriteAccess(user, session)`** — super_admin passes; center_manager checks `center_id`; teacher checks `class_teachers`.
+
+**`assertReadAccess(user, session)`** — same as write, but also passes if `session.teacher_user_id === user.id`.
+
+**`createProgressSession` — 8-step flow:**
+1. Teacher ownership check via `class_teachers`
+2. Enrollment validation (exists, correct class, status = `active`)
+3. Duplicate session guard: one per `(enrollment_id, session_date)` → `409 CONFLICT`
+4. Criteria validation: each `criteria_id` must be active for the class; `marks_obtained ≤ max_marks`; no duplicate `criteria_id`
+5. Pre-compute `homework_total`, `homework_max`, `homework_pct` in memory
+6. **Single transaction:** `INSERT progress_sessions` → `INSERT homework_entries` → bulk `INSERT homework_scores`
+7. Fire-and-forget `notifyGuardianQueue.add(...)` after transaction commit
+8. Return `{ session_id, homework_entry_id, homework_total, homework_max, homework_pct }`
+
+**`getStudentProgress` with `include=homework_scores`:** exactly 3 DB queries — sessions → entries bulk → scores bulk. Grouped in JS using Maps to avoid N+1.
+
+**`updateHomeworkScore`:** after patching, fetches all remaining scores for the entry and recomputes totals, returning them alongside the updated score row.
+
+---
+
+## Assessments Module
+
+**Route prefix:** `/api/v1`  
+**Mount:** `app.use('/api/v1', require('./routes/assessments'))`
+
+### Endpoints
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| POST | `/classes/:class_id/assessments` | teacher, center_manager | Create an assessment for a class |
+| GET | `/classes/:class_id/assessments` | super_admin, center_manager, teacher | List assessments for a class |
+| GET | `/assessments/:assessment_id` | super_admin, center_manager, teacher | Get a single assessment |
+| POST | `/assessments/:assessment_id/results` | teacher, center_manager | Bulk-insert results (single transaction) |
+| GET | `/assessments/:assessment_id/results` | super_admin, center_manager, teacher | List all results for an assessment |
+| PATCH | `/assessments/:assessment_id/results/:result_id` | super_admin, center_manager, teacher | Correct a result |
+| GET | `/students/:user_id/assessments` | any authenticated | Student's full assessment history |
+
+### Zod schemas (`src/routes/assessments.js`)
+
+**createAssessmentSchema**
+```js
+{
+  title:           z.string().min(1),
+  title_ur:        z.string().optional(),
+  type:            z.enum(['written', 'oral', 'topic_test']).optional(),
+  assessment_date: z.string().date().optional(),
+  max_score:       z.number().int().min(0).optional(),
+  instructions_ur: z.string().optional(),
+}
+```
+
+**createResultsSchema — per-item shape (resultItemSchema)**
+```js
+{
+  student_user_id:    z.string().uuid(),
+  examiner_user_id:   z.string().uuid().optional(), // defaults to req.user.id
+  score:              z.number().int().min(0).optional(),
+  oral_grade:         z.enum(['excellent', 'good', 'average', 'fail']).optional(),
+  topic_tested_id:    z.string().uuid().optional(),
+  subtopic_tested_id: z.string().uuid().optional(),
+  remarks_ur:         z.string().optional(),
+  remarks_ar:         z.string().optional(),
+}
+// .refine: exactly one of score or oral_grade must be present (not both, not neither)
+```
+
+**updateResultSchema** — any subset of `score`, `oral_grade`, `topic_tested_id`, `subtopic_tested_id`, `remarks_ur`, `remarks_ar`; at least one field required.
+
+### Business rules
+
+**oral/written mutual exclusivity:**
+- Enforced in two layers:
+  1. **Zod** (`resultItemSchema.refine`): exactly one of `score` / `oral_grade` must be present in each result object.
+  2. **Service** (`assertTypeGradeConsistency`): after fetching the assessment from DB, re-validates against `assessment.type`:
+     - `type === 'oral'` → `oral_grade` required, `score` must be absent
+     - `type === 'written'` or `type === 'topic_test'` → `score` required, `oral_grade` must be absent
+
+**409 RESULT_EXISTS:** thrown when a `(assessment_id, student_user_id)` row already exists in `assessment_results` (unique constraint in migration 008).
+
+**Duplicate-in-request guard:** if the same `student_user_id` appears twice in the `results` array, throws `400 VALIDATION_ERROR` before any DB writes.
+
+**Score ceiling check:** if `assessment.max_score` is set and `score > max_score`, throws `400 VALIDATION_ERROR` (applies to both POST /results and PATCH /results/:result_id).
+
+**Access control (`assertWriteAccess` / `assertReadAccess`):**
+- `super_admin` → always passes
+- `center_manager` → `user.center_id` must match `class.center_id`
+- `teacher` → must have an active `class_teachers` row for the assessment's `class_id`
+- All others → `403 FORBIDDEN`
+- Both write and read use identical logic (`assertReadAccess = assertWriteAccess`).
+
+### Request / Response shapes
+
+**POST /classes/:class_id/assessments — Request**
+```json
+{
+  "title": "Mid-Term Hifz Test",
+  "title_ur": "درمیانی مدتی حفظ ٹیسٹ",
+  "type": "written",
+  "assessment_date": "2026-05-01",
+  "max_score": 100,
+  "instructions_ur": "سورہ بقرہ کی تلاوت لازمی ہے"
+}
+```
+
+**POST /assessments/:assessment_id/results — Request (bulk)**
+```json
+{
+  "results": [
+    {
+      "student_user_id": "uuid",
+      "score": 85,
+      "topic_tested_id": "uuid",
+      "remarks_ur": "بہت اچھی تلاوت"
+    },
+    {
+      "student_user_id": "uuid2",
+      "score": 72
+    }
+  ]
+}
+```
+For oral assessments replace `score` with `oral_grade: "excellent"`.
+
+**GET /assessments/:assessment_id/results — Response 200**
+```json
+[
+  {
+    "id": "uuid",
+    "assessment_id": "uuid",
+    "student_user_id": "uuid",
+    "student_full_name": "Aisha Khan",
+    "student_full_name_ur": "عائشہ خان",
+    "examiner_user_id": "uuid",
+    "score": 85,
+    "oral_grade": null,
+    "topic_tested_id": "uuid",
+    "subtopic_tested_id": null,
+    "remarks_ur": "بہت اچھی تلاوت",
+    "remarks_ar": null,
+    "created_at": "...",
+    "updated_at": "..."
+  }
+]
+```
+
+**GET /students/:user_id/assessments — Query params**
+```
+?class_id=uuid&from=YYYY-MM-DD&to=YYYY-MM-DD
+```
+Returns a flat array of assessment + result data joined together — no second query needed.
+
+### `src/repositories/assessments.repository.js`
+
+| Function | Description |
+|----------|-------------|
+| `listAssessmentsByClass(classId, { from, to })` | Active assessments for a class, optionally date-filtered, ordered by `assessment_date DESC` |
+| `getAssessmentById(assessmentId)` | Single active assessment row |
+| `createAssessment(data)` | Insert + `RETURNING *` |
+| `getResultByStudentAndAssessment(assessmentId, studentUserId)` | Duplicate guard for 409 RESULT_EXISTS |
+| `getResultById(resultId)` | Single active result row |
+| `listResultsByAssessment(assessmentId)` | Results joined with `users` for `student_full_name` / `student_full_name_ur`; ordered by student name |
+| `listAssessmentsByStudent(studentUserId, { classId, from, to })` | Joins `assessment_results` → `assessments`; flat rows with both assessment and result fields |
+| `bulkCreateResults(trx, rows)` | Bulk insert within transaction, `RETURNING *` |
+| `updateResult(resultId, data)` | Patch + `updated_at` + `RETURNING *` |
+
+### `src/services/assessments.service.js`
+
+**`assertTypeGradeConsistency(assessmentType, result)`** — enforces oral/written mutual exclusivity at the service layer (second check after Zod). Throws `400 VALIDATION_ERROR` with `field: 'score'` or `field: 'oral_grade'`.
+
+**`createResults` — flow:**
+1. Fetch assessment; `assertWriteAccess`
+2. `assertTypeGradeConsistency` for every result item
+3. Detect duplicate `student_user_id` within the request array → `400 VALIDATION_ERROR`
+4. Check each student for existing result → `409 RESULT_EXISTS`
+5. Score ceiling check (if `assessment.max_score != null`)
+6. Single `db.transaction` → `bulkCreateResults`
+
+**`updateResult` — flow:**
+1. Fetch assessment + result; verify `result.assessment_id === assessmentId`
+2. Merge proposed values with existing values → `assertTypeGradeConsistency` on merged object (prevents clearing `oral_grade` from an oral assessment)
+3. Score ceiling check if `score` is being updated
+4. `repo.updateResult`
 
 ---
 
@@ -1005,6 +1276,7 @@ Stub worker that registers a processor on the `notify-guardian` queue. Implement
 | `ENROLLMENT_CONFLICT` | 409 | Student already has an active enrollment in the class |
 | `CLASS_FULL` | 409 | Active enrollment count ≥ `classes.max_capacity` |
 | `SESSION_EXISTS` | 409 | Attendance session already exists for this class on this date |
+| `RESULT_EXISTS` | 409 | A result already exists for this student in the assessment |
 | `VALIDATION_ERROR` | 400 | Zod schema failure; includes `field` |
 | `RATE_LIMIT_EXCEEDED` | 429 | Express rate-limiter triggered |
 | `INTERNAL_SERVER_ERROR` | 500 | Unhandled exception |
