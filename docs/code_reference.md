@@ -1514,34 +1514,277 @@ React + Vite SPA located in `frontend/`. Connects to the backend REST API.
 frontend/
   src/
     api/
-      client.js           Axios instance — base URL from VITE_API_URL, Bearer token injection
-      auth.js             signIn, signUp, refreshToken, getMe
-      centers.js          listCenters, getCenter, createCenter, updateCenter
+      client.js           Axios instance — in-memory Bearer token, silent-refresh on 401,
+                          auth:logout event dispatch on refresh failure
+      auth.js             login, logout, refresh, getMe, changePassword
+      centers.js          getOrg, updateOrg, getCenters, createCenter, getCenter, updateCenter,
+                          getClassrooms, createClassroom, updateClassroom,
+                          getCenterOverview, getCenterClasses
 
     context/
-      AuthContext.jsx     AuthProvider — user state, signIn, signOut stored in localStorage
+      AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
+                          via httpOnly cookie; exposes user, role, isAuthenticated, login, logout
+      ToastContext.jsx    ToastProvider — portal-rendered toast stack; addToast(type, message, duration)
 
     hooks/
-      useAuth.js          useContext(AuthContext) wrapper
+      useAuth.js          Thin useContext(AuthContext) wrapper
+      useToast.js         { success, error, warning, toast } helpers over ToastContext
+
+    components/
+      ProtectedRoute.jsx  Layout route guard — redirects to /signin if unauthenticated;
+                          renders a 403 view if user's role is not in the `roles` prop
+      Button.jsx          variant: primary|outline|ghost  ·  size: sm|md|lg
+      Card.jsx            Named exports: Card, CardHeader, CardBody, CardFooter
+      Badge.jsx           variant: green|gold|blue|red|sand|purple
+      MetricCard.jsx      label, value, sub, variant: green|gold|blue|neutral
+      DataTable.jsx       columns config, rows, loading, emptyTitle, emptyDescription
+      PageHeader.jsx      title, subtitle, optional action: { label, onClick, variant }
+      Modal.jsx           open, title, size: sm|md|lg, onClose — rendered via portal
+      ProgressBar.jsx     value 0–100, variant: green|gold|blue|neutral|red, height
+      EmptyState.jsx      icon, title, description, optional action: { label, onClick }
+      LoadingSpinner.jsx  size, color — injects keyframe on first render
+      RTLInput.jsx        Urdu/Arabic text input; multiline prop renders textarea
 
     layouts/
       AuthLayout.jsx      Redirects authenticated users to /; renders <Outlet> otherwise
-      AppShell.jsx        Sidebar + topbar shell; redirects unauthenticated to /signin
-                          Nav items are role-driven (super_admin / center_manager / teacher / student)
+      AppShell.jsx        Sidebar + topbar shell — pure layout, no auth logic
+                          Nav sections driven by role from AuthContext
 
     pages/
       auth/
-        SignIn.jsx         Split-panel auth screen: sign-in form + demo role cards + sign-up form
+        SignIn.jsx           Split-panel sign-in page: form + demo role cards; tab links to /signup
+        SignUp.jsx           Split-panel registration page with success state after account creation
       admin/
-        Dashboard.jsx      Org overview metrics (calls GET /reports/org/overview)
-        Centers.jsx        Centers list table + create/edit modal (full CRUD)
-      Placeholder.jsx      Stub for routes not yet implemented
+        Dashboard.jsx        Org overview metrics (calls GET /reports/org/overview)
+        Centers/
+          CentersList.jsx    Centers table with per-center stats; super_admin only;
+                             center_manager auto-redirected to their own center detail
+          CenterDetail.jsx   3-tab view: Overview (metrics + classes), Classrooms (inline edit),
+                             Settings (bilingual form); accessible to super_admin + center_manager
+          AddCenterModal.jsx Modal form for POST /centers — invalidates query + shows toast
+        Org/
+          OrgSettings.jsx    GET /org + PATCH /org form; bilingual fields with RTLInput
+      Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
       tokens.css          All CSS custom properties (colors, fonts, radii, shadows, sizing vars)
       globals.css         All reusable component classes (auth, sidebar, topbar, cards, table,
                           chips, progress bar, form controls, buttons, attendance grid)
 ```
+
+### Shared component library
+
+All components are in `frontend/src/components/` and use inline styles driven exclusively by CSS custom properties from `tokens.css`. No CSS modules or external UI library.
+
+#### Button
+
+```jsx
+<Button variant="primary" size="md" onClick={fn} disabled={false}>Label</Button>
+```
+
+| Prop | Values | Default |
+|------|--------|---------|
+| `variant` | `primary` `outline` `ghost` | `primary` |
+| `size` | `sm` `md` `lg` | `md` |
+| `disabled` | boolean | `false` |
+| `type` | html button type | `button` |
+
+Passes any extra HTML button props through via `{...rest}`.
+
+#### Card / CardHeader / CardBody / CardFooter
+
+Named exports — compose freely:
+
+```jsx
+import { Card, CardHeader, CardBody, CardFooter } from '../components/Card';
+
+<Card>
+  <CardHeader>
+    <span className="card-title">Title</span>
+    <button className="card-action">Action</button>
+  </CardHeader>
+  <CardBody>content</CardBody>
+  <CardFooter><Button>Save</Button></CardFooter>
+</Card>
+```
+
+`CardFooter` renders a right-aligned flex row with a top border. All slots accept a `style` override prop.
+
+#### Badge
+
+```jsx
+<Badge variant="green">Active</Badge>
+<Badge variant="purple">Super Admin</Badge>
+```
+
+Variants: `green` `gold` `blue` `red` `sand` `purple`. Maps directly to the design's chip colour set.
+
+#### MetricCard
+
+```jsx
+<MetricCard label="Total students" value="1,284" sub="↑ 48 this month" variant="green" />
+```
+
+Renders the 3px top colour bar automatically from `variant`. All four variants (`green` `gold` `blue` `neutral`) are supported.
+
+#### DataTable
+
+```jsx
+const columns = [
+  { key: 'name',   label: 'Name' },
+  { key: 'status', label: 'Status', render: (val) => <Badge variant="green">{val}</Badge> },
+];
+
+<DataTable columns={columns} rows={data} loading={isLoading} emptyTitle="No centers yet" />
+```
+
+`render(value, row)` receives the cell value and the full row object. Shows `LoadingSpinner` while `loading=true` and `EmptyState` when `rows` is empty.
+
+#### PageHeader
+
+```jsx
+<PageHeader
+  title="Centers"
+  subtitle="All Quran Foundation learning centers"
+  action={{ label: '+ New center', onClick: openModal }}
+/>
+```
+
+`action.variant` defaults to `'primary'`; pass `'outline'` or `'ghost'` to override.
+
+#### Modal
+
+```jsx
+<Modal open={show} title="Edit center" size="md" onClose={() => setShow(false)}>
+  <form>...</form>
+</Modal>
+```
+
+Rendered via `createPortal` into `document.body`. Closes on Escape key or overlay click. Body slot is scrollable independently of the header. `size` controls `maxWidth`: `sm=400`, `md=520`, `lg=720`.
+
+#### Toast / useToast
+
+`ToastProvider` must wrap the app (already done in `App.jsx`). Use the hook anywhere inside:
+
+```jsx
+const toast = useToast();
+
+toast.success('Center created.');
+toast.error('Failed to save changes.');
+toast.warning('Capacity almost full.');
+toast.toast({ type: 'success', message: '...', duration: 6000 }); // custom duration
+```
+
+Toasts render bottom-right via a portal. Default `duration` is 4000 ms; pass `duration: 0` to make a toast persist until dismissed manually.
+
+#### ProgressBar
+
+```jsx
+<ProgressBar value={76} variant="green" height={6} />
+```
+
+`value` is clamped to 0–100. The green variant uses the emerald gradient from the design. Pass `height` in pixels to adjust thickness (default 6).
+
+#### EmptyState
+
+```jsx
+<EmptyState
+  icon="⊙"
+  title="No centers yet"
+  description="Create the first center to get started."
+  action={{ label: '+ New center', onClick: openModal }}
+/>
+```
+
+The `action` renders an `outline` Button below the description.
+
+#### LoadingSpinner
+
+```jsx
+<LoadingSpinner size={24} color="var(--emerald)" />
+```
+
+Injects its `@keyframes spin` rule into `<head>` on first render (once only). Safe to render multiple instances.
+
+#### RTLInput
+
+```jsx
+{/* Single-line */}
+<RTLInput placeholder="حمزہ رؤف" value={val} onChange={(e) => setVal(e.target.value)} />
+
+{/* Multi-line */}
+<RTLInput multiline rows={3} placeholder="نوٹ لکھیں" value={note} onChange={...} />
+```
+
+Applies `dir="rtl"` and `font-family: var(--font-display)` (Amiri) automatically. Exposes the emerald focus ring on focus. Pass any additional HTML `input` / `textarea` props via `{...rest}`.
+
+### Centers & Org frontend module
+
+#### `frontend/src/api/centers.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getOrg()` | `GET /org` | Fetch org profile |
+| `updateOrg(payload)` | `PATCH /org` | Update org settings |
+| `getCenters(params)` | `GET /centers` | List centers; accepts `?is_active`, `?city`, `?page`, `?per_page` |
+| `createCenter(payload)` | `POST /centers` | Create a center |
+| `getCenter(centerId)` | `GET /centers/:id` | Single center row |
+| `updateCenter(centerId, payload)` | `PATCH /centers/:id` | Patch center fields |
+| `getClassrooms(centerId)` | `GET /centers/:id/classrooms` | List classrooms |
+| `createClassroom(centerId, payload)` | `POST /centers/:id/classrooms` | Add a classroom |
+| `updateClassroom(centerId, classroomId, payload)` | `PATCH /centers/:id/classrooms/:roomId` | Update a classroom |
+| `getCenterOverview(centerId, params)` | `GET /reports/centers/:id/overview` | Per-center stats (students, classes, attendance %) |
+| `getCenterClasses(centerId, params)` | `GET /centers/:id/classes` | Classes list for the overview tab |
+
+#### `CentersList.jsx` — query pattern
+
+Uses two react-query primitives in tandem:
+```jsx
+// 1. Fetch all centers
+const { data } = useQuery({ queryKey: ['centers'], queryFn: getCenters });
+const centers = data?.data ?? data ?? [];
+
+// 2. Fetch per-center overview stats in parallel (N calls, one per center)
+const reportQueries = useQueries({
+  queries: centers.map((c) => ({
+    queryKey: ['center-overview', c.id],
+    queryFn:  () => getCenterOverview(c.id),
+    staleTime: 3 * 60_000,
+  })),
+});
+```
+Report data is indexed by center ID and merged into the table rows. Stats columns show `—` while loading.
+
+**Role guard:** `center_manager` visiting `/admin/centers` is immediately redirected to `/admin/centers/:their_center_id` via a `useEffect`.
+
+#### `CenterDetail.jsx` — three tabs
+
+| Tab | Data fetched | Key interactions |
+|-----|-------------|-----------------|
+| Overview | `getCenterOverview`, `getCenterClasses` | MetricCards (students, classes, attendance); classes table |
+| Classrooms | `getClassrooms` | Inline edit: click name → input appears, Enter saves via `updateClassroom`; "Add classroom" row at top |
+| Settings | center data from parent query | Bilingual form (English + Urdu side by side); Urdu fields use `RTLInput`; super_admin can toggle `is_active` |
+
+**center_manager scoping:** if `user.center_id !== params.id`, the component redirects to the correct center.
+
+#### `OrgSettings.jsx`
+
+Fetches `GET /org`, pre-populates a controlled form, saves via `PATCH /org`. Fields: `name`, `name_ur` (RTLInput), `name_ar` (RTLInput), `contact_email`, `contact_phone`. Logo field is a placeholder (file upload deferred until storage backend is configured).
+
+#### `AddCenterModal.jsx`
+
+Wraps `Modal` (size `md`). On submit: calls `createCenter()` → invalidates `['centers']` query → calls `toast.success()` → closes. Error is shown inline in the modal. Resets form on close.
+
+#### Sidebar nav updates (`AppShell.jsx`)
+
+| Role | Updated nav links |
+|------|-----------------|
+| `super_admin` | Centers → `/admin/centers`; Settings → `/admin/org` |
+| `center_manager` | "My Center" item dynamically resolved to `/admin/centers/:user.center_id` at render time |
+
+### Token audit result
+
+All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
 
 ### Environment variable
 
@@ -1553,28 +1796,88 @@ Set in `frontend/.env`.
 
 ### Auth flow
 
-1. `AuthProvider` reads `access_token` from `localStorage` on mount and calls `GET /auth/me` to rehydrate `user` state.
-2. Axios request interceptor injects `Authorization: Bearer <token>` on every request.
-3. Axios response interceptor clears tokens and redirects to `/signin` on 401.
-4. `signOut()` clears `localStorage` and nulls user state — react-router redirects follow automatically.
+**Token storage strategy:**
+- `access_token` lives in a module-level JS variable inside `client.js` — never written to `localStorage` or a cookie.
+- `refresh_token` is stored in an httpOnly cookie set by the API server. The client never reads it directly; it is sent automatically on every request via `withCredentials: true`.
 
-### Routing
+**Session restore on app load (`AuthProvider` mount):**
+1. Calls `POST /auth/refresh` with no body (httpOnly cookie sent automatically).
+2. On success: stores returned `access_token` in memory via `setAccessToken()`, then calls `GET /auth/me` to populate `user` state.
+3. On failure (no valid cookie / expired): stays logged out, sets `loading = false`.
+
+**Login:**
+1. `login({ phone, password })` calls `POST /auth/login`.
+2. Stores `access_token` in memory; sets `user` state from the response `user` object.
+
+**Logout:**
+1. `logout()` calls `POST /auth/logout` (sends the httpOnly cookie so the server can revoke it).
+2. Clears in-memory `access_token`; nulls `user` state.
+3. React Router detects `isAuthenticated = false` and redirects to `/signin`.
+
+**Automatic silent refresh on 401:**
+- The axios response interceptor catches 401 responses.
+- Attempts `POST /auth/refresh` using a raw `axios` call (bypasses the interceptor to avoid infinite loops).
+- Concurrent requests that arrive during the refresh are queued and replayed once the new token is available.
+- If the refresh itself fails, dispatches a `auth:logout` DOM event. `AuthProvider` listens for this event and clears state, triggering a redirect.
+
+**`AuthContext` values:**
+
+| Value | Type | Description |
+|-------|------|-------------|
+| `user` | `object \| null` | Full user profile from `/auth/me` |
+| `role` | `string \| null` | `user.roles[0]` — primary role |
+| `isAuthenticated` | `boolean` | `!!user` |
+| `loading` | `boolean` | `true` until initial silent refresh resolves |
+| `login(credentials)` | `async fn` | Calls API, stores token, sets user |
+| `logout()` | `async fn` | Calls API, clears token and user |
+
+### Route protection
+
+`ProtectedRoute` is a react-router v6 layout route (renders `<Outlet />`):
+
+```jsx
+// All authenticated users
+<Route element={<ProtectedRoute />}>
+  <Route element={<AppShell />}>
+    <Route path="/dashboard" element={<AdminDashboard />} />
+    ...
+  </Route>
+</Route>
+
+// Role-restricted sub-tree
+<Route element={<ProtectedRoute roles={['super_admin']} />}>
+  <Route path="/centers" element={<Centers />} />
+</Route>
+```
+
+Behaviour:
+- `loading = true` → renders nothing (waits for session restore).
+- `!isAuthenticated` → `<Navigate to="/signin" replace />`.
+- `roles` provided but `role` not in list → inline 403 view (no redirect).
+- Otherwise → `<Outlet />`.
+
+### Routing table
 
 | Path | Component | Guard |
 |------|-----------|-------|
 | `/` | `RootRedirect` | → `/dashboard` if authed, `/signin` otherwise |
 | `/signin` | `SignIn` | `AuthLayout` (redirects authed users away) |
-| `/dashboard` | `AdminDashboard` | `AppShell` (redirects unauthed to `/signin`) |
-| `/centers` | `Centers` | `AppShell` |
-| `/courses`, `/teachers`, etc. | `Placeholder` | `AppShell` |
+| `/signup` | `SignUp` | `AuthLayout` |
+| `/dashboard` | `AdminDashboard` | `ProtectedRoute` (any role) |
+| `/admin/centers` | `CentersList` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager is redirected to their own center |
+| `/admin/centers/:id` | `CenterDetail` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager enforced to own center_id |
+| `/admin/org` | `OrgSettings` | `ProtectedRoute roles={['super_admin']}` |
+| `/centers` | redirect | → `/admin/centers` (legacy redirect) |
+| `/settings` | redirect | → `/admin/org` (legacy redirect) |
+| `/courses`, `/teachers`, `/students`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
 
 ### Role-based sidebar nav
 
-`AppShell` reads `user.roles[0]` and selects a nav config object from `NAV_CONFIG`:
+`AppShell` reads `role` from `useAuth()` and selects from `NAV_CONFIG`:
 
 | Role | Nav sections |
 |------|-------------|
-| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports |
+| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Reports, Settings) |
 | `center_manager` | My Center (Dashboard, Classes, Enrollment, Attendance), Admin (Reports) |
 | `teacher` | My Classes (Dashboard, Attendance, Log Progress, Assessments) |
 | `student` | My Learning (My Progress, Attendance, Schedule, Results) |

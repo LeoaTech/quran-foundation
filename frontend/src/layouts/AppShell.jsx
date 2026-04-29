@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const NAV_CONFIG = {
@@ -10,8 +10,8 @@ const NAV_CONFIG = {
       {
         title: 'Overview',
         items: [
-          { to: '/dashboard', label: 'Dashboard', icon: '⊞' },
-          { to: '/centers',   label: 'Centers',   icon: '⊙' },
+          { to: '/dashboard',    label: 'Dashboard', icon: '⊞' },
+          { to: '/admin/centers', label: 'Centers',   icon: '⊙' },
         ],
       },
       {
@@ -25,8 +25,8 @@ const NAV_CONFIG = {
       {
         title: 'Reports',
         items: [
-          { to: '/reports',  label: 'Reports',  icon: '▦' },
-          { to: '/settings', label: 'Settings', icon: '⚙' },
+          { to: '/reports',   label: 'Reports',  icon: '▦' },
+          { to: '/admin/org', label: 'Settings', icon: '⚙' },
         ],
       },
     ],
@@ -40,6 +40,7 @@ const NAV_CONFIG = {
         title: 'My Center',
         items: [
           { to: '/dashboard',  label: 'Dashboard',  icon: '⊞' },
+          { to: 'MY_CENTER',   label: 'My Center',  icon: '⊙' },
           { to: '/classes',    label: 'Classes',    icon: '◈' },
           { to: '/enrollment', label: 'Enrollment', icon: '○' },
           { to: '/attendance', label: 'Attendance', icon: '☑' },
@@ -102,14 +103,24 @@ function pageTitle(pathname) {
 }
 
 export default function AppShell() {
-  const { user, signOut, loading } = useAuth();
+  const { user, role, logout } = useAuth();
   const location = useLocation();
 
-  if (loading) return null;
-  if (!user)   return <Navigate to="/signin" replace />;
-
-  const role = user.roles?.[0] ?? 'student';
-  const config = NAV_CONFIG[role] ?? NAV_CONFIG.student;
+  // For center_manager, replace the static center link with their own center URL
+  const rawConfig = NAV_CONFIG[role ?? 'student'] ?? NAV_CONFIG.student;
+  const config = role === 'center_manager' && user?.center_id
+    ? {
+        ...rawConfig,
+        sections: rawConfig.sections.map((section) => ({
+          ...section,
+          items: section.items.map((item) =>
+            item.label === 'My Center'
+              ? { ...item, to: `/admin/centers/${user.center_id}` }
+              : item,
+          ),
+        })),
+      }
+    : rawConfig;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -146,7 +157,7 @@ export default function AppShell() {
         </nav>
 
         <div className="sidebar-footer">
-          <button className="btn-signout" onClick={signOut}>Sign out</button>
+          <button className="btn-signout" onClick={logout}>Sign out</button>
         </div>
       </aside>
 
