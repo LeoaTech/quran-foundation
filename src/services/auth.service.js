@@ -156,4 +156,74 @@ async function changePassword({ userId, current_password, new_password }) {
   await authRepo.updatePassword(userId, hash);
 }
 
-module.exports = { login, refresh, logout, changePassword };
+// ── Student Signup ────────────────────────────────────────────────────────────
+// Creates a new user with the 'student' role at the selected center.
+// Everything runs in a DB transaction so any failure rolls back completely.
+
+async function signup({ full_name, full_name_ur, phone, password, center_id }) {
+  const db = require('../db/knex');
+
+  // 1. Check that center exists and is active
+  const center = await db('centers').where({ id: center_id, is_active: true }).first();
+  if (!center) {
+    throw new AppError('NOT_FOUND', 'Center not found or inactive.', 'مرکز نہیں ملا یا غیر فعال ہے۔', 404);
+  }
+
+  // 2. Check for duplicate phone
+  const existing = await authRepo.findByPhone(phone);
+  if (existing) {
+    throw new AppError('CONFLICT', 'An account with this phone number already exists.', 'اس فون نمبر کا اکاؤنٹ پہلے سے موجود ہے۔', 409);
+  }
+
+  // 3. Hash the password
+  const password_hash = await bcrypt.hash(password, 12);
+
+  // 4. Transactional: create user + assign student role
+  const newUser = await db.transaction(async (trx) => {
+    // Generate a placeholder email from phone (email column is NOT NULL in the DB)
+    const emailPlaceholder = `${phone.replace(/[^0-9]/g, '')}@student.qf.local`;
+
+    const [user] = await trx('users').insert({
+      full_name,
+      full_name_ur: full_name_ur || null,
+      phone,
+      email: emailPlaceholder,
+      password_hash,
+      preferred_lang: 'ur',
+      is_active: true,
+    }).returning('*');
+
+    const roleRow = await trx('roles').where({ name: 'student' }).first();
+    if (!roleRow) throw new Error("Role 'student' not found in roles table.");
+
+    await trx('user_roles').insert({
+      user_id: user.id,
+      role_id: roleRow.id,
+      center_id: center_id,
+    });
+
+    return user;
+  });
+
+  // 5. Auto-login: issue tokens so the student can start using the app immediately
+  const roles = ['student'];
+  const jti = uuidv4();
+  const access_token = signAccess(newUser.id, roles, center_id);
+  const refresh_token = signRefresh(newUser.id, jti, center_id);
+
+  return {
+    access_token,
+    refresh_token,
+    user: {
+      id: newUser.id,
+      full_name: newUser.full_name,
+      full_name_ur: newUser.full_name_ur,
+      preferred_lang: newUser.preferred_lang,
+      roles,
+      center_id,
+    },
+  };
+}
+
+
+module.exports = { login, refresh, logout, changePassword, signup };
