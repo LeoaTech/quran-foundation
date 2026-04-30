@@ -27,11 +27,21 @@ const changePasswordSchema = z.object({
   new_password: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
+const signupSchema = z.object({
+  full_name:    z.string().min(1, 'Full name is required'),
+  full_name_ur: z.string().optional(),
+  phone:        z.string().min(1, 'Phone is required'),
+  password:     z.string().min(8, 'Password must be at least 8 characters'),
+  center_id:    z.string().uuid('center_id must be a valid UUID'),
+});
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 // Public
 router.post('/login',   validate(loginSchema),   controller.login);
 router.post('/refresh', validate(refreshSchema), controller.refresh);
+router.post('/signup',  validate(signupSchema),  controller.signup);
+router.get('/centers',  controller.listPublicCenters);
 
 // Authenticated
 router.post('/logout',          requireAuth, validate(logoutSchema),         controller.logout);

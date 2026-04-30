@@ -34,4 +34,20 @@ async function changePassword(req, res, next) {
   }
 }
 
-module.exports = { login, refresh, logout, changePassword };
+async function signup(req, res, next) {
+  try {
+    res.status(201).json(await authService.signup(req.body));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listPublicCenters(req, res, next) {
+  try {
+    res.json(await authService.listPublicCenters());
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, refresh, logout, changePassword, signup, listPublicCenters };
