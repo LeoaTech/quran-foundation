@@ -1524,6 +1524,11 @@ frontend/
                           getTopics, createTopic, updateTopic, deleteTopic,
                           createSubtopic, updateSubtopic, deleteSubtopic,
                           getCourseLevels, createCourseLevel, updateCourseLevel
+      classes.js          getClasses, createClass, getClass, updateClass,
+                          getClassTeachers, assignTeacher, removeTeacher,
+                          getHomeworkCriteria, createCriterion, updateCriterion,
+                          deactivateCriterion, getClassEnrollments
+      users.js            getUsers, getUser, createUser, updateUser
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1574,6 +1579,13 @@ frontend/
           TopicManager.jsx   Split-panel: left 40% topic list with delete confirm, right 60% subtopic editor
           AddCourseModal.jsx Modal form for POST /courses — invalidates query + toast
           EditCourseModal.jsx Modal form for PATCH /courses/:id — pre-populated from course data
+      manager/
+        Classes/
+          ClassesList.jsx    Table with filter bar (course dropdown, active/all toggle); capacity color coding;
+                             row-click navigates to ClassDetail; center_manager scoped to user.center_id
+          ClassDetail.jsx    4-tab view: Students, Teachers (assign/remove), Homework Criteria, Schedule
+          AddClassModal.jsx  POST /centers/:id/classes; day multi-select; level dropdown loads after course chosen;
+                             on create navigates to new ClassDetail
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -1852,6 +1864,70 @@ Both wrap `Modal` (size `md`). Fields: `name`, `name_ur` (RTLInput), `name_ar` (
 | `super_admin` | Centers → `/admin/centers`; Settings → `/admin/org` |
 | `center_manager` | "My Center" item dynamically resolved to `/admin/centers/:user.center_id` at render time |
 
+### Classes & Homework Criteria frontend module
+
+#### `frontend/src/api/classes.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getClasses(centerId, params)` | `GET /centers/:id/classes` | List classes; `?course_id`, `?is_active` |
+| `createClass(centerId, payload)` | `POST /centers/:id/classes` | Create class section |
+| `getClass(classId)` | `GET /classes/:id` | Single class row |
+| `updateClass(classId, payload)` | `PATCH /classes/:id` | Edit class fields |
+| `getClassTeachers(classId)` | `GET /classes/:id/teachers` | Assigned teacher list |
+| `assignTeacher(classId, payload)` | `POST /classes/:id/teachers` | Assign teacher; payload `{ teacher_user_id, is_primary, assigned_from }` |
+| `removeTeacher(classId, teacherUserId)` | `DELETE /classes/:id/teachers/:uid` | Remove teacher |
+| `getHomeworkCriteria(classId)` | `GET /classes/:id/homework-criteria` | All criteria (active + inactive) |
+| `createCriterion(classId, payload)` | `POST /classes/:id/homework-criteria` | Add criterion |
+| `updateCriterion(classId, criteriaId, payload)` | `PATCH /classes/:id/homework-criteria/:cid` | Edit criterion |
+| `deactivateCriterion(classId, criteriaId)` | `PATCH …` with `{ is_active: false }` | Soft-deactivate |
+| `getClassEnrollments(classId, params)` | `GET /classes/:id/enrollments` | Enrolled students; `?status=active` |
+
+#### `frontend/src/api/users.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getUsers(params)` | `GET /users` | List users; `?center_id`, `?role`, `?search`, `?is_active`, `?page`, `?per_page` |
+| `getUser(userId)` | `GET /users/:id` | Single user profile |
+| `createUser(payload)` | `POST /users` | Create user |
+| `updateUser(userId, payload)` | `PATCH /users/:id` | Update user |
+
+#### `ClassesList.jsx`
+
+- Fetches `GET /centers/:id/classes` scoped to `user.center_id` from AuthContext.
+- **Filter bar:** course dropdown (`getCourses`) + Active/All toggle (two-button group).
+- **Capacity color coding:** `enrolled/max < 0.8` → emerald; `0.8–0.99` → amber; `>= 1.0` → red.
+- Schedule days rendered as small day chips. Row hover highlights. Row click navigates to `/classes/:id`.
+- `AddClassModal` opened from header "+ Add class" button.
+
+#### `ClassDetail.jsx` — four tabs
+
+| Tab | Data fetched | Key interactions |
+|-----|-------------|-----------------|
+| Students | `getClassEnrollments` `?status=active` | Read-only table; "Enroll student" button is a stub (enrollment flow is separate) |
+| Teachers | `getClassTeachers` | Assign via inline search (`getUsers ?role=teacher`); first assigned is auto-set as primary; remove with confirmation |
+| Homework Criteria | `getHomeworkCriteria`, `getTopics` | Ordered table; inline add/edit form with topic dropdown and conditional subtopic dropdown; deactivate with one click (preserved in history); total marks counter |
+| Schedule | class data | Visual day chips (active=emerald, inactive=sand); start time and days-per-week summary; class details card |
+
+#### `AddClassModal.jsx`
+
+Wraps `Modal` (size `md`). Fields:
+- `name`, `name_ur` (RTLInput)
+- `course_id` (select from `getCourses`); changing course resets `course_level_id`
+- `course_level_id` (conditional select from `getCourseLevels(course_id)`; disabled until course chosen)
+- `max_capacity` (number), `start_time` (time input)
+- `schedule_days` (multi-select toggle buttons — Mon/Tue/Wed/Thu/Fri/Sat/Sun)
+
+On create: calls `createClass(centerId, payload)` with `schedule_days` joined as comma-separated string → invalidates `['classes', centerId]` → navigates to `/classes/:newId`.
+
+#### Homework Criteria UX rules
+
+- Only active criteria are counted in the "Total: N marks" header.
+- Inactive criteria still appear in the table (dimmed at 50% opacity) for audit visibility.
+- The amber warning banner ("Deactivating a criterion will hide it from future sessions...") is shown whenever there are active criteria.
+- The topic dropdown loads all topics for the class's `course_id` from `getTopics`. The subtopic dropdown is disabled until a topic with subtopics is selected.
+- `display_order` auto-populated as `activeCriteria.length + 1` but editable.
+
 ### Token audit result
 
 All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
@@ -1939,6 +2015,8 @@ Behaviour:
 | `/admin/org` | `OrgSettings` | `ProtectedRoute roles={['super_admin']}` |
 | `/admin/courses` | `CoursesList` | `ProtectedRoute` (any authenticated role) |
 | `/admin/courses/:id` | `CourseDetail` | `ProtectedRoute` (any authenticated role) |
+| `/classes` | `ClassesList` | `ProtectedRoute roles={['center_manager','teacher']}` — center_manager scoped to user.center_id |
+| `/classes/:id` | `ClassDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |
