@@ -1520,6 +1520,10 @@ frontend/
       centers.js          getOrg, updateOrg, getCenters, createCenter, getCenter, updateCenter,
                           getClassrooms, createClassroom, updateClassroom,
                           getCenterOverview, getCenterClasses
+      courses.js          getCourses, createCourse, updateCourse,
+                          getTopics, createTopic, updateTopic, deleteTopic,
+                          createSubtopic, updateSubtopic, deleteSubtopic,
+                          getCourseLevels, createCourseLevel, updateCourseLevel
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1564,6 +1568,12 @@ frontend/
           AddCenterModal.jsx Modal form for POST /centers — invalidates query + shows toast
         Org/
           OrgSettings.jsx    GET /org + PATCH /org form; bilingual fields with RTLInput
+        Courses/
+          CoursesList.jsx    3-column card grid; course type chips; "Manage topics" / "Edit" actions
+          CourseDetail.jsx   3-tab view: Topics (TopicManager), Levels (table + form), Classes (info panel)
+          TopicManager.jsx   Split-panel: left 40% topic list with delete confirm, right 60% subtopic editor
+          AddCourseModal.jsx Modal form for POST /courses — invalidates query + toast
+          EditCourseModal.jsx Modal form for PATCH /courses/:id — pre-populated from course data
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -1775,6 +1785,66 @@ Fetches `GET /org`, pre-populates a controlled form, saves via `PATCH /org`. Fie
 
 Wraps `Modal` (size `md`). On submit: calls `createCenter()` → invalidates `['centers']` query → calls `toast.success()` → closes. Error is shown inline in the modal. Resets form on close.
 
+### Courses & Topics frontend module
+
+#### `frontend/src/api/courses.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getCourses(params)` | `GET /courses` | List all courses; accessible to any authenticated user |
+| `createCourse(payload)` | `POST /courses` | Create a course (super_admin) |
+| `updateCourse(courseId, payload)` | `PATCH /courses/:id` | Update course fields |
+| `getTopics(courseId)` | `GET /courses/:id/topics` | List topics with nested `subtopics[]` array |
+| `createTopic(courseId, payload)` | `POST /courses/:id/topics` | Add a topic (admin teacher) |
+| `updateTopic(courseId, topicId, payload)` | `PATCH /courses/:id/topics/:tid` | Edit or reorder a topic |
+| `deleteTopic(courseId, topicId)` | `DELETE /courses/:id/topics/:tid` | Soft-delete topic (`is_active=false`) |
+| `createSubtopic(courseId, topicId, payload)` | `POST /courses/:id/topics/:tid/subtopics` | Add a subtopic |
+| `updateSubtopic(courseId, topicId, subtopicId, payload)` | `PATCH /courses/:id/topics/:tid/subtopics/:sid` | Edit a subtopic |
+| `deleteSubtopic(courseId, topicId, subtopicId)` | `DELETE /courses/:id/topics/:tid/subtopics/:sid` | Remove a subtopic |
+| `getCourseLevels(courseId)` | `GET /courses/:id/levels` | List course levels |
+| `createCourseLevel(courseId, payload)` | `POST /courses/:id/levels` | Add a level |
+| `updateCourseLevel(courseId, levelId, payload)` | `PATCH /courses/:id/levels/:lid` | Edit a level |
+
+#### `CoursesList.jsx` — card grid
+
+- Fetches `GET /courses` via `useQuery(['courses'], getCourses)`.
+- Renders a 3-column CSS grid of `CourseCard` components.
+- **Type chips:** `hifz → chip-green`, `nazra → chip-blue`, `tajweed → chip-gold`, `arabic → chip-sand`.
+- Each card shows: type chip, English name, Urdu name (RTL), description_ur (RTL), two action buttons.
+- "Manage topics" navigates to `/admin/courses/:id`.
+- "Edit" opens `EditCourseModal` with the course pre-loaded.
+- "+" header button opens `AddCourseModal`.
+
+#### `TopicManager.jsx` — split panel (embedded in `CourseDetail`)
+
+Split-panel component that receives a `courseId` prop. Fetches `GET /courses/:id/topics` via `useQuery(['topics', courseId])`.
+
+| Panel | Width | Content |
+|-------|-------|---------|
+| Left | 40% | Numbered topic list; click to select; delete button with inline confirm; "Add" form appears at top |
+| Right | 60% | Selected topic's header + edit form (collapsible) + subtopic list with inline edit/delete + add form |
+
+**State management:** all mutations call `qc.invalidateQueries(['topics', courseId])` on success — no optimistic updates needed as the list is small.
+
+**Delete flow:** clicking ✕ on a topic shows an inline `ConfirmDelete` row (red banner with Cancel / Delete buttons) in-place before the actual delete call.
+
+#### `CourseDetail.jsx` — three tabs
+
+| Tab | Component | Data |
+|-----|-----------|------|
+| Topics | `<TopicManager courseId={id} />` | Embedded split-panel editor |
+| Levels | `LevelsTab` inline | `useQuery(['course-levels', id], getCourseLevels)` — table + add/edit form toggled inline |
+| Classes | `ClassesTab` inline | Static info panel (cross-center classes are managed per-center) |
+
+Back-navigation "← Courses" button links to `/admin/courses`. The course data comes from the already-cached `['courses']` query (no extra request).
+
+#### `AddCourseModal.jsx` / `EditCourseModal.jsx`
+
+Both wrap `Modal` (size `md`). Fields: `name`, `name_ur` (RTLInput), `name_ar` (RTLInput), `type` (select: hifz/nazra/tajweed/arabic), `description_ur` (RTLInput multiline).
+
+- **Add:** on submit calls `createCourse()` → invalidates `['courses']` → `toast.success` → closes; resets form on close.
+- **Edit:** `useEffect` pre-populates from `course` prop; on submit calls `updateCourse(course.id, form)` → invalidates `['courses']` → `toast.success`.
+
 #### Sidebar nav updates (`AppShell.jsx`)
 
 | Role | Updated nav links |
@@ -1867,9 +1937,12 @@ Behaviour:
 | `/admin/centers` | `CentersList` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager is redirected to their own center |
 | `/admin/centers/:id` | `CenterDetail` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager enforced to own center_id |
 | `/admin/org` | `OrgSettings` | `ProtectedRoute roles={['super_admin']}` |
+| `/admin/courses` | `CoursesList` | `ProtectedRoute` (any authenticated role) |
+| `/admin/courses/:id` | `CourseDetail` | `ProtectedRoute` (any authenticated role) |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
+| `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |
-| `/courses`, `/teachers`, `/students`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
+| `/teachers`, `/students`, `/reports`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
 
 ### Role-based sidebar nav
 
@@ -1877,7 +1950,7 @@ Behaviour:
 
 | Role | Nav sections |
 |------|-------------|
-| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Reports, Settings) |
+| `super_admin` | Overview (Dashboard → `/dashboard`, Centers → `/admin/centers`), Academic (Courses → `/admin/courses`, Teachers, Students), Reports (Reports, Settings → `/admin/org`) |
 | `center_manager` | My Center (Dashboard, Classes, Enrollment, Attendance), Admin (Reports) |
 | `teacher` | My Classes (Dashboard, Attendance, Log Progress, Assessments) |
 | `student` | My Learning (My Progress, Attendance, Schedule, Results) |

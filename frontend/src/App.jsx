@@ -16,6 +16,9 @@ import CentersList    from './pages/admin/Centers/CentersList';
 import CenterDetail   from './pages/admin/Centers/CenterDetail';
 import OrgSettings    from './pages/admin/Org/OrgSettings';
 
+import CoursesList    from './pages/admin/Courses/CoursesList';
+import CourseDetail   from './pages/admin/Courses/CourseDetail';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -63,11 +66,16 @@ export default function App() {
                     <Route path="/admin/org" element={<OrgSettings />} />
                   </Route>
 
+                  {/* Courses & topics — any authenticated */}
+                  <Route path="/admin/courses"     element={<CoursesList />} />
+                  <Route path="/admin/courses/:id" element={<CourseDetail />} />
+
                   {/* Legacy redirect */}
                   <Route path="/centers" element={<Navigate to="/admin/centers" replace />} />
 
-                  {/* Placeholder routes */}
-                  <Route path="/courses"     element={<Placeholder />} />
+                  {/* Legacy redirect */}
+                  <Route path="/courses" element={<Navigate to="/admin/courses" replace />} />
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/reports"     element={<Placeholder />} />
