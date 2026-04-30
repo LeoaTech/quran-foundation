@@ -1529,6 +1529,8 @@ frontend/
                           getHomeworkCriteria, createCriterion, updateCriterion,
                           deactivateCriterion, getClassEnrollments
       users.js            getUsers, getUser, createUser, updateUser
+      enrollments.js      createEnrollment, getClassEnrollments, getStudentEnrollments,
+                          updateEnrollment
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1586,6 +1588,13 @@ frontend/
           ClassDetail.jsx    4-tab view: Students, Teachers (assign/remove), Homework Criteria, Schedule
           AddClassModal.jsx  POST /centers/:id/classes; day multi-select; level dropdown loads after course chosen;
                              on create navigates to new ClassDetail
+        Enrollments/
+          EnrollmentsList.jsx  Class dropdown + status toggle (active/withdrawn/all) + name search;
+                               client-side filtering; Withdraw action opens WithdrawModal
+          EnrollmentForm.jsx   Two-column layout: student details (left) + course/class/prior knowledge (right);
+                               two-step submit: POST /users then POST /enrollments;
+                               handles 409 ENROLLMENT_CONFLICT and CLASS_FULL inline
+          WithdrawModal.jsx    PATCH /enrollments/:id {status: withdrawn}; withdrawal date + optional Urdu reason
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -1928,6 +1937,50 @@ On create: calls `createClass(centerId, payload)` with `schedule_days` joined as
 - The topic dropdown loads all topics for the class's `course_id` from `getTopics`. The subtopic dropdown is disabled until a topic with subtopics is selected.
 - `display_order` auto-populated as `activeCriteria.length + 1` but editable.
 
+### Enrollments frontend module
+
+#### `frontend/src/api/enrollments.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `createEnrollment(payload)` | `POST /enrollments` | Enroll a student into a class |
+| `getClassEnrollments(classId, params)` | `GET /classes/:id/enrollments` | List students in a class; `?status=active` |
+| `getStudentEnrollments(userId)` | `GET /students/:id/enrollments` | All classes a student is enrolled in |
+| `updateEnrollment(enrollmentId, payload)` | `PATCH /enrollments/:id` | Withdraw or transfer; `{ status, withdrawn_on }` |
+
+#### `EnrollmentForm.jsx` — two-step submit
+
+This is a single-page form that creates a student and enrolls them in one submit:
+
+1. **Step 1 — Create student:** `POST /users` with `role: 'student'` and `center_id: user.center_id`. Returns `{ id, full_name, temp_password }`.
+2. **Step 2 — Enroll:** `POST /enrollments` with the new `student_user_id`, `class_id`, `center_id`, `enrolled_on`, `prior_level`, `notes_ur`.
+
+**Layout (two-column):**
+
+| Left column | Right column (stacked cards) |
+|-------------|------------------------------|
+| Student details card: first + last name, full_name_ur (RTLInput), date_of_birth, gender, guardian_name, guardian_phone, guardian_whatsapp, preferred_lang | Card 1 — Course & class: course select → class select (filtered by course); class options show capacity inline; full classes are disabled |
+| | Card 2 — Prior knowledge: level select + notes_ur (RTLInput textarea) |
+| | Full-width primary submit button |
+
+**Error handling:**
+- `ENROLLMENT_CONFLICT` (409) → inline error on class field in English + Urdu
+- `CLASS_FULL` (409) → inline error on class field
+- Other errors → toast
+
+**Success state:** replaces the form with a centered success panel showing "Enroll another" and "View student profile" actions.
+
+#### `EnrollmentsList.jsx`
+
+- **Filter bar:** class dropdown (loaded from `getClasses(centerId)`) + Active/Withdrawn/All status toggle + name search input.
+- **Search:** client-side filter on both `full_name` and `full_name_ur` fields, so Arabic/Urdu name search works without an extra API call.
+- **Withdraw action:** opens `WithdrawModal`; on success invalidates `['class-enrollments', classId]`.
+- Defaults to the first class in the list; switching the class dropdown re-fetches enrollments.
+
+#### `WithdrawModal.jsx`
+
+Wraps `Modal` (size `sm`). Confirms the student name and class name, accepts a withdrawal date (default today) and an optional Urdu reason (RTLInput textarea). Calls `PATCH /enrollments/:id { status: 'withdrawn', withdrawn_on, notes_ur }`.
+
 ### Token audit result
 
 All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
@@ -2017,6 +2070,8 @@ Behaviour:
 | `/admin/courses/:id` | `CourseDetail` | `ProtectedRoute` (any authenticated role) |
 | `/classes` | `ClassesList` | `ProtectedRoute roles={['center_manager','teacher']}` — center_manager scoped to user.center_id |
 | `/classes/:id` | `ClassDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/enrollment` | `EnrollmentsList` | `ProtectedRoute roles={['center_manager']}` |
+| `/enrollment/new` | `EnrollmentForm` | `ProtectedRoute roles={['center_manager']}` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |

@@ -19,8 +19,11 @@ import OrgSettings    from './pages/admin/Org/OrgSettings';
 import CoursesList    from './pages/admin/Courses/CoursesList';
 import CourseDetail   from './pages/admin/Courses/CourseDetail';
 
-import ClassesList    from './pages/manager/Classes/ClassesList';
-import ClassDetail    from './pages/manager/Classes/ClassDetail';
+import ClassesList       from './pages/manager/Classes/ClassesList';
+import ClassDetail       from './pages/manager/Classes/ClassDetail';
+
+import EnrollmentsList   from './pages/manager/Enrollments/EnrollmentsList';
+import EnrollmentForm    from './pages/manager/Enrollments/EnrollmentForm';
 
 import Placeholder    from './pages/Placeholder';
 
@@ -85,11 +88,16 @@ export default function App() {
                     <Route path="/classes/:id" element={<ClassDetail />} />
                   </Route>
 
+                  {/* Enrollments — center_manager only */}
+                  <Route element={<ProtectedRoute roles={['center_manager']} />}>
+                    <Route path="/enrollment"     element={<EnrollmentsList />} />
+                    <Route path="/enrollment/new" element={<EnrollmentForm />} />
+                  </Route>
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
-                  <Route path="/enrollment"  element={<Placeholder />} />
                   <Route path="/attendance"  element={<Placeholder />} />
                   <Route path="/progress"    element={<Placeholder />} />
                   <Route path="/assessments" element={<Placeholder />} />
