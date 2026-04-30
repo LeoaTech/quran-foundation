@@ -225,5 +225,14 @@ async function signup({ full_name, full_name_ur, phone, password, center_id }) {
   };
 }
 
+// ── Public Centers List (for Signup form) ────────────────────────────────────
 
-module.exports = { login, refresh, logout, changePassword, signup };
+async function listPublicCenters() {
+  const db = require('../db/knex');
+  return db('centers')
+    .where({ is_active: true })
+    .select('id', 'name', 'name_ur', 'city')
+    .orderBy('name', 'asc');
+}
+
+module.exports = { login, refresh, logout, changePassword, signup, listPublicCenters };
