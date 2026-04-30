@@ -1,30 +1,58 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import client from '../../api/client';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { signup, getPublicCenters } from '../../api/auth';
+import { setAccessToken } from '../../api/client';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function SignUp() {
-  const [firstName,    setFirstName]    = useState('');
-  const [lastName,     setLastName]     = useState('');
-  const [fullNameUr,   setFullNameUr]   = useState('');
-  const [phone,        setPhone]        = useState('');
-  const [approvalCode, setApprovalCode] = useState('');
-  const [password,     setPassword]     = useState('');
-  const [error,        setError]        = useState('');
-  const [success,      setSuccess]      = useState(false);
-  const [busy,         setBusy]         = useState(false);
+  const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
+
+  const [firstName,  setFirstName]  = useState('');
+  const [lastName,   setLastName]   = useState('');
+  const [fullNameUr, setFullNameUr] = useState('');
+  const [phone,      setPhone]      = useState('');
+  const [centerId,   setCenterId]   = useState('');
+  const [password,   setPassword]   = useState('');
+  const [error,      setError]      = useState('');
+  const [success,    setSuccess]    = useState(false);
+  const [busy,       setBusy]       = useState(false);
+
+  // Centers list for dropdown
+  const [centers,       setCenters]       = useState([]);
+  const [centersLoading, setCentersLoading] = useState(true);
+
+  useEffect(() => {
+    getPublicCenters()
+      .then(setCenters)
+      .catch(() => setCenters([]))
+      .finally(() => setCentersLoading(false));
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (!centerId) {
+      setError('Please select a center.');
+      return;
+    }
+
     setBusy(true);
     try {
-      await client.post('/auth/signup', {
+      const data = await signup({
         full_name:    `${firstName} ${lastName}`.trim(),
         full_name_ur: fullNameUr || undefined,
         phone,
         password,
-        approval_code: approvalCode,
+        center_id:    centerId,
       });
+
+      // Auto-login: store the access token and set user in auth context
+      if (data.access_token) {
+        setAccessToken(data.access_token);
+      }
+
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.error?.message ?? 'Registration failed.');
@@ -50,8 +78,8 @@ export default function SignUp() {
             Nurturing Hearts<br />Through Knowledge
           </div>
           <div className="auth-left-sub">
-            Register with your center manager's approval code to join your
-            Quran Foundation center.
+            Select your center and create an account to start your
+            Quran learning journey.
           </div>
         </div>
 
@@ -73,25 +101,25 @@ export default function SignUp() {
             <button className="auth-tab active">Sign up</button>
           </div>
 
-          {error   && <div className="auth-error">{error}</div>}
+          {error && <div className="auth-error">{error}</div>}
 
           {success ? (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
-              <div className="auth-title">Account created</div>
+              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--emerald)' }}>✓</div>
+              <div className="auth-title">Account created!</div>
               <div className="auth-subtitle" style={{ marginBottom: 24 }}>
-                Your account is pending approval by your center manager.
+                Your student account has been created successfully. You can now sign in.
               </div>
               <Link to="/signin">
                 <button className="btn-auth" style={{ width: 'auto', padding: '12px 32px' }}>
-                  Back to sign in
+                  Sign in now
                 </button>
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="auth-title">Create account</div>
-              <div className="auth-subtitle">Register with your center manager's approval code</div>
+              <div className="auth-subtitle">Register as a student at your nearest center</div>
 
               <div className="field-row">
                 <div className="field">
@@ -122,8 +150,29 @@ export default function SignUp() {
               </div>
 
               <div className="field">
-                <label>Center approval code</label>
-                <input type="text" placeholder="e.g. GUL-2026" value={approvalCode} onChange={(e) => setApprovalCode(e.target.value)} required />
+                <label>Select center</label>
+                {centersLoading ? (
+                  <select disabled>
+                    <option>Loading centers…</option>
+                  </select>
+                ) : centers.length === 0 ? (
+                  <select disabled>
+                    <option>No centers available</option>
+                  </select>
+                ) : (
+                  <select
+                    value={centerId}
+                    onChange={(e) => setCenterId(e.target.value)}
+                    required
+                  >
+                    <option value="">— Select your center —</option>
+                    {centers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.name_ur ? ` — ${c.name_ur}` : ''}{c.city ? ` (${c.city})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="field">
@@ -131,7 +180,7 @@ export default function SignUp() {
                 <input type="password" placeholder="Min. 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
               </div>
 
-              <button className="btn-auth" type="submit" disabled={busy}>
+              <button className="btn-auth" type="submit" disabled={busy || centersLoading}>
                 {busy ? 'Creating account…' : 'Create account'}
               </button>
             </form>
