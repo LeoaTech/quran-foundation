@@ -1531,6 +1531,8 @@ frontend/
       users.js            getUsers, getUser, createUser, updateUser
       enrollments.js      createEnrollment, getClassEnrollments, getStudentEnrollments,
                           updateEnrollment
+      attendance.js       createAttendanceSession, getClassAttendance, getSessionRecords,
+                          updateRecord, getStudentAttendance
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1540,6 +1542,7 @@ frontend/
     hooks/
       useAuth.js          Thin useContext(AuthContext) wrapper
       useToast.js         { success, error, warning, toast } helpers over ToastContext
+      useAttendance.js    useClassAttendance, useStudentAttendance, useMarkAttendance, useCorrectRecord
 
     components/
       ProtectedRoute.jsx  Layout route guard — redirects to /signin if unauthenticated;
@@ -1595,6 +1598,16 @@ frontend/
                                two-step submit: POST /users then POST /enrollments;
                                handles 409 ENROLLMENT_CONFLICT and CLASS_FULL inline
           WithdrawModal.jsx    PATCH /enrollments/:id {status: withdrawn}; withdrawal date + optional Urdu reason
+      teacher/
+        Attendance/
+          MarkAttendance.jsx   Class+date selector → roster with P/A/L toggle buttons; absent note field;
+                               live summary header; sticky bottom bar; gold banner if editing existing session
+          AttendanceSheet.jsx  Week/month grid; per-student % column; per-day % header; inline record correction;
+                               CSV export with BOM for Urdu text
+      student/
+        Attendance/
+          MyAttendance.jsx     4 MetricCards (Present/Absent/Late/Attendance%); monthly calendar grid;
+                               scrollable session history table (descending date order)
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -1981,6 +1994,52 @@ This is a single-page form that creates a student and enrolls them in one submit
 
 Wraps `Modal` (size `sm`). Confirms the student name and class name, accepts a withdrawal date (default today) and an optional Urdu reason (RTLInput textarea). Calls `PATCH /enrollments/:id { status: 'withdrawn', withdrawn_on, notes_ur }`.
 
+### Attendance frontend module
+
+#### `frontend/src/api/attendance.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `createAttendanceSession(classId, payload)` | `POST /classes/:id/attendance` | Bulk-mark session; `{ session_date, records[] }` |
+| `getClassAttendance(classId, params)` | `GET /classes/:id/attendance` | `?from`, `?to` date range |
+| `getSessionRecords(sessionId)` | `GET /attendance/sessions/:id/records` | Records for a specific session |
+| `updateRecord(sessionId, recordId, payload)` | `PATCH /attendance/sessions/:sid/records/:rid` | Correct a single record |
+| `getStudentAttendance(userId, params)` | `GET /students/:id/attendance` | `?class_id`, `?from`, `?to`; returns `{ total_sessions, present, absent, late, attendance_pct, records[] }` |
+
+#### `frontend/src/hooks/useAttendance.js` — hook exports
+
+| Hook | Returns | Description |
+|------|---------|-------------|
+| `useClassAttendance(classId, dateRange)` | `useQuery` result | Attendance sessions for a class in `{ from, to }` range |
+| `useStudentAttendance(userId, params)` | `useQuery` result | Student attendance history + summary |
+| `useMarkAttendance(classId)` | `useMutation` | `mutateAsync({ session_date, records[] })` — invalidates class attendance cache on success |
+| `useCorrectRecord()` | `useMutation` | `mutateAsync({ sessionId, recordId, classId, payload })` — invalidates class attendance cache |
+
+#### `MarkAttendance.jsx` — teacher marking view
+
+1. Class selector + date picker (default today) + "Load class" button.
+2. On load: fetches active enrollments + existing session for that date in parallel.
+3. If an existing session is found → pre-populates records and shows a gold "Editing existing session" banner.
+4. Each student row: name + Urdu name + three toggle buttons (P=emerald, A=red, L=gold). Selecting "A" reveals a Urdu RTLInput note field below.
+5. **Live summary header** updates as statuses change (no API call — derived from `records` state).
+6. **Sticky bottom bar** (fixed, above sidebar, full width) shows summary + "Save attendance" button. Calls `POST /classes/:id/attendance` with all records.
+
+#### `AttendanceSheet.jsx` — review grid
+
+- **Mode toggle:** Week (7 columns) or Month (N columns = days in month).
+- **Date navigation:** ← → arrows shift by 1 week or 1 month.
+- **Grid:** rows = enrolled students, columns = dates. Each cell shows a P/A/L chip. Clicking a cell opens an inline 3-button corrector row (P/A/L + cancel) → calls `updateRecord`.
+- **Per-student % column** (right): present+late / total visible sessions with data.
+- **Per-day % header row**: class attendance % for each day a session exists. Colored green ≥ 75%, red below.
+- **CSV export**: client-side; includes BOM (`﻿`) so Urdu names render correctly in Excel. Columns: Student, Urdu Name, one column per date, Attendance %.
+
+#### `MyAttendance.jsx` — student read-only view
+
+- Fetches `GET /students/:id/attendance?from=YYYY-01-01&to=YYYY-12-31` for the current year.
+- **4 MetricCards**: Present, Absent, Late, Attendance % (color: green ≥ 75%, gold 50–74%, red <50%).
+- **Monthly calendar grid**: 7-column Monday-anchored grid. Days with sessions are colored (green=present, red=absent, gold=late). Hover shows date + status. Month navigation ← → changes the displayed month (year-level data already loaded).
+- **Sessions table**: descending date order, columns Date / Status (Badge) / Note (Urdu RTL). Capped at 480px height with scroll.
+
 ### Token audit result
 
 All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
@@ -2072,6 +2131,9 @@ Behaviour:
 | `/classes/:id` | `ClassDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/enrollment` | `EnrollmentsList` | `ProtectedRoute roles={['center_manager']}` |
 | `/enrollment/new` | `EnrollmentForm` | `ProtectedRoute roles={['center_manager']}` |
+| `/attendance` | `MarkAttendance` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/attendance/sheet` | `AttendanceSheet` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/attendance/my` | `MyAttendance` | `ProtectedRoute roles={['student']}` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |

@@ -25,6 +25,10 @@ import ClassDetail       from './pages/manager/Classes/ClassDetail';
 import EnrollmentsList   from './pages/manager/Enrollments/EnrollmentsList';
 import EnrollmentForm    from './pages/manager/Enrollments/EnrollmentForm';
 
+import MarkAttendance    from './pages/teacher/Attendance/MarkAttendance';
+import AttendanceSheet   from './pages/teacher/Attendance/AttendanceSheet';
+import MyAttendance      from './pages/student/Attendance/MyAttendance';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -94,11 +98,19 @@ export default function App() {
                     <Route path="/enrollment/new" element={<EnrollmentForm />} />
                   </Route>
 
+                  {/* Attendance — role-split */}
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/attendance"       element={<MarkAttendance />} />
+                    <Route path="/attendance/sheet" element={<AttendanceSheet />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['student']} />}>
+                    <Route path="/attendance/my" element={<MyAttendance />} />
+                  </Route>
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
-                  <Route path="/attendance"  element={<Placeholder />} />
                   <Route path="/progress"    element={<Placeholder />} />
                   <Route path="/assessments" element={<Placeholder />} />
                   <Route path="/schedule"    element={<Placeholder />} />
