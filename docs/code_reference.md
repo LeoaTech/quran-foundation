@@ -1520,6 +1520,19 @@ frontend/
       centers.js          getOrg, updateOrg, getCenters, createCenter, getCenter, updateCenter,
                           getClassrooms, createClassroom, updateClassroom,
                           getCenterOverview, getCenterClasses
+      courses.js          getCourses, createCourse, updateCourse,
+                          getTopics, createTopic, updateTopic, deleteTopic,
+                          createSubtopic, updateSubtopic, deleteSubtopic,
+                          getCourseLevels, createCourseLevel, updateCourseLevel
+      classes.js          getClasses, createClass, getClass, updateClass,
+                          getClassTeachers, assignTeacher, removeTeacher,
+                          getHomeworkCriteria, createCriterion, updateCriterion,
+                          deactivateCriterion, getClassEnrollments
+      users.js            getUsers, getUser, createUser, updateUser
+      enrollments.js      createEnrollment, getClassEnrollments, getStudentEnrollments,
+                          updateEnrollment
+      attendance.js       createAttendanceSession, getClassAttendance, getSessionRecords,
+                          updateRecord, getStudentAttendance
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1529,6 +1542,7 @@ frontend/
     hooks/
       useAuth.js          Thin useContext(AuthContext) wrapper
       useToast.js         { success, error, warning, toast } helpers over ToastContext
+      useAttendance.js    useClassAttendance, useStudentAttendance, useMarkAttendance, useCorrectRecord
 
     components/
       ProtectedRoute.jsx  Layout route guard — redirects to /signin if unauthenticated;
@@ -1564,6 +1578,36 @@ frontend/
           AddCenterModal.jsx Modal form for POST /centers — invalidates query + shows toast
         Org/
           OrgSettings.jsx    GET /org + PATCH /org form; bilingual fields with RTLInput
+        Courses/
+          CoursesList.jsx    3-column card grid; course type chips; "Manage topics" / "Edit" actions
+          CourseDetail.jsx   3-tab view: Topics (TopicManager), Levels (table + form), Classes (info panel)
+          TopicManager.jsx   Split-panel: left 40% topic list with delete confirm, right 60% subtopic editor
+          AddCourseModal.jsx Modal form for POST /courses — invalidates query + toast
+          EditCourseModal.jsx Modal form for PATCH /courses/:id — pre-populated from course data
+      manager/
+        Classes/
+          ClassesList.jsx    Table with filter bar (course dropdown, active/all toggle); capacity color coding;
+                             row-click navigates to ClassDetail; center_manager scoped to user.center_id
+          ClassDetail.jsx    4-tab view: Students, Teachers (assign/remove), Homework Criteria, Schedule
+          AddClassModal.jsx  POST /centers/:id/classes; day multi-select; level dropdown loads after course chosen;
+                             on create navigates to new ClassDetail
+        Enrollments/
+          EnrollmentsList.jsx  Class dropdown + status toggle (active/withdrawn/all) + name search;
+                               client-side filtering; Withdraw action opens WithdrawModal
+          EnrollmentForm.jsx   Two-column layout: student details (left) + course/class/prior knowledge (right);
+                               two-step submit: POST /users then POST /enrollments;
+                               handles 409 ENROLLMENT_CONFLICT and CLASS_FULL inline
+          WithdrawModal.jsx    PATCH /enrollments/:id {status: withdrawn}; withdrawal date + optional Urdu reason
+      teacher/
+        Attendance/
+          MarkAttendance.jsx   Class+date selector → roster with P/A/L toggle buttons; absent note field;
+                               live summary header; sticky bottom bar; gold banner if editing existing session
+          AttendanceSheet.jsx  Week/month grid; per-student % column; per-day % header; inline record correction;
+                               CSV export with BOM for Urdu text
+      student/
+        Attendance/
+          MyAttendance.jsx     4 MetricCards (Present/Absent/Late/Attendance%); monthly calendar grid;
+                               scrollable session history table (descending date order)
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -1775,12 +1819,226 @@ Fetches `GET /org`, pre-populates a controlled form, saves via `PATCH /org`. Fie
 
 Wraps `Modal` (size `md`). On submit: calls `createCenter()` → invalidates `['centers']` query → calls `toast.success()` → closes. Error is shown inline in the modal. Resets form on close.
 
+### Courses & Topics frontend module
+
+#### `frontend/src/api/courses.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getCourses(params)` | `GET /courses` | List all courses; accessible to any authenticated user |
+| `createCourse(payload)` | `POST /courses` | Create a course (super_admin) |
+| `updateCourse(courseId, payload)` | `PATCH /courses/:id` | Update course fields |
+| `getTopics(courseId)` | `GET /courses/:id/topics` | List topics with nested `subtopics[]` array |
+| `createTopic(courseId, payload)` | `POST /courses/:id/topics` | Add a topic (admin teacher) |
+| `updateTopic(courseId, topicId, payload)` | `PATCH /courses/:id/topics/:tid` | Edit or reorder a topic |
+| `deleteTopic(courseId, topicId)` | `DELETE /courses/:id/topics/:tid` | Soft-delete topic (`is_active=false`) |
+| `createSubtopic(courseId, topicId, payload)` | `POST /courses/:id/topics/:tid/subtopics` | Add a subtopic |
+| `updateSubtopic(courseId, topicId, subtopicId, payload)` | `PATCH /courses/:id/topics/:tid/subtopics/:sid` | Edit a subtopic |
+| `deleteSubtopic(courseId, topicId, subtopicId)` | `DELETE /courses/:id/topics/:tid/subtopics/:sid` | Remove a subtopic |
+| `getCourseLevels(courseId)` | `GET /courses/:id/levels` | List course levels |
+| `createCourseLevel(courseId, payload)` | `POST /courses/:id/levels` | Add a level |
+| `updateCourseLevel(courseId, levelId, payload)` | `PATCH /courses/:id/levels/:lid` | Edit a level |
+
+#### `CoursesList.jsx` — card grid
+
+- Fetches `GET /courses` via `useQuery(['courses'], getCourses)`.
+- Renders a 3-column CSS grid of `CourseCard` components.
+- **Type chips:** `hifz → chip-green`, `nazra → chip-blue`, `tajweed → chip-gold`, `arabic → chip-sand`.
+- Each card shows: type chip, English name, Urdu name (RTL), description_ur (RTL), two action buttons.
+- "Manage topics" navigates to `/admin/courses/:id`.
+- "Edit" opens `EditCourseModal` with the course pre-loaded.
+- "+" header button opens `AddCourseModal`.
+
+#### `TopicManager.jsx` — split panel (embedded in `CourseDetail`)
+
+Split-panel component that receives a `courseId` prop. Fetches `GET /courses/:id/topics` via `useQuery(['topics', courseId])`.
+
+| Panel | Width | Content |
+|-------|-------|---------|
+| Left | 40% | Numbered topic list; click to select; delete button with inline confirm; "Add" form appears at top |
+| Right | 60% | Selected topic's header + edit form (collapsible) + subtopic list with inline edit/delete + add form |
+
+**State management:** all mutations call `qc.invalidateQueries(['topics', courseId])` on success — no optimistic updates needed as the list is small.
+
+**Delete flow:** clicking ✕ on a topic shows an inline `ConfirmDelete` row (red banner with Cancel / Delete buttons) in-place before the actual delete call.
+
+#### `CourseDetail.jsx` — three tabs
+
+| Tab | Component | Data |
+|-----|-----------|------|
+| Topics | `<TopicManager courseId={id} />` | Embedded split-panel editor |
+| Levels | `LevelsTab` inline | `useQuery(['course-levels', id], getCourseLevels)` — table + add/edit form toggled inline |
+| Classes | `ClassesTab` inline | Static info panel (cross-center classes are managed per-center) |
+
+Back-navigation "← Courses" button links to `/admin/courses`. The course data comes from the already-cached `['courses']` query (no extra request).
+
+#### `AddCourseModal.jsx` / `EditCourseModal.jsx`
+
+Both wrap `Modal` (size `md`). Fields: `name`, `name_ur` (RTLInput), `name_ar` (RTLInput), `type` (select: hifz/nazra/tajweed/arabic), `description_ur` (RTLInput multiline).
+
+- **Add:** on submit calls `createCourse()` → invalidates `['courses']` → `toast.success` → closes; resets form on close.
+- **Edit:** `useEffect` pre-populates from `course` prop; on submit calls `updateCourse(course.id, form)` → invalidates `['courses']` → `toast.success`.
+
 #### Sidebar nav updates (`AppShell.jsx`)
 
 | Role | Updated nav links |
 |------|-----------------|
 | `super_admin` | Centers → `/admin/centers`; Settings → `/admin/org` |
 | `center_manager` | "My Center" item dynamically resolved to `/admin/centers/:user.center_id` at render time |
+
+### Classes & Homework Criteria frontend module
+
+#### `frontend/src/api/classes.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getClasses(centerId, params)` | `GET /centers/:id/classes` | List classes; `?course_id`, `?is_active` |
+| `createClass(centerId, payload)` | `POST /centers/:id/classes` | Create class section |
+| `getClass(classId)` | `GET /classes/:id` | Single class row |
+| `updateClass(classId, payload)` | `PATCH /classes/:id` | Edit class fields |
+| `getClassTeachers(classId)` | `GET /classes/:id/teachers` | Assigned teacher list |
+| `assignTeacher(classId, payload)` | `POST /classes/:id/teachers` | Assign teacher; payload `{ teacher_user_id, is_primary, assigned_from }` |
+| `removeTeacher(classId, teacherUserId)` | `DELETE /classes/:id/teachers/:uid` | Remove teacher |
+| `getHomeworkCriteria(classId)` | `GET /classes/:id/homework-criteria` | All criteria (active + inactive) |
+| `createCriterion(classId, payload)` | `POST /classes/:id/homework-criteria` | Add criterion |
+| `updateCriterion(classId, criteriaId, payload)` | `PATCH /classes/:id/homework-criteria/:cid` | Edit criterion |
+| `deactivateCriterion(classId, criteriaId)` | `PATCH …` with `{ is_active: false }` | Soft-deactivate |
+| `getClassEnrollments(classId, params)` | `GET /classes/:id/enrollments` | Enrolled students; `?status=active` |
+
+#### `frontend/src/api/users.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getUsers(params)` | `GET /users` | List users; `?center_id`, `?role`, `?search`, `?is_active`, `?page`, `?per_page` |
+| `getUser(userId)` | `GET /users/:id` | Single user profile |
+| `createUser(payload)` | `POST /users` | Create user |
+| `updateUser(userId, payload)` | `PATCH /users/:id` | Update user |
+
+#### `ClassesList.jsx`
+
+- Fetches `GET /centers/:id/classes` scoped to `user.center_id` from AuthContext.
+- **Filter bar:** course dropdown (`getCourses`) + Active/All toggle (two-button group).
+- **Capacity color coding:** `enrolled/max < 0.8` → emerald; `0.8–0.99` → amber; `>= 1.0` → red.
+- Schedule days rendered as small day chips. Row hover highlights. Row click navigates to `/classes/:id`.
+- `AddClassModal` opened from header "+ Add class" button.
+
+#### `ClassDetail.jsx` — four tabs
+
+| Tab | Data fetched | Key interactions |
+|-----|-------------|-----------------|
+| Students | `getClassEnrollments` `?status=active` | Read-only table; "Enroll student" button is a stub (enrollment flow is separate) |
+| Teachers | `getClassTeachers` | Assign via inline search (`getUsers ?role=teacher`); first assigned is auto-set as primary; remove with confirmation |
+| Homework Criteria | `getHomeworkCriteria`, `getTopics` | Ordered table; inline add/edit form with topic dropdown and conditional subtopic dropdown; deactivate with one click (preserved in history); total marks counter |
+| Schedule | class data | Visual day chips (active=emerald, inactive=sand); start time and days-per-week summary; class details card |
+
+#### `AddClassModal.jsx`
+
+Wraps `Modal` (size `md`). Fields:
+- `name`, `name_ur` (RTLInput)
+- `course_id` (select from `getCourses`); changing course resets `course_level_id`
+- `course_level_id` (conditional select from `getCourseLevels(course_id)`; disabled until course chosen)
+- `max_capacity` (number), `start_time` (time input)
+- `schedule_days` (multi-select toggle buttons — Mon/Tue/Wed/Thu/Fri/Sat/Sun)
+
+On create: calls `createClass(centerId, payload)` with `schedule_days` joined as comma-separated string → invalidates `['classes', centerId]` → navigates to `/classes/:newId`.
+
+#### Homework Criteria UX rules
+
+- Only active criteria are counted in the "Total: N marks" header.
+- Inactive criteria still appear in the table (dimmed at 50% opacity) for audit visibility.
+- The amber warning banner ("Deactivating a criterion will hide it from future sessions...") is shown whenever there are active criteria.
+- The topic dropdown loads all topics for the class's `course_id` from `getTopics`. The subtopic dropdown is disabled until a topic with subtopics is selected.
+- `display_order` auto-populated as `activeCriteria.length + 1` but editable.
+
+### Enrollments frontend module
+
+#### `frontend/src/api/enrollments.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `createEnrollment(payload)` | `POST /enrollments` | Enroll a student into a class |
+| `getClassEnrollments(classId, params)` | `GET /classes/:id/enrollments` | List students in a class; `?status=active` |
+| `getStudentEnrollments(userId)` | `GET /students/:id/enrollments` | All classes a student is enrolled in |
+| `updateEnrollment(enrollmentId, payload)` | `PATCH /enrollments/:id` | Withdraw or transfer; `{ status, withdrawn_on }` |
+
+#### `EnrollmentForm.jsx` — two-step submit
+
+This is a single-page form that creates a student and enrolls them in one submit:
+
+1. **Step 1 — Create student:** `POST /users` with `role: 'student'` and `center_id: user.center_id`. Returns `{ id, full_name, temp_password }`.
+2. **Step 2 — Enroll:** `POST /enrollments` with the new `student_user_id`, `class_id`, `center_id`, `enrolled_on`, `prior_level`, `notes_ur`.
+
+**Layout (two-column):**
+
+| Left column | Right column (stacked cards) |
+|-------------|------------------------------|
+| Student details card: first + last name, full_name_ur (RTLInput), date_of_birth, gender, guardian_name, guardian_phone, guardian_whatsapp, preferred_lang | Card 1 — Course & class: course select → class select (filtered by course); class options show capacity inline; full classes are disabled |
+| | Card 2 — Prior knowledge: level select + notes_ur (RTLInput textarea) |
+| | Full-width primary submit button |
+
+**Error handling:**
+- `ENROLLMENT_CONFLICT` (409) → inline error on class field in English + Urdu
+- `CLASS_FULL` (409) → inline error on class field
+- Other errors → toast
+
+**Success state:** replaces the form with a centered success panel showing "Enroll another" and "View student profile" actions.
+
+#### `EnrollmentsList.jsx`
+
+- **Filter bar:** class dropdown (loaded from `getClasses(centerId)`) + Active/Withdrawn/All status toggle + name search input.
+- **Search:** client-side filter on both `full_name` and `full_name_ur` fields, so Arabic/Urdu name search works without an extra API call.
+- **Withdraw action:** opens `WithdrawModal`; on success invalidates `['class-enrollments', classId]`.
+- Defaults to the first class in the list; switching the class dropdown re-fetches enrollments.
+
+#### `WithdrawModal.jsx`
+
+Wraps `Modal` (size `sm`). Confirms the student name and class name, accepts a withdrawal date (default today) and an optional Urdu reason (RTLInput textarea). Calls `PATCH /enrollments/:id { status: 'withdrawn', withdrawn_on, notes_ur }`.
+
+### Attendance frontend module
+
+#### `frontend/src/api/attendance.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `createAttendanceSession(classId, payload)` | `POST /classes/:id/attendance` | Bulk-mark session; `{ session_date, records[] }` |
+| `getClassAttendance(classId, params)` | `GET /classes/:id/attendance` | `?from`, `?to` date range |
+| `getSessionRecords(sessionId)` | `GET /attendance/sessions/:id/records` | Records for a specific session |
+| `updateRecord(sessionId, recordId, payload)` | `PATCH /attendance/sessions/:sid/records/:rid` | Correct a single record |
+| `getStudentAttendance(userId, params)` | `GET /students/:id/attendance` | `?class_id`, `?from`, `?to`; returns `{ total_sessions, present, absent, late, attendance_pct, records[] }` |
+
+#### `frontend/src/hooks/useAttendance.js` — hook exports
+
+| Hook | Returns | Description |
+|------|---------|-------------|
+| `useClassAttendance(classId, dateRange)` | `useQuery` result | Attendance sessions for a class in `{ from, to }` range |
+| `useStudentAttendance(userId, params)` | `useQuery` result | Student attendance history + summary |
+| `useMarkAttendance(classId)` | `useMutation` | `mutateAsync({ session_date, records[] })` — invalidates class attendance cache on success |
+| `useCorrectRecord()` | `useMutation` | `mutateAsync({ sessionId, recordId, classId, payload })` — invalidates class attendance cache |
+
+#### `MarkAttendance.jsx` — teacher marking view
+
+1. Class selector + date picker (default today) + "Load class" button.
+2. On load: fetches active enrollments + existing session for that date in parallel.
+3. If an existing session is found → pre-populates records and shows a gold "Editing existing session" banner.
+4. Each student row: name + Urdu name + three toggle buttons (P=emerald, A=red, L=gold). Selecting "A" reveals a Urdu RTLInput note field below.
+5. **Live summary header** updates as statuses change (no API call — derived from `records` state).
+6. **Sticky bottom bar** (fixed, above sidebar, full width) shows summary + "Save attendance" button. Calls `POST /classes/:id/attendance` with all records.
+
+#### `AttendanceSheet.jsx` — review grid
+
+- **Mode toggle:** Week (7 columns) or Month (N columns = days in month).
+- **Date navigation:** ← → arrows shift by 1 week or 1 month.
+- **Grid:** rows = enrolled students, columns = dates. Each cell shows a P/A/L chip. Clicking a cell opens an inline 3-button corrector row (P/A/L + cancel) → calls `updateRecord`.
+- **Per-student % column** (right): present+late / total visible sessions with data.
+- **Per-day % header row**: class attendance % for each day a session exists. Colored green ≥ 75%, red below.
+- **CSV export**: client-side; includes BOM (`﻿`) so Urdu names render correctly in Excel. Columns: Student, Urdu Name, one column per date, Attendance %.
+
+#### `MyAttendance.jsx` — student read-only view
+
+- Fetches `GET /students/:id/attendance?from=YYYY-01-01&to=YYYY-12-31` for the current year.
+- **4 MetricCards**: Present, Absent, Late, Attendance % (color: green ≥ 75%, gold 50–74%, red <50%).
+- **Monthly calendar grid**: 7-column Monday-anchored grid. Days with sessions are colored (green=present, red=absent, gold=late). Hover shows date + status. Month navigation ← → changes the displayed month (year-level data already loaded).
+- **Sessions table**: descending date order, columns Date / Status (Badge) / Note (Urdu RTL). Capped at 480px height with scroll.
 
 ### Token audit result
 
@@ -1867,9 +2125,19 @@ Behaviour:
 | `/admin/centers` | `CentersList` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager is redirected to their own center |
 | `/admin/centers/:id` | `CenterDetail` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager enforced to own center_id |
 | `/admin/org` | `OrgSettings` | `ProtectedRoute roles={['super_admin']}` |
+| `/admin/courses` | `CoursesList` | `ProtectedRoute` (any authenticated role) |
+| `/admin/courses/:id` | `CourseDetail` | `ProtectedRoute` (any authenticated role) |
+| `/classes` | `ClassesList` | `ProtectedRoute roles={['center_manager','teacher']}` — center_manager scoped to user.center_id |
+| `/classes/:id` | `ClassDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/enrollment` | `EnrollmentsList` | `ProtectedRoute roles={['center_manager']}` |
+| `/enrollment/new` | `EnrollmentForm` | `ProtectedRoute roles={['center_manager']}` |
+| `/attendance` | `MarkAttendance` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/attendance/sheet` | `AttendanceSheet` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/attendance/my` | `MyAttendance` | `ProtectedRoute roles={['student']}` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
+| `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |
-| `/courses`, `/teachers`, `/students`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
+| `/teachers`, `/students`, `/reports`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
 
 ### Role-based sidebar nav
 
@@ -1877,7 +2145,7 @@ Behaviour:
 
 | Role | Nav sections |
 |------|-------------|
-| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Reports, Settings) |
+| `super_admin` | Overview (Dashboard → `/dashboard`, Centers → `/admin/centers`), Academic (Courses → `/admin/courses`, Teachers, Students), Reports (Reports, Settings → `/admin/org`) |
 | `center_manager` | My Center (Dashboard, Classes, Enrollment, Attendance), Admin (Reports) |
 | `teacher` | My Classes (Dashboard, Attendance, Log Progress, Assessments) |
 | `student` | My Learning (My Progress, Attendance, Schedule, Results) |

@@ -17,7 +17,7 @@ const NAV_CONFIG = {
       {
         title: 'Academic',
         items: [
-          { to: '/courses',  label: 'Courses',  icon: '◈' },
+          { to: '/admin/courses', label: 'Courses', icon: '◈' },
           { to: '/teachers', label: 'Teachers', icon: '◉' },
           { to: '/students', label: 'Students', icon: '○' },
         ],
@@ -78,10 +78,10 @@ const NAV_CONFIG = {
       {
         title: 'My Learning',
         items: [
-          { to: '/dashboard',  label: 'My Progress', icon: '⊞' },
-          { to: '/attendance', label: 'Attendance',  icon: '☑' },
-          { to: '/schedule',   label: 'Schedule',    icon: '◉' },
-          { to: '/results',    label: 'Results',     icon: '▦' },
+          { to: '/dashboard',       label: 'My Progress', icon: '⊞' },
+          { to: '/attendance/my',   label: 'Attendance',  icon: '☑' },
+          { to: '/schedule',        label: 'Schedule',    icon: '◉' },
+          { to: '/results',         label: 'Results',     icon: '▦' },
         ],
       },
     ],
