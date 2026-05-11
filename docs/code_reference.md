@@ -1533,6 +1533,8 @@ frontend/
                           updateEnrollment
       attendance.js       createAttendanceSession, getClassAttendance, getSessionRecords,
                           updateRecord, getStudentAttendance
+      progress.js         createSession, getSession, updateSession, getStudentProgress,
+                          updateHomeworkEntry, updateHomeworkScore
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1543,6 +1545,8 @@ frontend/
       useAuth.js          Thin useContext(AuthContext) wrapper
       useToast.js         { success, error, warning, toast } helpers over ToastContext
       useAttendance.js    useClassAttendance, useStudentAttendance, useMarkAttendance, useCorrectRecord
+      useProgress.js      useStudentProgress, useHomeworkCriteria, useCreateSession, useClassProgress,
+                          useClassEnrollments
 
     components/
       ProtectedRoute.jsx  Layout route guard — redirects to /signin if unauthenticated;
@@ -1604,10 +1608,19 @@ frontend/
                                live summary header; sticky bottom bar; gold banner if editing existing session
           AttendanceSheet.jsx  Week/month grid; per-student % column; per-day % header; inline record correction;
                                CSV export with BOM for Urdu text
+        Progress/
+          ProgressLogger.jsx   Class+student selector (searchable dropdown with last-session preview);
+                               grade toggle buttons (4 colors); RTLInput note fields; per-criterion score rows
+                               with running total; sticky submit bar; confetti burst on success
+          ClassProgress.jsx    Card grid of all enrolled students; per-student last session + HW avg ProgressBar;
+                               "Log today" button navigates to ProgressLogger pre-filled
       student/
         Attendance/
           MyAttendance.jsx     4 MetricCards (Present/Absent/Late/Attendance%); monthly calendar grid;
                                scrollable session history table (descending date order)
+        Progress/
+          MyProgress.jsx       3 MetricCards; topic progress section (expandable subtopic rows with ✓/○);
+                               session history table (expandable row shows per-criterion scores)
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -2040,6 +2053,75 @@ Wraps `Modal` (size `sm`). Confirms the student name and class name, accepts a w
 - **Monthly calendar grid**: 7-column Monday-anchored grid. Days with sessions are colored (green=present, red=absent, gold=late). Hover shows date + status. Month navigation ← → changes the displayed month (year-level data already loaded).
 - **Sessions table**: descending date order, columns Date / Status (Badge) / Note (Urdu RTL). Capped at 480px height with scroll.
 
+### Progress & Homework frontend module
+
+#### `frontend/src/api/progress.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `createSession(payload)` | `POST /progress-sessions` | Log classwork + homework scores in one call |
+| `getSession(sessionId)` | `GET /progress-sessions/:id` | Single session with scores |
+| `updateSession(sessionId, payload)` | `PATCH /progress-sessions/:id` | Correct classwork entry |
+| `getStudentProgress(userId, params)` | `GET /students/:id/progress` | Full history; `?class_id`, `?from`, `?to`, `?include=homework_scores` |
+| `updateHomeworkEntry(entryId, payload)` | `PATCH /homework-entries/:id` | Update submission status or overall note |
+| `updateHomeworkScore(entryId, scoreId, payload)` | `PATCH /homework-entries/:id/scores/:sid` | Correct a single score |
+
+#### `frontend/src/hooks/useProgress.js` — hook exports
+
+| Hook | Returns | Description |
+|------|---------|-------------|
+| `useStudentProgress(userId, params)` | `useQuery` | Student progress history + aggregate stats |
+| `useHomeworkCriteria(classId)` | `useQuery` | Active and inactive criteria for a class |
+| `useCreateSession()` | `useMutation` | `mutateAsync(payload)` — invalidates student progress + class enrollments on success |
+| `useClassProgress(classId, dateRange)` | `useQuery` | Class-level attendance reused for overview |
+| `useClassEnrollments(classId)` | `useQuery` | Active enrollments with student names |
+
+#### `ProgressLogger.jsx` — teacher daily workflow
+
+This is the highest-usage screen. Layout:
+
+1. **Select student** (top card): class selector → searchable dropdown of enrolled students. Each dropdown item shows name, Urdu name, and last session date. Selected student shows a summary banner with their most recent topic + grade.
+
+2. **Left column — Classwork card:**
+   - Topic select (options show `title_ur / title`); changing topic resets subtopic
+   - Subtopic select (conditional — only appears when topic has subtopics)
+   - **Grade buttons:** 4 large toggle buttons in a 2×2 grid: Excellent (emerald), Good (blue), Average (amber), Needs Revision (red). Fill on selection.
+   - Teacher note Urdu (RTLInput multiline, Amiri font)
+   - Collapsible Arabic note section (hidden by default)
+
+3. **Right column — Homework Scores card:**
+   - Each active criterion rendered as `ScoreRow`: label_ur (RTL), topic chip, `/ max` label, number input (validated on blur to prevent over-max), expandable Urdu note field (revealed via ✎ button)
+   - **Running total footer**: `{total} / {maxTotal}` + live `(pct%)` in color (green ≥ 80%, amber 60–79%, red <60%)
+   - Homework due date picker
+   - Overall homework note (RTLInput)
+
+4. **Sticky submit bar**: shows `{student} · {class} · {date}`. Disabled until a grade is selected. On success: confetti burst (24 colored particles, CSS animation), toast, form resets to student selection. On error: shows `message_ur` from API alongside English message.
+
+**`createSession` payload:**
+```json
+{
+  "enrollment_id": "uuid",
+  "class_id": "uuid",
+  "session_date": "YYYY-MM-DD",
+  "classwork": { "topic_id", "subtopic_id", "grade", "note_ur", "note_ar" },
+  "homework": { "due_date", "overall_note_ur", "scores": [{ "criteria_id", "marks_obtained", "note_ur" }] }
+}
+```
+
+#### `ClassProgress.jsx` — class overview
+
+- Class selector + last 7/30/90 days toggle.
+- Fetches enrollments then **`useQueries`** for per-student progress in parallel (one query per student).
+- Cards in a responsive auto-fill grid. Each card: name + Urdu name, last session date + grade chip, topic name (RTL), mini ProgressBar for HW avg.
+- "Log today →" button navigates to `/progress?enrollment=...&class=...` so ProgressLogger can pre-fill the student selector.
+
+#### `MyProgress.jsx` — student read-only view
+
+- Fetches `GET /students/:id/progress?include=homework_scores&from=YYYY-01-01&to=YYYY-MM-DD`.
+- **3 MetricCards**: Topics covered, Attendance %, Homework avg (color-coded).
+- **Topic progress** (left column): one bar per topic. `pct = subtopics_covered / total_subtopics`. Clicking a topic with subtopics expands an inline list showing ✓ (covered) or ○ (not yet) per subtopic, using Amiri font for Urdu names.
+- **Session history table** (right column): Date / Topic / Subtopic / Grade / HW % / Teacher note. Clicking a row (when it has homework scores) expands an inline scores breakdown showing `marks / max` per criterion.
+
 ### Token audit result
 
 All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
@@ -2134,6 +2216,9 @@ Behaviour:
 | `/attendance` | `MarkAttendance` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/attendance/sheet` | `AttendanceSheet` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/attendance/my` | `MyAttendance` | `ProtectedRoute roles={['student']}` |
+| `/progress` | `ProgressLogger` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/progress/class` | `ClassProgress` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/progress/my` | `MyProgress` | `ProtectedRoute roles={['student']}` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |

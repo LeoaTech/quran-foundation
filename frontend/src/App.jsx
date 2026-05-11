@@ -29,6 +29,10 @@ import MarkAttendance    from './pages/teacher/Attendance/MarkAttendance';
 import AttendanceSheet   from './pages/teacher/Attendance/AttendanceSheet';
 import MyAttendance      from './pages/student/Attendance/MyAttendance';
 
+import ProgressLogger    from './pages/teacher/Progress/ProgressLogger';
+import ClassProgress     from './pages/teacher/Progress/ClassProgress';
+import MyProgress        from './pages/student/Progress/MyProgress';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -107,11 +111,20 @@ export default function App() {
                     <Route path="/attendance/my" element={<MyAttendance />} />
                   </Route>
 
+                  {/* Progress — teacher logging + class overview */}
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/progress"       element={<ProgressLogger />} />
+                    <Route path="/progress/class" element={<ClassProgress />} />
+                  </Route>
+                  {/* Student's own progress */}
+                  <Route element={<ProtectedRoute roles={['student']} />}>
+                    <Route path="/progress/my" element={<MyProgress />} />
+                  </Route>
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
-                  <Route path="/progress"    element={<Placeholder />} />
                   <Route path="/assessments" element={<Placeholder />} />
                   <Route path="/schedule"    element={<Placeholder />} />
                   <Route path="/results"     element={<Placeholder />} />

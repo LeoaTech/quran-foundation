@@ -62,10 +62,11 @@ const NAV_CONFIG = {
       {
         title: 'My Classes',
         items: [
-          { to: '/dashboard',   label: 'Dashboard',     icon: '⊞' },
-          { to: '/attendance',  label: 'Attendance',    icon: '☑' },
-          { to: '/progress',    label: 'Log Progress',  icon: '◈' },
-          { to: '/assessments', label: 'Assessments',   icon: '▦' },
+          { to: '/dashboard',       label: 'Dashboard',     icon: '⊞' },
+          { to: '/attendance',      label: 'Attendance',    icon: '☑' },
+          { to: '/progress',        label: 'Log Progress',  icon: '◈' },
+          { to: '/progress/class',  label: 'Class Overview', icon: '◉' },
+          { to: '/assessments',     label: 'Assessments',   icon: '▦' },
         ],
       },
     ],
@@ -78,7 +79,7 @@ const NAV_CONFIG = {
       {
         title: 'My Learning',
         items: [
-          { to: '/dashboard',       label: 'My Progress', icon: '⊞' },
+          { to: '/progress/my',     label: 'My Progress', icon: '⊞' },
           { to: '/attendance/my',   label: 'Attendance',  icon: '☑' },
           { to: '/schedule',        label: 'Schedule',    icon: '◉' },
           { to: '/results',         label: 'Results',     icon: '▦' },
