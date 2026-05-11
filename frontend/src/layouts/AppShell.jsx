@@ -81,8 +81,8 @@ const NAV_CONFIG = {
         items: [
           { to: '/progress/my',     label: 'My Progress', icon: '⊞' },
           { to: '/attendance/my',   label: 'Attendance',  icon: '☑' },
-          { to: '/schedule',        label: 'Schedule',    icon: '◉' },
-          { to: '/results',         label: 'Results',     icon: '▦' },
+          { to: '/schedule',           label: 'Schedule',    icon: '◉' },
+          { to: '/assessments/my',  label: 'Results',     icon: '▦' },
         ],
       },
     ],

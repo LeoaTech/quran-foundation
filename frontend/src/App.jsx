@@ -33,6 +33,10 @@ import ProgressLogger    from './pages/teacher/Progress/ProgressLogger';
 import ClassProgress     from './pages/teacher/Progress/ClassProgress';
 import MyProgress        from './pages/student/Progress/MyProgress';
 
+import AssessmentsList   from './pages/teacher/Assessments/AssessmentsList';
+import AssessmentDetail  from './pages/teacher/Assessments/AssessmentDetail';
+import MyAssessments     from './pages/student/Assessments/MyAssessments';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -121,13 +125,22 @@ export default function App() {
                     <Route path="/progress/my" element={<MyProgress />} />
                   </Route>
 
+                  {/* Assessments — teacher + center_manager create/view */}
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/assessments"     element={<AssessmentsList />} />
+                    <Route path="/assessments/:id" element={<AssessmentDetail />} />
+                  </Route>
+                  {/* Student's own results */}
+                  <Route element={<ProtectedRoute roles={['student']} />}>
+                    <Route path="/assessments/my" element={<MyAssessments />} />
+                  </Route>
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
-                  <Route path="/assessments" element={<Placeholder />} />
                   <Route path="/schedule"    element={<Placeholder />} />
-                  <Route path="/results"     element={<Placeholder />} />
+                  <Route path="/results"     element={<Navigate to="/assessments/my" replace />} />
 
                 </Route>
               </Route>

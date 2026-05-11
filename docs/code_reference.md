@@ -1535,6 +1535,8 @@ frontend/
                           updateRecord, getStudentAttendance
       progress.js         createSession, getSession, updateSession, getStudentProgress,
                           updateHomeworkEntry, updateHomeworkScore
+      assessments.js      getClassAssessments, createAssessment, getAssessment, updateAssessment,
+                          submitResults, updateResult, getAssessmentResults, getStudentAssessments
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1621,6 +1623,14 @@ frontend/
         Progress/
           MyProgress.jsx       3 MetricCards; topic progress section (expandable subtopic rows with ✓/○);
                                session history table (expandable row shows per-criterion scores)
+        Assessments/
+          MyAssessments.jsx    Read-only table sorted by date desc; score color-coded by %; Urdu remarks RTL
+      teacher/
+        Assessments/
+          AssessmentsList.jsx  Class selector + type filter; row-click navigates to AssessmentDetail
+          AssessmentDetail.jsx 2 tabs: Enter Results (per-student score/grade form) + Results Overview
+                               (summary MetricCards + sortable table + CSV export)
+          CreateAssessmentModal.jsx  max_score hidden when type=oral; blue info banner shown for oral type
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -2122,6 +2132,52 @@ This is the highest-usage screen. Layout:
 - **Topic progress** (left column): one bar per topic. `pct = subtopics_covered / total_subtopics`. Clicking a topic with subtopics expands an inline list showing ✓ (covered) or ○ (not yet) per subtopic, using Amiri font for Urdu names.
 - **Session history table** (right column): Date / Topic / Subtopic / Grade / HW % / Teacher note. Clicking a row (when it has homework scores) expands an inline scores breakdown showing `marks / max` per criterion.
 
+### Assessments frontend module
+
+#### `frontend/src/api/assessments.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getClassAssessments(classId)` | `GET /classes/:id/assessments` | List assessments for a class |
+| `createAssessment(classId, payload)` | `POST /classes/:id/assessments` | Create assessment |
+| `getAssessment(assessmentId)` | `GET /assessments/:id` | Single assessment with metadata |
+| `updateAssessment(assessmentId, payload)` | `PATCH /assessments/:id` | Edit assessment |
+| `submitResults(assessmentId, results)` | `POST /assessments/:id/results` | Bulk-submit results array |
+| `updateResult(assessmentId, resultId, payload)` | `PATCH /assessments/:id/results/:rid` | Correct one result |
+| `getAssessmentResults(assessmentId)` | `GET /assessments/:id/results` | All results for an assessment |
+| `getStudentAssessments(userId)` | `GET /students/:id/assessments` | Student's full assessment history |
+
+#### `AssessmentsList.jsx`
+
+- Class selector + type filter toggle (All / Written / Oral / Topic test).
+- Fetches `getClassAssessments(classId)` — `results_recorded / total_students` shown in the Results column, colored green when fully complete.
+- Row click navigates to `/assessments/:id`. "Create assessment" button opens `CreateAssessmentModal` and, on creation, navigates directly to the new detail page.
+
+#### `AssessmentDetail.jsx` — two tabs
+
+**Tab 1 — Enter results:**
+- Fetches active enrollments + existing results in parallel on mount.
+- Per-student row: name + Urdu name, then either a numeric score input (for written/topic_test) or 4 oral grade buttons (Excellent/Good/Average/Fail, color-coded), plus an optional topic-tested dropdown and Urdu remarks RTLInput.
+- Students with already-saved results show a green ✓ next to their name; editing marks them unsaved.
+- "Save all results" calls `submitResults(assessmentId, results[])` with only non-empty entries.
+
+**Tab 2 — Results overview:**
+- Written/topic_test: 4 MetricCards (avg score, highest, lowest, students above 60%).
+- Table sorted by score descending; score shown in color (green ≥ 80%, amber 60–79%, red <60%); oral grades show colored chips.
+- **CSV export** with BOM includes Student, Urdu name, score/grade, topic, remarks.
+
+#### `CreateAssessmentModal.jsx`
+
+- `max_score` field is dynamically hidden when `type === 'oral'`.
+- When oral is selected, a blue info banner explains that oral evaluations use grades instead of scores.
+- On create: invalidates `['class-assessments', classId]`, navigates to new assessment detail.
+
+#### `MyAssessments.jsx` (student)
+
+- Fetches `GET /students/:id/assessments`.
+- Table sorted descending by date. Each row: date, assessment title + Urdu title stacked, type chip, score/percentage (color-coded) or oral grade chip, topic (Amiri/RTL), remarks (Amiri/RTL).
+- No interaction — fully read-only.
+
 ### Token audit result
 
 All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
@@ -2219,6 +2275,10 @@ Behaviour:
 | `/progress` | `ProgressLogger` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/progress/class` | `ClassProgress` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/progress/my` | `MyProgress` | `ProtectedRoute roles={['student']}` |
+| `/assessments` | `AssessmentsList` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/assessments/:id` | `AssessmentDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/assessments/my` | `MyAssessments` | `ProtectedRoute roles={['student']}` |
+| `/results` | redirect | → `/assessments/my` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |
