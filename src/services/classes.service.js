@@ -1,5 +1,6 @@
 const repo      = require('../repositories/classes.repository');
 const centerRepo = require('../repositories/centers.repository');
+const activityLog = require('./activityLog.service');
 const { AppError } = require('../utils/errors');
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -89,13 +90,34 @@ async function createClass({ user, centerId, body }) {
     throw new AppError('NOT_FOUND', 'Center not found or inactive.', 'مرکز نہیں ملا یا غیر فعال ہے۔', 404);
   }
 
-  return repo.createClass({ ...body, center_id: centerId });
+  const cls = await repo.createClass({ ...body, center_id: centerId });
+  activityLog.log({
+    actor:       user,
+    action:      'class.create',
+    entity_type: 'class',
+    entity_id:   cls.id,
+    center_id:   centerId,
+    org_id:      center.org_id,
+    summary_en:  `Created class "${cls.name}" at center "${center.name}"`,
+    metadata:    { class_name: cls.name, center_name: center.name },
+  }).catch(() => {});
+  return cls;
 }
 
 async function updateClass({ user, classId, body }) {
   const cls = await requireClass(classId);
   await assertClassAccess(user, cls);
-  return repo.updateClass(classId, body);
+  const updated = await repo.updateClass(classId, body);
+  activityLog.log({
+    actor:       user,
+    action:      'class.update',
+    entity_type: 'class',
+    entity_id:   classId,
+    center_id:   cls.center_id,
+    summary_en:  `Updated class "${updated.name || cls.name}"`,
+    metadata:    { class_name: updated.name || cls.name },
+  }).catch(() => {});
+  return updated;
 }
 
 // ── Class Teachers ─────────────────────────────────────────────────────────────

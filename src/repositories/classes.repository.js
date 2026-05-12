@@ -3,22 +3,55 @@ const db = require('../db/knex');
 // ── Classes ───────────────────────────────────────────────────────────────────
 
 function listClasses(centerId, { courseId, isActive } = {}) {
-  const query = db('classes').where({ center_id: centerId }).orderBy('name', 'asc');
-  if (courseId  !== undefined) query.where({ course_id: courseId });
-  if (isActive  !== undefined) query.where({ is_active: isActive });
+  const query = db('classes as c')
+    .join('courses as cr', 'cr.id', 'c.course_id')
+    .leftJoin('course_levels as cl', 'cl.id', 'c.course_level_id')
+    .leftJoin('enrollments as e', function() {
+      this.on('e.class_id', '=', 'c.id')
+          .andOnVal('e.status', '=', 'active')
+          .andOnVal('e.is_active', '=', true);
+    })
+    .where('c.center_id', centerId)
+    .select(
+      'c.*',
+      'cr.name as course_name',
+      'cr.type as course_type',
+      'cl.title as course_level_title',
+      db.raw('COUNT(e.id)::int as enrolled_count')
+    )
+    .groupBy('c.id', 'cr.id', 'cl.id')
+    .orderBy('c.name', 'asc');
+    
+  if (courseId  !== undefined) query.where('c.course_id', courseId);
+  if (isActive  !== undefined) query.where('c.is_active', isActive);
   return query;
 }
 
 // Returns only the classes a specific teacher is assigned to within a center.
 function listClassesForTeacher(centerId, teacherUserId, { courseId, isActive } = {}) {
   const query = db('classes as c')
+    .join('courses as cr', 'cr.id', 'c.course_id')
+    .leftJoin('course_levels as cl', 'cl.id', 'c.course_level_id')
     .join('class_teachers as ct', function () {
       this.on('ct.class_id', '=', 'c.id').andOnVal('ct.is_active', '=', true);
+    })
+    .leftJoin('enrollments as e', function() {
+      this.on('e.class_id', '=', 'c.id')
+          .andOnVal('e.status', '=', 'active')
+          .andOnVal('e.is_active', '=', true);
     })
     .where('c.center_id', centerId)
     .where('ct.teacher_user_id', teacherUserId)
     .orderBy('c.name', 'asc')
-    .select('c.*');
+    .select(
+      'c.*',
+      'cr.name as course_name',
+      'cr.type as course_type',
+      'cl.title as course_level_title',
+      db.raw('COUNT(e.id)::int as enrolled_count')
+    )
+    .groupBy('c.id', 'cr.id', 'cl.id', 'ct.id');
+    
   if (courseId !== undefined) query.where('c.course_id', courseId);
   if (isActive !== undefined) query.where('c.is_active', isActive);
   return query;
