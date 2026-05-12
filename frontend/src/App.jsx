@@ -25,9 +25,13 @@ import ClassDetail       from './pages/manager/Classes/ClassDetail';
 import EnrollmentsList   from './pages/manager/Enrollments/EnrollmentsList';
 import EnrollmentForm    from './pages/manager/Enrollments/EnrollmentForm';
 
+import DonationsList     from './pages/manager/Finance/DonationsList';
+import RecordDonation    from './pages/manager/Finance/RecordDonation';
+
 import MarkAttendance    from './pages/teacher/Attendance/MarkAttendance';
 import AttendanceSheet   from './pages/teacher/Attendance/AttendanceSheet';
 import MyAttendance      from './pages/student/Attendance/MyAttendance';
+
 import Enrollment     from './pages/manager/Enrollment';
 
 import Placeholder    from './pages/Placeholder';
@@ -94,10 +98,13 @@ export default function App() {
                     <Route path="/classes/:id" element={<ClassDetail />} />
                   </Route>
 
-                  {/* Enrollments — center_manager only */}
+                  {/* Enrollments & Finance — center_manager only */}
                   <Route element={<ProtectedRoute roles={['center_manager']} />}>
                     <Route path="/enrollment"     element={<EnrollmentsList />} />
                     <Route path="/enrollment/new" element={<EnrollmentForm />} />
+                    
+                    <Route path="/donations"     element={<DonationsList />} />
+                    <Route path="/donations/new" element={<RecordDonation />} />
                   </Route>
 
                   {/* Attendance — role-split */}
