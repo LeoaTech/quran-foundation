@@ -1,5 +1,10 @@
 import client from './client';
 
+export async function getCenterClasses(centerId) {
+  const res = await client.get(`/centers/${centerId}/classrooms`);
+  return res.data;
+}
+
 // ── Classes ───────────────────────────────────────────────────────────────────
 export const getClasses = (centerId, params = {}) =>
   client.get(`/centers/${centerId}/classes`, { params }).then((r) => r.data);

@@ -26,6 +26,16 @@ function capacityColor(enrolled, max) {
   return 'var(--emerald)';
 }
 
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':');
+  let hours = parseInt(h, 10);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  if (hours === 0) hours = 12;
+  else if (hours > 12) hours -= 12;
+  return `${hours}:${m} ${suffix}`;
+}
+
 function thStyle() {
   return { textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' };
 }
@@ -181,10 +191,14 @@ export default function ClassesList() {
                       )}
                     </td>
                     <td style={tdStyle(!isLast)}>
-                      {chip ? (
-                        <span className={chip.cls}>{chip.label}</span>
-                      ) : (
-                        <span style={{ fontSize: 12 }}>{cls.course_name ?? cls.course?.name ?? '—'}</span>
+                      <div style={{ fontWeight: 500, color: 'var(--ink)' }}>
+                        {cls.course_name ?? cls.course?.name ?? '—'}
+                        {chip && <span className={chip.cls} style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px' }}>{chip.label}</span>}
+                      </div>
+                      {cls.course_level_title && (
+                        <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
+                          {cls.course_level_title}
+                        </div>
                       )}
                     </td>
                     <td style={tdStyle(!isLast)}>
@@ -199,7 +213,7 @@ export default function ClassesList() {
                         </div>
                       )}
                       {cls.start_time && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 3 }}>{cls.start_time}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 3 }}>{formatTime(cls.start_time)}</div>
                       )}
                     </td>
                     <td style={tdStyle(!isLast)}>
