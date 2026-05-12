@@ -1,5 +1,8 @@
 const repo      = require('../repositories/enrollments.repository');
 const classRepo = require('../repositories/classes.repository');
+const financeRepo = require('../repositories/finance.repository');
+const activityLog = require('./activityLog.service');
+const db        = require('../db/knex');
 const { AppError } = require('../utils/errors');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,7 +46,7 @@ async function requireEnrollment(enrollmentId) {
 // ── Service functions ─────────────────────────────────────────────────────────
 
 async function createEnrollment({ user, body }) {
-  const { student_user_id, class_id, enrolled_on, prior_level, notes_ur } = body;
+  const { student_user_id, class_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method } = body;
 
   const cls = await requireClass(class_id);
 
@@ -80,16 +83,191 @@ async function createEnrollment({ user, body }) {
 
   const today = new Date().toISOString().split('T')[0];
 
-  return repo.createEnrollment({
-    student_user_id,
-    class_id,
-    center_id:   cls.center_id,
-    status:      'active',
-    enrolled_on: enrolled_on || today,
-    prior_level: prior_level || null,
-    notes_ur:    notes_ur    || null,
-    is_active:   true,
+  const result = await db.transaction(async (trx) => {
+    const enrollment = await repo.createEnrollment({
+      student_user_id,
+      class_id,
+      center_id:   cls.center_id,
+      status:      'active',
+      enrolled_on: enrolled_on || today,
+      prior_level: prior_level || null,
+      notes_ur:    notes_ur    || null,
+      is_active:   true,
+    }, trx);
+
+    if (amount_paid != null) {
+      await financeRepo.createFeePayment({
+        enrollment_id: enrollment.id,
+        amount_paid,
+        payment_method: payment_method || 'cash',
+        received_by_user_id: user.id,
+        center_id: cls.center_id,
+        payment_date: today,
+      }, trx);
+    }
+
+    return enrollment;
   });
+
+  const student = await db('users').where({ id: student_user_id }).first();
+  const studentName = student ? student.full_name : 'Unknown Student';
+
+  activityLog.log({
+    actor:       user,
+    action:      'enrollment.create',
+    entity_type: 'enrollment',
+    entity_id:   result.id,
+    center_id:   cls.center_id,
+    summary_en:  `Enrolled student ${studentName} into ${cls.name}`,
+    metadata:    { student_user_id, class_id },
+  }).catch(() => {});
+
+  if (amount_paid != null) {
+    activityLog.log({
+      actor:       user,
+      action:      'payment.collect',
+      entity_type: 'enrollment',
+      entity_id:   result.id,
+      center_id:   cls.center_id,
+      summary_en:  `${user.full_name || 'System'} collected fee ${amount_paid} PKR for enrollment in ${cls.name}`,
+      metadata:    { amount_paid, payment_method: payment_method || 'cash' },
+    }).catch(() => {});
+  }
+
+  return result;
+}
+
+// ── Enroll New Student (transactional) ────────────────────────────────────────
+// Creates a new user, assigns the 'student' role, and enrolls them into a class
+// — all inside a single DB transaction. If ANY step fails the entire operation
+// is rolled back so there are no orphan users or partial data.
+
+async function enrollNewStudent({ user, body }) {
+  const {
+    full_name, full_name_ur, phone, whatsapp, date_of_birth, gender,
+    class_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method
+  } = body;
+
+  // ── Pre-flight checks (outside transaction — read-only) ─────────────────
+  const cls = await requireClass(class_id);
+
+  if (!cls.is_active) {
+    throw new AppError('NOT_FOUND', 'Class not found or inactive.', 'کلاس نہیں ملی یا غیر فعال ہے۔', 404);
+  }
+
+  // center_manager may only enroll into their own center's classes.
+  assertCenterAccess(user, cls.center_id);
+
+  // Capacity check
+  if (cls.max_capacity != null) {
+    const activeCount = await repo.countActiveEnrollments(class_id);
+    if (activeCount >= cls.max_capacity) {
+      throw new AppError('CLASS_FULL', 'This class has reached its maximum capacity.', 'یہ کلاس اپنی زیادہ سے زیادہ گنجائش تک پہنچ گئی ہے۔', 409);
+    }
+  }
+
+  // Duplicate phone check — prevent creating a second user with the same phone.
+  if (phone) {
+    const existingUser = await db('users').where({ phone }).first();
+    if (existingUser) {
+      // Check if this user is already enrolled in this class
+      const existingEnrollment = await repo.getActiveEnrollmentForStudent(class_id, existingUser.id);
+      if (existingEnrollment) {
+        throw new AppError('ENROLLMENT_CONFLICT', 'A student with this phone is already enrolled in this class.', 'اس فون نمبر والا طالب علم پہلے سے اس کلاس میں داخل ہے۔', 409);
+      }
+      throw new AppError('USER_EXISTS', `A user with phone ${phone} already exists (${existingUser.full_name}). Use the standard enrollment endpoint with their user ID.`, 'اس فون نمبر کا صارف پہلے سے موجود ہے۔', 409);
+    }
+  }
+
+  // ── Transactional block ─────────────────────────────────────────────────
+  const today = new Date().toISOString().split('T')[0];
+  const tempPassword = `Qf${require('crypto').randomBytes(4).toString('hex')}`;
+  const password_hash = await require('bcryptjs').hash(tempPassword, 10);
+
+  const result = await db.transaction(async (trx) => {
+    // 1. Create the user
+    const [newUser] = await trx('users').insert({
+      full_name,
+      full_name_ur: full_name_ur || null,
+      email:        `student_${require('crypto').randomBytes(4).toString('hex')}@qf.local`,
+      phone:        phone || null,
+      whatsapp:     whatsapp || null,
+      date_of_birth: date_of_birth || null,
+      gender:       gender || null,
+      password_hash,
+      preferred_lang: 'ur',
+      is_active:    true,
+    }).returning('*');
+
+    // 2. Assign the 'student' role scoped to this center
+    const roleRow = await trx('roles').where({ name: 'student' }).first();
+    if (!roleRow) throw new Error("Role 'student' not found in roles table.");
+
+    await trx('user_roles').insert({
+      user_id:   newUser.id,
+      role_id:   roleRow.id,
+      center_id: cls.center_id,
+    });
+
+    // 3. Create the enrollment
+    const [enrollment] = await trx('enrollments').insert({
+      student_user_id: newUser.id,
+      class_id,
+      center_id:   cls.center_id,
+      status:      'active',
+      enrolled_on: enrolled_on || today,
+      prior_level: prior_level || null,
+      notes_ur:    notes_ur || null,
+      is_active:   true,
+    }).returning('*');
+
+    if (amount_paid != null) {
+      await financeRepo.createFeePayment({
+        enrollment_id: enrollment.id,
+        amount_paid,
+        payment_method: payment_method || 'cash',
+        received_by_user_id: user.id,
+        center_id: cls.center_id,
+        payment_date: today,
+      }, trx);
+    }
+
+    return { user: newUser, enrollment, temp_password: tempPassword };
+  });
+
+  const responseData = {
+    student: {
+      id:        result.user.id,
+      full_name: result.user.full_name,
+      phone:     result.user.phone,
+      temp_password: result.temp_password,
+    },
+    enrollment: result.enrollment,
+  };
+
+  activityLog.log({
+    actor:       user,
+    action:      'enrollment.create',
+    entity_type: 'enrollment',
+    entity_id:   result.enrollment.id,
+    center_id:   result.enrollment.center_id,
+    summary_en:  `Enrolled student ${result.user.full_name} into ${cls.name}`,
+    metadata:    { student_name: result.user.full_name, class_id },
+  }).catch(() => {});
+
+  if (amount_paid != null) {
+    activityLog.log({
+      actor:       user,
+      action:      'payment.collect',
+      entity_type: 'enrollment',
+      entity_id:   result.enrollment.id,
+      center_id:   result.enrollment.center_id,
+      summary_en:  `${user.full_name || 'System'} collected fee ${amount_paid} PKR for enrollment in ${cls.name}`,
+      metadata:    { amount_paid, payment_method: payment_method || 'cash' },
+    }).catch(() => {});
+  }
+
+  return responseData;
 }
 
 async function listEnrollmentsByClass({ user, classId, query = {} }) {
@@ -101,6 +279,12 @@ async function listEnrollmentsByClass({ user, classId, query = {} }) {
 
   const status = query.status; // optional filter: 'active' | 'withdrawn'
   return repo.listEnrollmentsByClass(classId, { status });
+}
+
+async function listEnrollmentsByCenter({ user, centerId, query = {} }) {
+  assertCenterAccess(user, centerId);
+  const status = query.status;
+  return repo.listEnrollmentsByCenter(centerId, { status });
 }
 
 async function listEnrollmentsByStudent({ user, studentUserId }) {
@@ -125,12 +309,24 @@ async function updateEnrollment({ user, enrollmentId, body }) {
     updates.withdrawn_on = new Date().toISOString().split('T')[0];
   }
 
-  return repo.updateEnrollment(enrollmentId, updates);
+  const updated = await repo.updateEnrollment(enrollmentId, updates);
+  activityLog.log({
+    actor:       user,
+    action:      'enrollment.update',
+    entity_type: 'enrollment',
+    entity_id:   enrollmentId,
+    center_id:   enrollment.center_id,
+    summary_en:  `Updated enrollment status to "${updates.status || enrollment.status}"`,
+    metadata:    { enrollment_id: enrollmentId, status: updates.status || enrollment.status },
+  }).catch(() => {});
+  return updated;
 }
 
 module.exports = {
   createEnrollment,
+  enrollNewStudent,
   listEnrollmentsByClass,
+  listEnrollmentsByCenter,
   listEnrollmentsByStudent,
   updateEnrollment,
 };

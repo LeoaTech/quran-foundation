@@ -15,6 +15,8 @@ const createEnrollmentSchema = z.object({
   enrolled_on:     z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
   prior_level:     z.string().max(100).optional(),
   notes_ur:        z.string().optional(),
+  amount_paid:     z.number().positive().optional(),
+  payment_method:  z.string().optional(),
 });
 
 const updateEnrollmentSchema = z.object({
@@ -35,6 +37,38 @@ router.post(
   requireRoles('super_admin', 'center_manager'),
   validate(createEnrollmentSchema),
   controller.createEnrollment,
+);
+
+// Enroll a NEW student — creates user + role + enrollment in one transaction.
+const enrollNewStudentSchema = z.object({
+  full_name:     z.string().min(1, 'full_name is required'),
+  full_name_ur:  z.string().optional(),
+  phone:         z.string().min(1, 'phone is required'),
+  whatsapp:      z.string().optional(),
+  date_of_birth: z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
+  gender:        z.enum(['male', 'female', 'other']).optional(),
+  class_id:      z.string().uuid('class_id must be a UUID'),
+  enrolled_on:   z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
+  prior_level:   z.string().max(100).optional(),
+  notes_ur:      z.string().optional(),
+  amount_paid:   z.number().positive().optional(),
+  payment_method: z.string().optional(),
+});
+
+router.post(
+  '/enrollments/enroll-student',
+  requireAuth,
+  requireRoles('super_admin', 'center_manager'),
+  validate(enrollNewStudentSchema),
+  controller.enrollNewStudent,
+);
+
+// List all enrollments for a center.
+router.get(
+  '/centers/:center_id/enrollments',
+  requireAuth,
+  requireRoles('super_admin', 'center_manager'),
+  controller.listEnrollmentsByCenter,
 );
 
 // List all enrollments for a class (?status=active|withdrawn).

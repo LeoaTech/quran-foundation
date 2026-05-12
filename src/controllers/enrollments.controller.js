@@ -8,9 +8,25 @@ async function createEnrollment(req, res, next) {
   }
 }
 
+async function enrollNewStudent(req, res, next) {
+  try {
+    res.status(201).json(await service.enrollNewStudent({ user: req.user, body: req.body }));
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function listEnrollmentsByClass(req, res, next) {
   try {
     res.json(await service.listEnrollmentsByClass({ user: req.user, classId: req.params.class_id, query: req.query }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listEnrollmentsByCenter(req, res, next) {
+  try {
+    res.json(await service.listEnrollmentsByCenter({ user: req.user, centerId: req.params.center_id, query: req.query }));
   } catch (err) {
     next(err);
   }
@@ -34,7 +50,9 @@ async function updateEnrollment(req, res, next) {
 
 module.exports = {
   createEnrollment,
+  enrollNewStudent,
   listEnrollmentsByClass,
+  listEnrollmentsByCenter,
   listEnrollmentsByStudent,
   updateEnrollment,
 };
