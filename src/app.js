@@ -71,6 +71,7 @@ app.use('/api/v1', require('./routes/progress'));
 app.use('/api/v1', require('./routes/assessments'));
 app.use('/api/v1', require('./routes/reports'));
 app.use('/api/v1', require('./routes/activityLog'));
+app.use('/api/v1/donations', require('./routes/donations'));
 
 // 404 handler
 app.use((_req, res) => {
