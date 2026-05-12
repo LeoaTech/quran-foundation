@@ -14,13 +14,16 @@ import {
   getCourseLevels,
   createCourseLevel,
   updateCourseLevel,
+  getCourseFees,
+  upsertLevelFee,
+  deleteLevelFee,
 } from '../../../api/courses';
 
 const TYPE_CHIP = {
-  hifz:    { label: 'Hifz',    cls: 'chip chip-green' },
-  nazra:   { label: 'Nazra',   cls: 'chip chip-blue'  },
-  tajweed: { label: 'Tajweed', cls: 'chip chip-gold'  },
-  arabic:  { label: 'Arabic',  cls: 'chip chip-sand'  },
+  hifz: { label: 'Hifz', cls: 'chip chip-green' },
+  nazra: { label: 'Nazra', cls: 'chip chip-blue' },
+  tajweed: { label: 'Tajweed', cls: 'chip chip-gold' },
+  arabic: { label: 'Arabic', cls: 'chip chip-sand' },
 };
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
@@ -61,17 +64,17 @@ function Field({ label, children }) {
 
 // ── Levels tab ────────────────────────────────────────────────────────────────
 function LevelsTab({ courseId }) {
-  const qc    = useQueryClient();
+  const qc = useQueryClient();
   const toast = useToast();
 
   const [addOpen, setAddOpen] = useState(false);
   const [editLevel, setEditLevel] = useState(null);
-  const [form, setForm] = useState({ title: '', title_ur: '', description_ur: '', level_order: '' });
+  const [form, setForm] = useState({ title: '', title_ur: '', description_ur: '', level_order: '', duration_months: '' });
   const [busy, setBusy] = useState(false);
 
   const { data: levels = [], isLoading } = useQuery({
     queryKey: ['course-levels', courseId],
-    queryFn:  () => getCourseLevels(courseId),
+    queryFn: () => getCourseLevels(courseId),
     staleTime: 5 * 60_000,
   });
 
@@ -80,17 +83,18 @@ function LevelsTab({ courseId }) {
   }
 
   function openAdd() {
-    setForm({ title: '', title_ur: '', description_ur: '', level_order: levels.length + 1 });
+    setForm({ title: '', title_ur: '', description_ur: '', level_order: levels.length + 1, duration_months: '' });
     setEditLevel(null);
     setAddOpen(true);
   }
 
   function openEdit(level) {
     setForm({
-      title:          level.title          ?? '',
-      title_ur:       level.title_ur       ?? '',
+      title: level.title ?? '',
+      title_ur: level.title_ur ?? '',
       description_ur: level.description_ur ?? '',
-      level_order:    level.level_order    ?? '',
+      level_order: level.level_order ?? '',
+      duration_months: level.duration_months ?? '',
     });
     setEditLevel(level);
     setAddOpen(true);
@@ -100,11 +104,16 @@ function LevelsTab({ courseId }) {
     e.preventDefault();
     setBusy(true);
     try {
+      const payload = {
+        ...form,
+        level_order: form.level_order !== '' ? Number(form.level_order) : undefined,
+        duration_months: form.duration_months !== '' ? Number(form.duration_months) : undefined,
+      };
       if (editLevel) {
-        await updateCourseLevel(courseId, editLevel.id, form);
+        await updateCourseLevel(courseId, editLevel.id, payload);
         toast.success('Level updated.');
       } else {
-        await createCourseLevel(courseId, form);
+        await createCourseLevel(courseId, payload);
         toast.success('Level added.');
       }
       await qc.invalidateQueries({ queryKey: ['course-levels', courseId] });
@@ -131,7 +140,7 @@ function LevelsTab({ courseId }) {
           <CardHeader><span className="card-title">{editLevel ? 'Edit level' : 'New level'}</span></CardHeader>
           <CardBody>
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '0 16px', alignItems: 'end' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px', gap: '0 16px', alignItems: 'end' }}>
                 <Field label="Order">
                   <input
                     className="f-input"
@@ -144,6 +153,16 @@ function LevelsTab({ courseId }) {
                 </Field>
                 <Field label="Title (English)">
                   <input className="f-input" value={form.title} onChange={setF('title')} placeholder="e.g. Beginner" required />
+                </Field>
+                <Field label="Duration (months)">
+                  <input
+                    className="f-input"
+                    type="number"
+                    min="1"
+                    value={form.duration_months}
+                    onChange={setF('duration_months')}
+                    placeholder="e.g. 6"
+                  />
                 </Field>
               </div>
               <Field label="Title (Urdu) — اردو عنوان">
@@ -176,6 +195,7 @@ function LevelsTab({ courseId }) {
                 <th style={{ width: 60 }}>#</th>
                 <th>Title</th>
                 <th>Urdu title</th>
+                <th>Duration</th>
                 <th>Description</th>
                 <th style={{ width: 80 }}></th>
               </tr>
@@ -186,6 +206,9 @@ function LevelsTab({ courseId }) {
                   <td style={{ color: 'var(--ink-pale)', fontSize: 13 }}>{lv.level_order}</td>
                   <td style={{ fontWeight: 500 }}>{lv.title}</td>
                   <td style={{ fontFamily: 'var(--font-display)', direction: 'rtl', textAlign: 'right' }}>{lv.title_ur}</td>
+                  <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                    {lv.duration_months ? `${lv.duration_months} months` : <span style={{ color: 'var(--ink-pale)' }}>—</span>}
+                  </td>
                   <td style={{ fontSize: 12, color: 'var(--ink-soft)', direction: 'rtl', textAlign: 'right' }}>{lv.description_ur}</td>
                   <td>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(lv)}>Edit</Button>
@@ -216,10 +239,198 @@ function ClassesTab({ courseId }) {
   );
 }
 
+// ── Fee Structure tab ─────────────────────────────────────────────────────────
+function FeeStructureTab({ courseId, courseName }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+
+  const { data: levels = [], isLoading: levelsLoading } = useQuery({
+    queryKey: ['course-levels', courseId],
+    queryFn: () => getCourseLevels(courseId),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: fees = [], isLoading: feesLoading } = useQuery({
+    queryKey: ['course-fees', courseId],
+    queryFn: () => getCourseFees(courseId),
+    staleTime: 5 * 60_000,
+  });
+
+  // Map levelId → fee record for quick lookup
+  const feeMap = Object.fromEntries(fees.map((f) => [f.course_level_id, f]));
+
+  // Inline fee form state — keyed by levelId
+  const [editingLevelId, setEditingLevelId] = useState(null);
+  const [feeForm, setFeeForm] = useState({ full_fee: '', notes: '' });
+  const [busy, setBusy] = useState(false);
+
+  function openFeeForm(level) {
+    const existing = feeMap[level.id];
+    setFeeForm({
+      full_fee: existing ? String(existing.full_fee) : '',
+      notes: existing?.notes ?? '',
+    });
+    setEditingLevelId(level.id);
+  }
+
+  async function handleFeeSubmit(e, levelId) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await upsertLevelFee(courseId, levelId, {
+        full_fee: Number(feeForm.full_fee),
+        notes: feeForm.notes || undefined,
+      });
+      toast.success('Fee saved.');
+      await qc.invalidateQueries({ queryKey: ['course-fees', courseId] });
+      setEditingLevelId(null);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to save fee.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteFee(levelId) {
+    if (!window.confirm('Remove this fee entry?')) return;
+    setBusy(true);
+    try {
+      await deleteLevelFee(courseId, levelId);
+      toast.success('Fee removed.');
+      await qc.invalidateQueries({ queryKey: ['course-fees', courseId] });
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to remove fee.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (levelsLoading || feesLoading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><LoadingSpinner size={24} /></div>;
+  }
+
+  if (levels.length === 0) {
+    return (
+      <EmptyState
+        icon="₨"
+        title="No levels defined"
+        description="Add levels to this course first before setting fee structures."
+      />
+    );
+  }
+
+  return (
+    <>
+      {/* Summary info badge */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <span className="chip chip-sand" style={{ fontSize: 11 }}>Cash</span>
+      </div>
+
+      <div style={{ border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 24 }}>
+        <table className="data-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th>Course</th>
+              <th>Level</th>
+              <th>Full Fee</th>
+              <th>Duration</th>
+              <th style={{ width: 130 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {levels.map((lv) => {
+              const fee = feeMap[lv.id];
+              const isEditing = editingLevelId === lv.id;
+              return (
+                <>
+                  <tr key={lv.id}>
+                    <td style={{ fontWeight: 500, fontSize: 13 }}>{courseName}</td>
+                    <td>
+                      <span className="chip chip-blue" style={{ fontSize: 11 }}>Level {lv.level_order}</span>
+                      {' '}
+                      <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{lv.title}</span>
+                    </td>
+                    <td>
+                      {fee ? (
+                        <span style={{ fontWeight: 700, color: 'var(--emerald)', fontSize: 14 }}>
+                          {fee.currency} {Number(fee.full_fee).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--ink-pale)', fontSize: 12 }}>Not set</span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                      {lv.duration_months ? `${lv.duration_months} months` : <span style={{ color: 'var(--ink-pale)' }}>—</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <Button
+                          size="sm"
+                          variant={isEditing ? 'outline' : 'primary'}
+                          onClick={() => isEditing ? setEditingLevelId(null) : openFeeForm(lv)}
+                          disabled={busy}
+                        >
+                          {isEditing ? 'Cancel' : fee ? 'Edit Fee' : 'Set Fee'}
+                        </Button>
+                        {fee && !isEditing && (
+                          <Button size="sm" variant="ghost" onClick={() => handleDeleteFee(lv.id)} disabled={busy}>
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {isEditing && (
+                    <tr key={`${lv.id}-form`}>
+                      <td colSpan={5} style={{ background: 'var(--sand-light)', padding: '16px 20px' }}>
+                        <form onSubmit={(e) => handleFeeSubmit(e, lv.id)}>
+                          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <div className="f-group" style={{ marginBottom: 0, minWidth: 160 }}>
+                              <label className="f-label">Full Fee (PKR)</label>
+                              <input
+                                className="f-input"
+                                type="number"
+                                min="1"
+                                step="0.01"
+                                value={feeForm.full_fee}
+                                onChange={(e) => setFeeForm((f) => ({ ...f, full_fee: e.target.value }))}
+                                placeholder="e.g. 8000"
+                                required
+                                autoFocus
+                              />
+                            </div>
+                            <div className="f-group" style={{ marginBottom: 0, flex: 1, minWidth: 180 }}>
+                              <label className="f-label">Notes (optional)</label>
+                              <input
+                                className="f-input"
+                                value={feeForm.notes}
+                                onChange={(e) => setFeeForm((f) => ({ ...f, notes: e.target.value }))}
+                                placeholder="e.g. includes registration"
+                              />
+                            </div>
+                            <Button type="submit" size="sm" variant="primary" disabled={busy}>
+                              {busy ? 'Saving…' : 'Save Fee'}
+                            </Button>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'topics',  label: 'Topics'  },
-  { id: 'levels',  label: 'Levels'  },
+  { id: 'topics', label: 'Topics' },
+  { id: 'levels', label: 'Levels' },
+  { id: 'fees', label: 'Fee Structure' },
   { id: 'classes', label: 'Classes' },
 ];
 
@@ -230,12 +441,12 @@ export default function CourseDetail() {
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ['courses'],
-    queryFn:  getCourses,
+    queryFn: getCourses,
     staleTime: 2 * 60_000,
   });
 
   const course = courses.find((c) => c.id === courseId);
-  const chip   = course ? (TYPE_CHIP[course.type] ?? { label: course.type, cls: 'chip chip-sand' }) : null;
+  const chip = course ? (TYPE_CHIP[course.type] ?? { label: course.type, cls: 'chip chip-sand' }) : null;
 
   if (isLoading) {
     return (
@@ -283,9 +494,10 @@ export default function CourseDetail() {
 
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === 'topics'  && <TopicManager courseId={courseId} />}
-      {tab === 'levels'  && <LevelsTab   courseId={courseId} />}
-      {tab === 'classes' && <ClassesTab  courseId={courseId} />}
+      {tab === 'topics' && <TopicManager courseId={courseId} />}
+      {tab === 'levels' && <LevelsTab courseId={courseId} />}
+      {tab === 'fees' && <FeeStructureTab courseId={courseId} courseName={course.name} />}
+      {tab === 'classes' && <ClassesTab courseId={courseId} />}
     </>
   );
 }
