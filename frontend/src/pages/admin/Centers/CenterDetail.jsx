@@ -15,6 +15,7 @@ import {
   getCenterOverview, getCenterClasses,
   getClassrooms, createClassroom, updateClassroom,
 } from '../../../api/centers';
+import ActivityLogTab from './ActivityLogTab';
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
@@ -385,6 +386,7 @@ function FormField({ label, children }) {
 const TABS = [
   { id: 'overview',   label: 'Overview' },
   { id: 'classrooms', label: 'Classrooms' },
+  { id: 'activity',   label: 'Activity' },
   { id: 'settings',   label: 'Settings' },
 ];
 
@@ -459,6 +461,7 @@ export default function CenterDetail() {
 
       {activeTab === 'overview'   && <OverviewTab   centerId={id} />}
       {activeTab === 'classrooms' && <ClassroomsTab centerId={id} />}
+      {activeTab === 'activity'   && <ActivityLogTab centerId={id} />}
       {activeTab === 'settings'   && <SettingsTab   centerId={id} center={center} />}
     </>
   );
