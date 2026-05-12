@@ -1,8 +1,17 @@
 import client from './client';
 
+
+
 // ── Courses ───────────────────────────────────────────────────────────────────
-export const getCourses = (params = {}) =>
-  client.get('/courses', { params }).then((r) => r.data);
+export async function getCourses() {
+  const res = await client.get('/courses');
+  return res.data;
+}
+
+export async function getCourseLevels(courseId) {
+  const res = await client.get(`/courses/${courseId}/levels`);
+  return res.data;
+}
 
 export const createCourse = (payload) =>
   client.post('/courses', payload).then((r) => r.data);
@@ -34,11 +43,20 @@ export const deleteSubtopic = (courseId, topicId, subtopicId) =>
   client.delete(`/courses/${courseId}/topics/${topicId}/subtopics/${subtopicId}`).then((r) => r.data);
 
 // ── Course levels ─────────────────────────────────────────────────────────────
-export const getCourseLevels = (courseId) =>
-  client.get(`/courses/${courseId}/levels`).then((r) => r.data);
 
 export const createCourseLevel = (courseId, payload) =>
   client.post(`/courses/${courseId}/levels`, payload).then((r) => r.data);
 
 export const updateCourseLevel = (courseId, levelId, payload) =>
   client.patch(`/courses/${courseId}/levels/${levelId}`, payload).then((r) => r.data);
+
+// ── Course Level Fees ──────────────────────────────────────────────────────────
+
+export const getCourseFees = (courseId) =>
+  client.get(`/courses/${courseId}/fees`).then((r) => r.data);
+
+export const upsertLevelFee = (courseId, levelId, payload) =>
+  client.put(`/courses/${courseId}/levels/${levelId}/fee`, payload).then((r) => r.data);
+
+export const deleteLevelFee = (courseId, levelId) =>
+  client.delete(`/courses/${courseId}/levels/${levelId}/fee`).then((r) => r.data);
