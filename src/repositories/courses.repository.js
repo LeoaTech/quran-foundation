@@ -38,6 +38,63 @@ async function createLevel(data) {
   return row;
 }
 
+async function updateLevel(levelId, data) {
+  const [row] = await db('course_levels')
+    .where({ id: levelId })
+    .update({ ...data, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
+
+// ── Course Level Fees ──────────────────────────────────────────────────────────
+
+function getLevelById(levelId) {
+  return db('course_levels').where({ id: levelId }).first();
+}
+
+// Returns all fees for a course joined with their level info.
+async function listFeesForCourse(courseId) {
+  return db('course_level_fees as f')
+    .join('course_levels as l', 'l.id', 'f.course_level_id')
+    .where('l.course_id', courseId)
+    .where('f.is_active', true)
+    .where('l.is_active', true)
+    .orderBy('l.level_order', 'asc')
+    .select(
+      'f.id',
+      'f.course_level_id',
+      'f.full_fee',
+      'f.currency',
+      'f.notes',
+      'l.title        as level_title',
+      'l.title_ur     as level_title_ur',
+      'l.level_order',
+      'l.duration_months',
+    );
+}
+
+function getFeeByLevelId(levelId) {
+  return db('course_level_fees').where({ course_level_id: levelId, is_active: true }).first();
+}
+
+// Upsert: one fee per level (unique constraint on course_level_id).
+async function upsertFee(levelId, data) {
+  const [row] = await db('course_level_fees')
+    .insert({ ...data, course_level_id: levelId })
+    .onConflict('course_level_id')
+    .merge({ ...data, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
+
+async function deleteFee(levelId) {
+  const [row] = await db('course_level_fees')
+    .where({ course_level_id: levelId })
+    .update({ is_active: false, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
+
 // ── Topics ────────────────────────────────────────────────────────────────────
 
 // Returns topics with subtopics nested. Uses a single left-join query
@@ -156,6 +213,12 @@ module.exports = {
   updateCourse,
   listLevelsByCourse,
   createLevel,
+  updateLevel,
+  getLevelById,
+  listFeesForCourse,
+  getFeeByLevelId,
+  upsertFee,
+  deleteFee,
   getTopicsWithSubtopics,
   getTopicById,
   createTopic,

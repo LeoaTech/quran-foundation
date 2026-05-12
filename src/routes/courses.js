@@ -33,10 +33,27 @@ const updateCourseSchema = z.object({
 });
 
 const createLevelSchema = z.object({
-  title:          z.string().min(1, 'title is required'),
-  title_ur:       z.string().optional(),
-  description_ur: z.string().optional(),
-  level_order:    z.number().int().min(0).optional(),
+  title:           z.string().min(1, 'title is required'),
+  title_ur:        z.string().optional(),
+  description_ur:  z.string().optional(),
+  level_order:     z.number().int().min(0).optional(),
+  duration_months: z.number().int().min(1).optional(),
+});
+
+const updateLevelSchema = z.object({
+  title:           z.string().min(1).optional(),
+  title_ur:        z.string().optional(),
+  description_ur:  z.string().optional(),
+  level_order:     z.number().int().min(0).optional(),
+  duration_months: z.number().int().min(1).nullable().optional(),
+}).refine((b) => Object.keys(b).length > 0, {
+  message: 'Request body must contain at least one field to update.',
+});
+
+const upsertFeeSchema = z.object({
+  full_fee: z.number().positive('full_fee must be a positive number'),
+  currency: z.string().length(3).optional().default('PKR'),
+  notes:    z.string().optional(),
 });
 
 const createTopicSchema = z.object({
@@ -109,12 +126,49 @@ router.patch(
 
 // ── Course Levels ──────────────────────────────────────────────────────────────
 
+router.get(
+  '/courses/:course_id/levels',
+  requireAuth,
+  controller.getLevels,
+);
+
 router.post(
   '/courses/:course_id/levels',
   requireAuth,
   requireRoles('super_admin'),
   validate(createLevelSchema),
   controller.createLevel,
+);
+
+router.patch(
+  '/courses/:course_id/levels/:level_id',
+  requireAuth,
+  requireRoles('super_admin'),
+  validate(updateLevelSchema),
+  controller.updateLevel,
+);
+
+// ── Course Level Fees ──────────────────────────────────────────────────────────
+
+router.get(
+  '/courses/:course_id/fees',
+  requireAuth,
+  controller.getCourseFees,
+);
+
+router.put(
+  '/courses/:course_id/levels/:level_id/fee',
+  requireAuth,
+  requireRoles('super_admin'),
+  validate(upsertFeeSchema),
+  controller.upsertCourseLevelFee,
+);
+
+router.delete(
+  '/courses/:course_id/levels/:level_id/fee',
+  requireAuth,
+  requireRoles('super_admin'),
+  controller.deleteCourseLevelFee,
 );
 
 // ── Topics ────────────────────────────────────────────────────────────────────

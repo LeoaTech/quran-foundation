@@ -18,7 +18,7 @@ async function getCourse(req, res, next) {
 
 async function createCourse(req, res, next) {
   try {
-    res.status(201).json(await service.createCourse({ body: req.body }));
+    res.status(201).json(await service.createCourse({ user: req.user, body: req.body }));
   } catch (err) {
     next(err);
   }
@@ -26,7 +26,15 @@ async function createCourse(req, res, next) {
 
 async function updateCourse(req, res, next) {
   try {
-    res.json(await service.updateCourse({ courseId: req.params.course_id, body: req.body }));
+    res.json(await service.updateCourse({ user: req.user, courseId: req.params.course_id, body: req.body }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getLevels(req, res, next) {
+  try {
+    res.json(await service.getLevels({ courseId: req.params.course_id }));
   } catch (err) {
     next(err);
   }
@@ -34,7 +42,55 @@ async function updateCourse(req, res, next) {
 
 async function createLevel(req, res, next) {
   try {
-    res.status(201).json(await service.createLevel({ courseId: req.params.course_id, body: req.body }));
+    res.status(201).json(await service.createLevel({ user: req.user, courseId: req.params.course_id, body: req.body }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateLevel(req, res, next) {
+  try {
+    res.json(await service.updateLevel({
+      user:     req.user,
+      courseId: req.params.course_id,
+      levelId:  req.params.level_id,
+      body:     req.body,
+    }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Course Level Fees ──────────────────────────────────────────────────────────
+
+async function getCourseFees(req, res, next) {
+  try {
+    res.json(await service.getCourseFees({ courseId: req.params.course_id }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function upsertCourseLevelFee(req, res, next) {
+  try {
+    res.json(await service.upsertCourseLevelFee({
+      user:     req.user,
+      courseId: req.params.course_id,
+      levelId:  req.params.level_id,
+      body:     req.body,
+    }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteCourseLevelFee(req, res, next) {
+  try {
+    res.json(await service.deleteCourseLevelFee({
+      user:     req.user,
+      courseId: req.params.course_id,
+      levelId:  req.params.level_id,
+    }));
   } catch (err) {
     next(err);
   }
@@ -58,7 +114,7 @@ async function createTopic(req, res, next) {
 
 async function updateTopic(req, res, next) {
   try {
-    res.json(await service.updateTopic({ courseId: req.params.course_id, topicId: req.params.topic_id, body: req.body }));
+    res.json(await service.updateTopic({ user: req.user, courseId: req.params.course_id, topicId: req.params.topic_id, body: req.body }));
   } catch (err) {
     next(err);
   }
@@ -66,7 +122,7 @@ async function updateTopic(req, res, next) {
 
 async function deleteTopic(req, res, next) {
   try {
-    res.json(await service.deleteTopic({ courseId: req.params.course_id, topicId: req.params.topic_id }));
+    res.json(await service.deleteTopic({ user: req.user, courseId: req.params.course_id, topicId: req.params.topic_id }));
   } catch (err) {
     next(err);
   }
@@ -114,7 +170,12 @@ module.exports = {
   getCourse,
   createCourse,
   updateCourse,
+  getLevels,
   createLevel,
+  updateLevel,
+  getCourseFees,
+  upsertCourseLevelFee,
+  deleteCourseLevelFee,
   getTopics,
   createTopic,
   updateTopic,
