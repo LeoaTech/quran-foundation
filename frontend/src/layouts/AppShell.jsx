@@ -23,6 +23,12 @@ const NAV_CONFIG = {
         ],
       },
       {
+        title: 'Finance',
+        items: [
+          { to: '/donations', label: 'Donations', icon: '💸' },
+        ],
+      },
+      {
         title: 'Reports',
         items: [
           { to: '/reports',   label: 'Reports',  icon: '▦' },
@@ -44,6 +50,12 @@ const NAV_CONFIG = {
           { to: '/classes',    label: 'Classes',    icon: '◈' },
           { to: '/enrollment', label: 'Enrollment', icon: '○' },
           { to: '/attendance', label: 'Attendance', icon: '☑' },
+        ],
+      },
+      {
+        title: 'Finance',
+        items: [
+          { to: '/donations', label: 'Donations', icon: '💸' },
         ],
       },
       {
