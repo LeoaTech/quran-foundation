@@ -7,11 +7,11 @@ import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import WithdrawModal from './WithdrawModal';
-import { getClassEnrollments } from '../../../api/enrollments';
+import { getClassEnrollments, getCenterEnrollments } from '../../../api/enrollments';
 import { getClasses } from '../../../api/classes';
 
 const STATUS_VARIANT = {
-  active:    'green',
+  active: 'green',
   withdrawn: 'sand',
   transferred: 'blue',
 };
@@ -26,30 +26,32 @@ function tdStyle(hasBorder = true) {
 
 export default function EnrollmentsList() {
   const { user } = useAuth();
-  const qc       = useQueryClient();
+  const qc = useQueryClient();
   const navigate = useNavigate();
   const centerId = user?.center_id;
 
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
-  const [search, setSearch]           = useState('');
+  const [search, setSearch] = useState('');
   const [withdrawTarget, setWithdrawTarget] = useState(null);
 
   const { data: classesRaw = [], isLoading: classesLoading } = useQuery({
     queryKey: ['classes', centerId],
-    queryFn:  () => getClasses(centerId, {}),
+    queryFn: () => getClasses(centerId, {}),
     staleTime: 2 * 60_000,
-    enabled:  !!centerId,
+    enabled: !!centerId,
   });
   const classes = classesRaw?.data ?? classesRaw ?? [];
 
-  const activeClassId = classFilter || classes[0]?.id;
+  const activeClassId = classFilter; // empty means "All Classes"
 
   const { data: enrollmentsRaw = [], isLoading: enrollLoading } = useQuery({
-    queryKey:  ['class-enrollments', activeClassId, statusFilter],
-    queryFn:   () => getClassEnrollments(activeClassId, statusFilter !== 'all' ? { status: statusFilter } : {}),
+    queryKey: ['enrollments', activeClassId || 'all', centerId, statusFilter],
+    queryFn: () => activeClassId
+      ? getClassEnrollments(activeClassId, statusFilter !== 'all' ? { status: statusFilter } : {})
+      : getCenterEnrollments(centerId, statusFilter !== 'all' ? { status: statusFilter } : {}),
     staleTime: 30_000,
-    enabled:   !!activeClassId,
+    enabled: !!centerId,
   });
 
   const allRows = enrollmentsRaw?.data ?? enrollmentsRaw ?? [];
@@ -58,7 +60,7 @@ export default function EnrollmentsList() {
     if (!search) return allRows;
     const q = search.toLowerCase();
     return allRows.filter((en) => {
-      const name   = (en.full_name    ?? en.student?.full_name    ?? '').toLowerCase();
+      const name = (en.full_name ?? en.student?.full_name ?? '').toLowerCase();
       const nameUr = (en.full_name_ur ?? en.student?.full_name_ur ?? '').toLowerCase();
       return name.includes(q) || nameUr.includes(q);
     });
@@ -67,7 +69,7 @@ export default function EnrollmentsList() {
   const isLoading = classesLoading || enrollLoading;
 
   function handleWithdrawSuccess() {
-    qc.invalidateQueries({ queryKey: ['class-enrollments', activeClassId] });
+    qc.invalidateQueries({ queryKey: ['enrollments'] });
   }
 
   return (
@@ -93,6 +95,7 @@ export default function EnrollmentsList() {
           value={classFilter}
           onChange={(e) => setClassFilter(e.target.value)}
         >
+          <option value="">All Classes</option>
           {classes.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -100,9 +103,9 @@ export default function EnrollmentsList() {
 
         <div style={{ display: 'flex', gap: 0, borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1.5px solid var(--sand-deep)' }}>
           {[
-            { label: 'Active',     value: 'active'    },
-            { label: 'Withdrawn',  value: 'withdrawn' },
-            { label: 'All',        value: 'all'       },
+            { label: 'Active', value: 'active' },
+            { label: 'Withdrawn', value: 'withdrawn' },
+            { label: 'All', value: 'all' },
           ].map(({ label, value }) => (
             <button
               key={value}
@@ -158,7 +161,7 @@ export default function EnrollmentsList() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Student', 'Urdu name', 'Class', 'Course', 'Enrolled on', 'Status', 'Actions'].map((h) => (
+                {['Student', 'Urdu name', 'Class', 'Course & Level', 'Enrolled on', 'Status', 'Actions'].map((h) => (
                   <th key={h} style={thStyle()}>{h}</th>
                 ))}
               </tr>
@@ -166,11 +169,11 @@ export default function EnrollmentsList() {
             <tbody>
               {rows.map((en, i) => {
                 const isLast = i === rows.length - 1;
-                const name   = en.full_name    ?? en.student?.full_name    ?? '—';
+                const name = en.full_name ?? en.student?.full_name ?? '—';
                 const nameUr = en.full_name_ur ?? en.student?.full_name_ur ?? '';
-                const clsName    = en.class_name    ?? en.class?.name    ?? '—';
-                const courseName = en.course_name   ?? en.course?.name   ?? '—';
-                const status     = en.status ?? 'active';
+                const clsName = en.class_name ?? en.class?.name ?? '—';
+                const courseName = en.course_name ?? en.course?.name ?? '—';
+                const status = en.status ?? 'active';
 
                 return (
                   <tr key={en.id}>
@@ -181,7 +184,10 @@ export default function EnrollmentsList() {
                       {nameUr}
                     </td>
                     <td style={tdStyle(!isLast)}>{clsName}</td>
-                    <td style={tdStyle(!isLast)}>{courseName}</td>
+                    <td style={tdStyle(!isLast)}>
+                      <div>{courseName}</div>
+                      {en.course_level_title && <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Level: {en.course_level_title}</div>}
+                    </td>
                     <td style={tdStyle(!isLast)}>
                       <span style={{ fontSize: 12 }}>{en.enrolled_on ?? '—'}</span>
                     </td>

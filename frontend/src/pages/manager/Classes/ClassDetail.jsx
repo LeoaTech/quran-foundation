@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
 import Badge from '../../../components/Badge';
@@ -10,6 +11,7 @@ import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../hooks/useToast';
 import {
   getClass,
+  updateClass,
   getClassTeachers,
   assignTeacher,
   removeTeacher,
@@ -29,7 +31,15 @@ const TYPE_CHIP = {
   arabic:  { label: 'Arabic',  cls: 'chip chip-sand'  },
 };
 
-const DAYS_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':');
+  let hours = parseInt(h, 10);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  if (hours === 0) hours = 12;
+  else if (hours > 12) hours -= 12;
+  return `${hours}:${m} ${suffix}`;
+}
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 function TabBar({ tabs, active, onChange }) {
@@ -68,7 +78,8 @@ function Field({ label, children }) {
 }
 
 // ── Students tab ──────────────────────────────────────────────────────────────
-function StudentsTab({ classId }) {
+function StudentsTab({ classId, cls }) {
+  const navigate = useNavigate();
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ['class-enrollments', classId],
     queryFn:  () => getClassEnrollments(classId, { status: 'active' }),
@@ -84,7 +95,17 @@ function StudentsTab({ classId }) {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button size="sm" variant="outline" disabled>Enroll student (coming soon)</Button>
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => {
+            const params = new URLSearchParams({ class_id: classId });
+            if (cls?.course_id) params.set('course_id', cls.course_id);
+            navigate(`/enrollment?${params.toString()}`);
+          }}
+        >
+          + Enroll student
+        </Button>
       </div>
       {rows.length === 0 ? (
         <EmptyState icon="○" title="No enrolled students" description="Enroll students into this class to get started." />
@@ -108,7 +129,7 @@ function StudentsTab({ classId }) {
                     {en.full_name_ur ?? en.student?.full_name_ur ?? ''}
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    {en.enrolled_on ?? '—'}
+                    {en.enrolled_on ? new Date(en.enrolled_on).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
                     {en.prior_level ?? '—'}
@@ -522,63 +543,205 @@ function HomeworkCriteriaTab({ classId, courseId }) {
   );
 }
 
-// ── Schedule tab ──────────────────────────────────────────────────────────────
-function ScheduleTab({ cls }) {
-  const scheduleDays = cls?.schedule_days
-    ? cls.schedule_days.split(',').map((d) => d.trim())
+// ── Settings tab (replaces read-only ScheduleTab) ────────────────────────────
+const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function SettingsTab({ cls, classId }) {
+  const qc    = useQueryClient();
+  const toast = useToast();
+  const { role } = useAuth();
+  const canEdit = role === 'super_admin' || role === 'center_manager';
+
+  const parsedDays = cls?.schedule_days
+    ? cls.schedule_days.split(',').map((d) => d.trim()).filter(Boolean)
     : [];
 
-  return (
-    <div>
-      <Card style={{ marginBottom: 16 }}>
-        <CardHeader><span className="card-title">Weekly schedule</span></CardHeader>
-        <CardBody>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            {DAYS_ORDER.map((day) => {
-              const active = scheduleDays.includes(day);
-              return (
-                <div
-                  key={day}
-                  style={{
-                    padding: '10px 16px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: active ? 'var(--emerald-light)' : 'var(--sand-mid)',
-                    color: active ? 'var(--emerald)' : 'var(--ink-pale)',
-                    fontWeight: active ? 600 : 400,
-                    fontSize: 13,
-                    border: active ? '1.5px solid var(--emerald)' : '1.5px solid transparent',
-                  }}
-                >
-                  {day}
-                </div>
-              );
-            })}
-          </div>
+  const [form, setForm] = useState({
+    name:          cls?.name          ?? '',
+    name_ur:       cls?.name_ur       ?? '',
+    schedule_days: parsedDays,
+    start_time:    cls?.start_time    ?? '',
+    max_capacity:  cls?.max_capacity  ?? '',
+    notes:         cls?.notes         ?? '',
+    is_active:     cls?.is_active     ?? true,
+  });
+  const [busy, setBusy] = useState(false);
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Start time</div>
-              <div style={{ fontSize: 20, fontFamily: 'var(--font-display)', color: 'var(--ink)', fontWeight: 600 }}>
-                {cls?.start_time ?? '—'}
+  function toggleDay(day) {
+    setForm((f) => {
+      const days = f.schedule_days.includes(day)
+        ? f.schedule_days.filter((d) => d !== day)
+        : [...f.schedule_days, day];
+      // Keep canonical order
+      return { ...f, schedule_days: ALL_DAYS.filter((d) => days.includes(d)) };
+    });
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      // Build only the fields the schema accepts — omit empty/null values
+      // so Zod's `.optional()` is satisfied (absent ≠ null for number fields).
+      const payload = {
+        name:     form.name,
+        is_active: form.is_active,
+      };
+      if (form.name_ur !== '')       payload.name_ur       = form.name_ur;
+      if (form.schedule_days.length) payload.schedule_days = form.schedule_days.join(',');
+      if (form.start_time)           payload.start_time    = form.start_time;
+      if (form.max_capacity !== '' && form.max_capacity !== null) {
+        payload.max_capacity = parseInt(form.max_capacity, 10);
+      }
+
+      await updateClass(classId, payload);
+      await qc.invalidateQueries({ queryKey: ['class', classId] });
+      await qc.invalidateQueries({ queryKey: ['classes'] });
+      toast.success('Class settings saved.');
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to save settings.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* ── Identity ── */}
+      <Card>
+        <CardHeader><span className="card-title">Class identity</span></CardHeader>
+        <CardBody>
+          <form onSubmit={handleSave}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+
+              <div className="f-group" style={{ marginBottom: 16 }}>
+                <label className="f-label">Name (English)</label>
+                <input
+                  className="f-input"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                  disabled={!canEdit}
+                />
+              </div>
+
+              <div className="f-group" style={{ marginBottom: 16 }}>
+                <label className="f-label">Name (Urdu) — اردو نام</label>
+                <RTLInput
+                  value={form.name_ur}
+                  onChange={(e) => setForm((f) => ({ ...f, name_ur: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+
+            </div>
+
+            {/* ── Schedule ── */}
+            <div className="f-group" style={{ marginBottom: 16 }}>
+              <label className="f-label">Schedule days</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                {ALL_DAYS.map((day) => {
+                  const active = form.schedule_days.includes(day);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => toggleDay(day)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: active ? '1.5px solid var(--emerald)' : '1.5px solid var(--sand-mid)',
+                        background: active ? 'var(--emerald-light)' : 'var(--white)',
+                        color: active ? 'var(--emerald)' : 'var(--ink-pale)',
+                        fontWeight: active ? 600 : 400,
+                        fontSize: 13,
+                        cursor: canEdit ? 'pointer' : 'default',
+                        fontFamily: 'var(--font-body)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Days per week</div>
-              <div style={{ fontSize: 20, fontFamily: 'var(--font-display)', color: 'var(--ink)', fontWeight: 600 }}>
-                {scheduleDays.length}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+
+              <div className="f-group" style={{ marginBottom: 16 }}>
+                <label className="f-label">Start time</label>
+                <input
+                  className="f-input"
+                  type="time"
+                  value={form.start_time}
+                  onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
+                  disabled={!canEdit}
+                />
               </div>
+
+              <div className="f-group" style={{ marginBottom: 16 }}>
+                <label className="f-label">Max capacity</label>
+                <input
+                  className="f-input"
+                  type="number"
+                  min="1"
+                  placeholder="No limit"
+                  value={form.max_capacity}
+                  onChange={(e) => setForm((f) => ({ ...f, max_capacity: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+
             </div>
-          </div>
+
+            <div className="f-group" style={{ marginBottom: 16 }}>
+              <label className="f-label">Notes (internal)</label>
+              <input
+                className="f-input"
+                placeholder="Optional notes…"
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                disabled={!canEdit}
+              />
+            </div>
+
+            {canEdit && (
+              <div className="f-group" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  id="class-is-active"
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
+                />
+                <label htmlFor="class-is-active" style={{ fontSize: 13, color: 'var(--ink-mid)', cursor: 'pointer' }}>
+                  Active class
+                </label>
+              </div>
+            )}
+
+            {canEdit && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <Button type="submit" variant="primary" disabled={busy}>
+                  {busy ? 'Saving…' : 'Save changes'}
+                </Button>
+              </div>
+            )}
+          </form>
         </CardBody>
       </Card>
 
+      {/* ── Read-only summary ── */}
       <Card>
         <CardHeader><span className="card-title">Class details</span></CardHeader>
         <CardBody>
           {[
-            ['Max capacity',  cls?.max_capacity  ?? '—'],
             ['Course',        cls?.course_name   ?? cls?.course?.name ?? '—'],
             ['Level',         cls?.course_level_title ?? '—'],
+            ['Days per week', form.schedule_days.length],
+            ['Max capacity',  cls?.max_capacity ?? 'No limit'],
             ['Status',        cls?.is_active ? 'Active' : 'Inactive'],
           ].map(([label, value]) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--sand)', fontSize: 13 }}>
@@ -588,6 +751,7 @@ function ScheduleTab({ cls }) {
           ))}
         </CardBody>
       </Card>
+
     </div>
   );
 }
@@ -597,7 +761,7 @@ const TABS = [
   { id: 'students',  label: 'Students'          },
   { id: 'teachers',  label: 'Teachers'          },
   { id: 'criteria',  label: 'Homework Criteria' },
-  { id: 'schedule',  label: 'Schedule'          },
+  { id: 'settings',  label: 'Settings'          },
 ];
 
 export default function ClassDetail() {
@@ -656,7 +820,7 @@ export default function ClassDetail() {
             )}
             <div style={{ fontSize: 12, color: 'var(--ink-pale)', display: 'flex', gap: 12 }}>
               {cls.schedule_days && (
-                <span>{cls.schedule_days} · {cls.start_time ?? ''}</span>
+                <span>{cls.schedule_days} · {formatTime(cls.start_time) || ''}</span>
               )}
               {(cls.center_name ?? cls.center?.name) && (
                 <span>{cls.center_name ?? cls.center?.name}</span>
@@ -668,10 +832,10 @@ export default function ClassDetail() {
 
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === 'students' && <StudentsTab classId={classId} />}
+      {tab === 'students' && <StudentsTab classId={classId} cls={cls} />}
       {tab === 'teachers' && <TeachersTab classId={classId} centerId={cls.center_id} />}
       {tab === 'criteria' && <HomeworkCriteriaTab classId={classId} courseId={cls.course_id} />}
-      {tab === 'schedule' && <ScheduleTab cls={cls} />}
+      {tab === 'settings' && <SettingsTab cls={cls} classId={classId} />}
     </>
   );
 }

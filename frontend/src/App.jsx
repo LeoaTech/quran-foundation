@@ -28,6 +28,7 @@ import EnrollmentForm    from './pages/manager/Enrollments/EnrollmentForm';
 import MarkAttendance    from './pages/teacher/Attendance/MarkAttendance';
 import AttendanceSheet   from './pages/teacher/Attendance/AttendanceSheet';
 import MyAttendance      from './pages/student/Attendance/MyAttendance';
+import Enrollment     from './pages/manager/Enrollment';
 
 import Placeholder    from './pages/Placeholder';
 
@@ -65,10 +66,11 @@ export default function App() {
                   {/* Dashboard */}
                   <Route path="/dashboard" element={<AdminDashboard />} />
 
-                  {/* Centers — super_admin list + center_manager redirect */}
+                  {/* Centers & Manager Features — super_admin + center_manager */}
                   <Route element={<ProtectedRoute roles={['super_admin', 'center_manager']} />}>
                     <Route path="/admin/centers"     element={<CentersList />} />
                     <Route path="/admin/centers/:id" element={<CenterDetail />} />
+                    <Route path="/enrollment"        element={<Enrollment />} />
                   </Route>
 
                   {/* Org settings — super_admin only */}
@@ -111,6 +113,8 @@ export default function App() {
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
+                  <Route path="/classes"     element={<Placeholder />} />
+                  <Route path="/attendance"  element={<Placeholder />} />
                   <Route path="/progress"    element={<Placeholder />} />
                   <Route path="/assessments" element={<Placeholder />} />
                   <Route path="/schedule"    element={<Placeholder />} />
