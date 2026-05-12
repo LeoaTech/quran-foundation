@@ -58,6 +58,7 @@ const ACTION_ICONS = {
   'user.role_assign':      '🔑',
   'center.create':         '🏢',
   'center.update':         '🏢',
+  'donation.collect':      '💸',
 };
 
 function actionIcon(action) {
@@ -86,6 +87,7 @@ const ACTION_FILTERS = [
   { value: 'attendance',  label: 'Attendance' },
   { value: 'user',        label: 'Users' },
   { value: 'center',      label: 'Center' },
+  { value: 'donation',    label: 'Donations' },
 ];
 
 // ── Log row ───────────────────────────────────────────────────────────────────
