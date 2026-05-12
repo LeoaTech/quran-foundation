@@ -26,7 +26,7 @@ async function getCenter(req, res, next) {
 
 async function createCenter(req, res, next) {
   try {
-    res.status(201).json(await service.createCenter({ body: req.body }));
+    res.status(201).json(await service.createCenter({ user: req.user, body: req.body }));
   } catch (err) {
     next(err);
   }

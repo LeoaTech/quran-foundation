@@ -1,4 +1,5 @@
 const repo = require('../repositories/centers.repository');
+const activityLog = require('./activityLog.service');
 const { AppError } = require('../utils/errors');
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ async function getCenter({ user, centerId }) {
   return center;
 }
 
-async function createCenter({ body }) {
+async function createCenter({ user, body }) {
   // Resolve the single org so the center is linked correctly.
   const org = await repo.getOrg();
   if (!org) {
@@ -76,7 +77,17 @@ async function createCenter({ body }) {
     );
   }
 
-  return repo.createCenter({ ...body, org_id: org.id });
+  const center = await repo.createCenter({ ...body, org_id: org.id });
+  activityLog.log({
+    actor:       user,
+    action:      'center.create',
+    entity_type: 'center',
+    entity_id:   center.id,
+    org_id:      org.id,
+    summary_en:  `Created center "${center.name}"`,
+    metadata:    { center_name: center.name },
+  }).catch(() => {});
+  return center;
 }
 
 async function updateCenter({ user, centerId, body }) {
@@ -86,6 +97,16 @@ async function updateCenter({ user, centerId, body }) {
   if (!existing) throw notFound('Center');
 
   const updated = await repo.updateCenter(centerId, body);
+  activityLog.log({
+    actor:       user,
+    action:      'center.update',
+    entity_type: 'center',
+    entity_id:   centerId,
+    center_id:   centerId,
+    org_id:      existing.org_id,
+    summary_en:  `Updated center "${updated.name}"`,
+    metadata:    { center_name: updated.name },
+  }).catch(() => {});
   return updated;
 }
 
