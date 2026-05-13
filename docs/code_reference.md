@@ -1403,6 +1403,97 @@ return result;
 
 **`getHomeworkPerformance`** — validates class exists + `assertCenterAccess` before querying. Not cached.
 
+### Frontend — Reports Module
+
+#### Files
+
+| File | Role |
+|------|------|
+| `frontend/src/api/reports.js` | 4 Axios helpers: `getOrgOverview`, `getCenterOverview(centerId, month)`, `getStudentSummary(userId)`, `getHomeworkPerformance(classId, params)` |
+| `frontend/src/hooks/useReports.js` | 4 React Query hooks (5-minute stale time): `useOrgReport`, `useCenterReport(centerId, month)`, `useStudentReport(userId)`, `useHomeworkReport(classId, dateRange)` |
+| `frontend/src/styles/print.css` | `@media print` stylesheet — hides sidebar, topbar, buttons, selects; sets `margin-left: 0`; `page-break-before: always` on `.report-section`; forces chip colors |
+| `frontend/src/pages/admin/Reports/OrgReport.jsx` | Super-admin org-wide report |
+| `frontend/src/pages/admin/Reports/CenterReport.jsx` | Center-level monthly report (super_admin selects center; center_manager scoped to own center) |
+| `frontend/src/pages/shared/Reports/StudentReport.jsx` | Printable student report card accessed via `/reports/students/:userId` |
+| `frontend/src/pages/teacher/Reports/HomeworkReport.jsx` | Per-class homework criterion breakdown for teachers |
+
+#### Routes
+
+| Path | Component | Guard |
+|------|-----------|-------|
+| `/reports` | `OrgReport` | `ProtectedRoute roles={['super_admin']}` |
+| `/reports/center` | `CenterReport` | `ProtectedRoute roles={['super_admin','center_manager']}` |
+| `/reports/homework` | `HomeworkReport` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/reports/students/:userId` | `StudentReport` | `ProtectedRoute roles={['center_manager','teacher','student','guardian']}` |
+
+#### Sidebar nav for Reports
+
+| Role | Section | Items added |
+|------|---------|-------------|
+| `super_admin` | Reports | Org Report → `/reports`, Center Report → `/reports/center`, Settings → `/admin/org` |
+| `center_manager` | Reports | Center Report → `/reports/center`, HW Report → `/reports/homework` |
+| `teacher` | Reports | HW Report → `/reports/homework` |
+
+#### OrgReport.jsx
+
+- `useOrgReport()` — org-wide stats (total students, centers, avg attendance, teachers).
+- `useQuery(['centers'], getCenters)` — populates center list for trend table.
+- `useQueries` (N×6 queries) — per-center per-month attendance for 6-month trend grid, fired in parallel.
+- Row 1: 4 `MetricCard`s — total students, active centers, avg attendance (color-coded), teachers.
+- Row 2 (2-col grid):
+  - Enrollments by course — `ProgressBar` per course relative to max enrollment.
+  - Centers ranked by attendance for selected `month` — sorted table with `ProgressBar` + colored % badge.
+- Row 3: Monthly attendance trend — matrix table (rows = centers, cols = last 6 months); each cell is a colored pill using `attendanceBg`/`attendanceColor`.
+- Print button → `window.print()`.
+
+#### CenterReport.jsx
+
+- `useCenterReport(centerId, month)` — center overview stats.
+- super_admin sees a center `<select>`; center_manager is auto-scoped via `user.center_id`.
+- `useQuery(['center', centerId], getCenter)` — resolves center name for the heading.
+- Section 1: 4 `MetricCard`s — students, active classes, attendance %, new enrollments.
+- Section 2 — Class breakdown table: class / teacher / students / avg attendance (inline `ProgressBar`) / avg HW% / topics covered.
+- Section 3 — Homework criteria breakdown: `label_ur` RTL with Amiri font, class avg color-coded green/gold/red, highest/lowest columns.
+- Export CSV button (semicolon-safe quoting) + Print button.
+
+#### StudentReport.jsx
+
+- Uses `useParams()` for `:userId`; calls `useStudentReport(userId)`.
+- Header: student name (English + Urdu), center / class / teacher / date, attendance % badge (color-coded).
+- Section 1 (Attendance): large % figure + `ProgressBar` + 3-month calendar dot grid (10×10 px colored dots per day present/absent/late, derived from `report.attendance_by_date`).
+- Section 2 (Academic Progress): topics covered list with ✓ icons + `GradesBreakdown` — 4 colored boxes (Excellent / Good / Average / Needs Revision) with counts.
+- Section 3 (Homework Performance): large avg % + per-criterion table with `TrendArrow` component.
+- Section 4 (Assessments): table of all assessment scores.
+- Section 5 (Teacher Remarks): last 3 session notes rendered as RTL Amiri block-quotes.
+- Print button → `window.print()`.
+
+#### HomeworkReport.jsx
+
+- Controls: class `<select>` + `from`/`to` date inputs (default: last 30 days).
+- `useHomeworkReport(classId, { from, to })` — fires only when a class is selected.
+- Summary row: 4 `MetricCard`s — sessions logged, avg HW% (color variant), top performer name, needs-attention student name.
+- Per-criterion card grid (`auto-fill minmax(280px,1fr)`):
+  - Card header: `label_ur` (Amiri, RTL) + max marks label.
+  - Circular avg % badge with `avgBg`/`avgColor` background (green/gold/red).
+  - Highest (emerald box) / Lowest (red or neutral box) side by side.
+  - "Needs attention" mini list — up to 3 `bottom_students` from API, name + avg score.
+- Export CSV button + Print button.
+
+#### print.css highlights
+
+```css
+@media print {
+  .sidebar, .topbar, .no-print, [data-no-print] { display: none !important; }
+  .app-main { margin-left: 0 !important; }
+  .content-area { padding: 0 !important; background: white !important; }
+  .report-section { page-break-before: always; }
+  .report-section:first-of-type { page-break-before: avoid; }
+  .card, .metric-card { page-break-inside: avoid; box-shadow: none !important; border: 1px solid #ccc !important; }
+  button, select, input[type="date"], .filter-bar { display: none !important; }
+  -webkit-print-color-adjust: exact; /* forces background-colors and chip fills */
+}
+```
+
 ---
 
 ## Jobs & Workers
@@ -2278,11 +2369,15 @@ Behaviour:
 | `/assessments` | `AssessmentsList` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/assessments/:id` | `AssessmentDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/assessments/my` | `MyAssessments` | `ProtectedRoute roles={['student']}` |
+| `/reports` | `OrgReport` | `ProtectedRoute roles={['super_admin']}` |
+| `/reports/center` | `CenterReport` | `ProtectedRoute roles={['super_admin','center_manager']}` |
+| `/reports/homework` | `HomeworkReport` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/reports/students/:userId` | `StudentReport` | `ProtectedRoute roles={['center_manager','teacher','student','guardian']}` |
 | `/results` | redirect | → `/assessments/my` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |
-| `/teachers`, `/students`, `/reports`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
+| `/teachers`, `/students` | `Placeholder` | `ProtectedRoute` (any role) |
 
 ### Role-based sidebar nav
 
@@ -2290,9 +2385,9 @@ Behaviour:
 
 | Role | Nav sections |
 |------|-------------|
-| `super_admin` | Overview (Dashboard → `/dashboard`, Centers → `/admin/centers`), Academic (Courses → `/admin/courses`, Teachers, Students), Reports (Reports, Settings → `/admin/org`) |
-| `center_manager` | My Center (Dashboard, Classes, Enrollment, Attendance), Admin (Reports) |
-| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Assessments) |
+| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Org Report → `/reports`, Center Report → `/reports/center`, Settings → `/admin/org`) |
+| `center_manager` | My Center (Dashboard, My Center, Classes, Enrollment, Attendance), Reports (Center Report → `/reports/center`, HW Report → `/reports/homework`) |
+| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Class Overview, Assessments), Reports (HW Report → `/reports/homework`) |
 | `student` | My Learning (My Progress, Attendance, Schedule, Results) |
 
 ### Design tokens (key values)

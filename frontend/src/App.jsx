@@ -37,6 +37,11 @@ import AssessmentsList   from './pages/teacher/Assessments/AssessmentsList';
 import AssessmentDetail  from './pages/teacher/Assessments/AssessmentDetail';
 import MyAssessments     from './pages/student/Assessments/MyAssessments';
 
+import OrgReport      from './pages/admin/Reports/OrgReport';
+import CenterReport   from './pages/admin/Reports/CenterReport';
+import StudentReport  from './pages/shared/Reports/StudentReport';
+import HomeworkReport from './pages/teacher/Reports/HomeworkReport';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -135,9 +140,22 @@ export default function App() {
                     <Route path="/assessments/my" element={<MyAssessments />} />
                   </Route>
 
+                  {/* Reports — role-split */}
+                  <Route element={<ProtectedRoute roles={['super_admin']} />}>
+                    <Route path="/reports"        element={<OrgReport />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['super_admin', 'center_manager']} />}>
+                    <Route path="/reports/center" element={<CenterReport />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/reports/homework" element={<HomeworkReport />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher', 'student', 'guardian']} />}>
+                    <Route path="/reports/students/:userId" element={<StudentReport />} />
+                  </Route>
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
-                  <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
                   <Route path="/schedule"    element={<Placeholder />} />
                   <Route path="/results"     element={<Navigate to="/assessments/my" replace />} />
