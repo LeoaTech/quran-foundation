@@ -1531,6 +1531,96 @@ return result;
 
 ---
 
+## RBAC API Module
+
+**Route prefix:** `/api/v1/rbac` (roles + permissions) and `/api/v1/users/:userId/permissions` (overrides)  
+**Mount:** `app.use('/api/v1', require('./routes/rbac'))`  
+All endpoints require JWT auth + a specific permission key (no role-based guards).
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/routes/rbac.js` | Route definitions + Zod validation schemas |
+| `src/controllers/rbac.controller.js` | Thin controllers — parse req, call service, send res |
+| `src/services/rbac.service.js` | Business logic — validation, count queries, assembly |
+| `src/repositories/permissions.js` | All DB queries (extended for RBAC API) |
+
+### Route → permission map
+
+| Method | Path | Permission |
+|--------|------|-----------|
+| GET | `/rbac/roles` | `roles.view` |
+| POST | `/rbac/roles` | `roles.create` |
+| GET | `/rbac/roles/:roleId` | `roles.view` |
+| PATCH | `/rbac/roles/:roleId` | `roles.edit` |
+| DELETE | `/rbac/roles/:roleId` | `roles.delete` |
+| GET | `/rbac/roles/:roleId/permissions` | `roles.view` |
+| PUT | `/rbac/roles/:roleId/permissions` | `roles.edit` |
+| PATCH | `/rbac/roles/:roleId/permissions/:permissionId` | `roles.edit` |
+| GET | `/rbac/permissions` | `permissions.view` |
+| POST | `/rbac/permissions` | `permissions.assign` |
+| PATCH | `/rbac/permissions/:permissionId` | `permissions.assign` |
+| GET | `/users/:userId/permissions` | `roles.assign` |
+| POST | `/users/:userId/permissions` | `roles.assign` |
+| DELETE | `/users/:userId/permissions/:permissionId` | `roles.assign` |
+
+### Key business rules (enforced in `rbac.service.js`)
+
+- **`POST /rbac/roles`**: `name` must be `/^[a-z][a-z0-9_]*$/`; uniqueness checked before insert; `is_system` forced to `false`.
+- **`PATCH /rbac/roles/:roleId`**: system roles (`is_system = true`) accept only `description`, `label_ur`, `color`. `name` and `is_system` are immutable via API.
+- **`DELETE /rbac/roles/:roleId`**: throws `400 SYSTEM_ROLE` if `is_system = true`; throws `409 ROLE_IN_USE` (with `user_count`) if any `user_roles` rows reference this role.
+- **`PUT /rbac/roles/:roleId/permissions`**: validates all supplied UUIDs exist in `permissions`; wrapped in a transaction; calls `invalidatePermissionCache` for all users carrying the role.
+- **`PATCH .../permissions/:permissionId`** (toggle): calls `repo.toggleRolePermission` which upserts/deletes the `role_permissions` row and invalidates affected users.
+- **`POST /rbac/permissions`**: validates `key === "{module}.{action}"` — key, module, and action must be self-consistent.
+- **`PATCH /rbac/permissions/:permissionId`**: only `label`, `label_ur`, `description`, `is_active` are patchable; `key`, `module`, `action` are silently ignored.
+- **`POST /users/:userId/permissions`**: upserts `user_permissions`; immediately invalidates that user's Redis cache.
+- **`DELETE /users/:userId/permissions/:permissionId`**: removes the override row; user's effective permission reverts to role grants.
+
+### New repository functions (in `permissions.repository.js`)
+
+| Function | Description |
+|----------|-------------|
+| `getRolesWithStats(params)` | Roles with correlated subquery counts: `user_count`, `permission_count` |
+| `getRoleById(roleId)` | Single role lookup — returns `null` if not found |
+| `getAllPermissionsWithRoleFlag(roleId)` | All active permissions with `is_granted` boolean derived via `EXISTS` subquery |
+| `toggleRolePermission(roleId, permId, isGranted, grantedBy)` | Insert or delete single `role_permissions` row; bulk-invalidates affected user caches |
+| `getRolePermissionsForUser(userId)` | Role-granted permissions with `granted_via_role` name, used for the display endpoint |
+
+### `GET /rbac/permissions` response shape
+
+```json
+{
+  "centers": [
+    { "id": "uuid", "key": "centers.create", "label": "Create Centers",
+      "label_ur": "مرکز بنائیں", "action": "create", "is_active": true }
+  ],
+  "courses": [ ... ]
+}
+```
+
+### `GET /users/:userId/permissions` response shape
+
+```json
+{
+  "role_permissions": [
+    { "key": "centers.view", "label": "View Centers", "granted_via_role": "center_manager" }
+  ],
+  "overrides": [
+    { "key": "centers.delete", "label": "Delete Centers", "is_granted": true }
+  ],
+  "resolved": ["centers.delete", "centers.view", "courses.view"]
+}
+```
+
+### New error codes
+
+| Code | Status | Condition |
+|------|--------|-----------|
+| `ROLE_IN_USE` | 409 | DELETE attempted on a role that still has users; response body includes `user_count` |
+
+---
+
 ## Jobs & Workers
 
 ### `src/jobs/notifyGuardian.js`

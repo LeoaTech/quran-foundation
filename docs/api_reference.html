@@ -87,6 +87,7 @@ h1{font-size:20px;font-weight:500;margin-bottom:2px;}
     <div class="nav-item" onclick="showPane('progress')">Progress & homework</div>
     <div class="nav-item" onclick="showPane('assessments')">Assessments</div>
     <div class="nav-item" onclick="showPane('reports')">Reports</div>
+    <div class="nav-item" onclick="showPane('rbac')">RBAC</div>
     <div class="section-divider">Conventions</div>
     <div class="nav-item" onclick="showPane('conventions')">Base URL & auth</div>
     <div class="nav-item" onclick="showPane('errors')">Errors & pagination</div>
@@ -627,6 +628,161 @@ Returns 401 if the access token is missing or invalid.</div></div>
     }
   ]
 }</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-rbac">
+      <div class="pane-title">RBAC</div>
+      <div class="pane-sub">Dynamic roles, permissions, and per-user overrides. All endpoints require <code>roles.*</code> or <code>permissions.*</code> permission keys.</div>
+
+      <div class="section-divider">Roles</div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method GET">GET</span><span class="ep-path">/rbac/roles</span><span class="ep-desc">List all roles with user & permission counts</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.view</span></div>
+          <div class="ep-section"><div class="ep-section-title">Query params</div><div class="code-block">?include=permissions   // embed full permissions array per role</div></div>
+          <div class="ep-section"><div class="ep-section-title">Response 200</div><div class="code-block">[
+  {
+    "id": "uuid", "name": "center_manager", "description": "...",
+    "color": "#085041", "is_system": true, "is_active": true,
+    "user_count": 7, "permission_count": 32,
+    "permissions": [...]  // only when ?include=permissions
+  }
+]</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method POST">POST</span><span class="ep-path">/rbac/roles</span><span class="ep-desc">Create a custom role</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.create</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{
+  "name": "curriculum_lead",      // snake_case, unique, is_system forced false
+  "description": "Manages topics and course structure across centers",
+  "label_ur": "نصاب کے ذمہ دار",
+  "color": "#5b21b6"
+}</div></div>
+          <div class="ep-section"><div class="ep-section-title">Response 201</div><div class="code-block">{ "id": "uuid", "name": "curriculum_lead", ... }</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method GET">GET</span><span class="ep-path">/rbac/roles/:roleId</span><span class="ep-desc">Get role with full permissions array</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.view</span></div></div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method PATCH">PATCH</span><span class="ep-path">/rbac/roles/:roleId</span><span class="ep-desc">Update role metadata</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.edit</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{
+  "description": "string",   // editable for all roles
+  "label_ur": "string",      // editable for all roles
+  "color": "#hex",           // editable for all roles
+  "is_active": true,         // non-system roles only
+  "name": "new_name"         // non-system roles only
+}</div></div>
+          <div class="ep-section"><div class="ep-section-title">Notes</div><div class="code-block">For system roles (is_system=true): only description, label_ur, color may change.
+name and is_system are always immutable via the API.</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method DELETE">DELETE</span><span class="ep-path">/rbac/roles/:roleId</span><span class="ep-desc">Delete a custom role</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.delete</span></div>
+          <div class="ep-section"><div class="ep-section-title">Error cases</div><div class="code-block">400 SYSTEM_ROLE    — is_system = true
+409 ROLE_IN_USE    — { "user_count": 7 } — users still hold this role</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method GET">GET</span><span class="ep-path">/rbac/roles/:roleId/permissions</span><span class="ep-desc">All permissions with is_granted flag for this role</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.view</span></div>
+          <div class="ep-section"><div class="ep-section-title">Response 200</div><div class="code-block">[
+  { "id": "uuid", "key": "centers.create", "label": "Create Centers", "module": "centers", "action": "create", "is_granted": true },
+  { "id": "uuid", "key": "centers.delete", "label": "Delete Centers", "module": "centers", "action": "delete", "is_granted": false }
+]</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method PUT">PUT</span><span class="ep-path">/rbac/roles/:roleId/permissions</span><span class="ep-desc">Full replace of role's permission set</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.edit</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{ "permission_ids": ["uuid", "uuid", ...] }</div></div>
+          <div class="ep-section"><div class="ep-section-title">Notes</div><div class="code-block">Wrapped in a transaction. Deletes all existing grants, inserts new set.
+Invalidates Redis permission cache for every user carrying this role.
+Returns updated all-permissions-with-flag array.</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method PATCH">PATCH</span><span class="ep-path">/rbac/roles/:roleId/permissions/:permissionId</span><span class="ep-desc">Toggle a single permission on/off for a role</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.edit</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{ "is_granted": true }   // false removes the link</div></div>
+        </div>
+      </div>
+
+      <div class="section-divider">Permissions</div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method GET">GET</span><span class="ep-path">/rbac/permissions</span><span class="ep-desc">List all permissions grouped by module</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">permissions.view</span></div>
+          <div class="ep-section"><div class="ep-section-title">Query params</div><div class="code-block">?module=centers&is_active=true</div></div>
+          <div class="ep-section"><div class="ep-section-title">Response 200</div><div class="code-block">{
+  "centers": [
+    { "id": "uuid", "key": "centers.create", "label": "Create Centers", "label_ur": "مرکز بنائیں", "action": "create", "is_active": true },
+    { "id": "uuid", "key": "centers.delete", "label": "Delete Centers", "label_ur": "مرکز حذف کریں", "action": "delete", "is_active": true }
+  ],
+  "courses": [ ... ]
+}</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method POST">POST</span><span class="ep-path">/rbac/permissions</span><span class="ep-desc">Create a new permission</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">permissions.assign</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{
+  "key": "reports.download",      // must equal "{module}.{action}"
+  "label": "Download Reports",
+  "label_ur": "رپورٹ ڈاؤنلوڈ کریں",
+  "module": "reports",
+  "action": "download",
+  "description": "Allows exporting and downloading any report"
+}</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method PATCH">PATCH</span><span class="ep-path">/rbac/permissions/:permissionId</span><span class="ep-desc">Update a permission's metadata</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">permissions.assign</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{
+  "label": "string",       // editable
+  "label_ur": "string",    // editable
+  "description": "string", // editable
+  "is_active": false       // deactivating hides it from role assignment UI
+}
+// key, module, action are immutable after creation</div></div>
+        </div>
+      </div>
+
+      <div class="section-divider">User permission overrides</div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method GET">GET</span><span class="ep-path">/users/:userId/permissions</span><span class="ep-desc">Get resolved permission set for a user</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.assign</span></div>
+          <div class="ep-section"><div class="ep-section-title">Response 200</div><div class="code-block">{
+  "role_permissions": [
+    { "key": "centers.view", "label": "View Centers", "module": "centers", "action": "view", "granted_via_role": "center_manager" }
+  ],
+  "overrides": [
+    { "key": "centers.delete", "label": "Delete Centers", "is_granted": true, "granted_at": "2026-04-20T..." }
+  ],
+  "resolved": ["centers.delete", "centers.view", ...]   // sorted final set
+}</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method POST">POST</span><span class="ep-path">/users/:userId/permissions</span><span class="ep-desc">Create or update a per-user permission override</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.assign</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{
+  "permission_id": "uuid",
+  "is_granted": true   // false = explicit deny (overrides role grants)
+}</div></div>
+          <div class="ep-section"><div class="ep-section-title">Notes</div><div class="code-block">Upserts the override row. Invalidates user's Redis permission cache immediately.</div></div>
+        </div>
+      </div>
+
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method DELETE">DELETE</span><span class="ep-path">/users/:userId/permissions/:permissionId</span><span class="ep-desc">Remove a per-user override (falls back to role-level)</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-super">roles.assign</span></div>
+          <div class="ep-section"><div class="ep-section-title">Notes</div><div class="code-block">Deletes the user_permissions row. Invalidates Redis cache.
+User's effective permission for this key reverts to their role grants.</div></div>
         </div>
       </div>
     </div>

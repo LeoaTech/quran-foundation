@@ -92,6 +92,23 @@ async function getRoles({ is_active } = {}) {
   return q;
 }
 
+// Roles with user_count and permission_count via correlated subqueries.
+async function getRolesWithStats({ is_active } = {}) {
+  const q = knex('roles')
+    .select(
+      'roles.*',
+      knex.raw('(SELECT COUNT(*) FROM user_roles        WHERE user_roles.role_id        = roles.id)::int AS user_count'),
+      knex.raw('(SELECT COUNT(*) FROM role_permissions  WHERE role_permissions.role_id  = roles.id)::int AS permission_count'),
+    )
+    .orderBy('roles.name');
+  if (is_active !== undefined) q.where('roles.is_active', is_active);
+  return q;
+}
+
+async function getRoleById(roleId) {
+  return knex('roles').where('id', roleId).first();
+}
+
 async function createRole(data) {
   const [row] = await knex('roles').insert(data).returning('*');
   return row;
@@ -118,6 +135,59 @@ async function getRolePermissions(roleId) {
     .join('permissions', 'role_permissions.permission_id', 'permissions.id')
     .where('role_permissions.role_id', roleId)
     .select('permissions.*', 'role_permissions.granted_at');
+}
+
+// Returns ALL permissions with is_granted=true/false for a given role.
+// Used by GET /rbac/roles/:roleId/permissions for the full toggle grid.
+async function getAllPermissionsWithRoleFlag(roleId) {
+  return knex('permissions')
+    .select(
+      'permissions.*',
+      knex.raw(
+        'EXISTS(SELECT 1 FROM role_permissions rp WHERE rp.role_id = ? AND rp.permission_id = permissions.id) AS is_granted',
+        [roleId],
+      ),
+    )
+    .where('permissions.is_active', true)
+    .orderBy(['permissions.module', 'permissions.action']);
+}
+
+// Insert or remove a single role↔permission link, then invalidate affected users.
+async function toggleRolePermission(roleId, permissionId, isGranted, grantedBy = null) {
+  if (isGranted) {
+    await knex('role_permissions')
+      .insert({ role_id: roleId, permission_id: permissionId, granted_by: grantedBy })
+      .onConflict(['role_id', 'permission_id'])
+      .ignore();
+  } else {
+    await knex('role_permissions')
+      .where({ role_id: roleId, permission_id: permissionId })
+      .delete();
+  }
+  const affected = await getUserIdsByRole(roleId);
+  await invalidatePermissionCache(affected);
+}
+
+// For GET /users/:userId/permissions — returns role-granted permissions with role names.
+async function getRolePermissionsForUser(userId) {
+  const userRoles = await knex('user_roles').where('user_id', userId).select('role_id');
+  const roleIds   = userRoles.map((r) => r.role_id);
+  if (roleIds.length === 0) return [];
+
+  return knex('role_permissions')
+    .join('permissions', 'role_permissions.permission_id', 'permissions.id')
+    .join('roles',       'role_permissions.role_id',       'roles.id')
+    .whereIn('role_permissions.role_id', roleIds)
+    .where('permissions.is_active', true)
+    .select(
+      'permissions.key',
+      'permissions.label',
+      'permissions.label_ur',
+      'permissions.module',
+      'permissions.action',
+      'roles.name AS granted_via_role',
+    )
+    .orderBy('permissions.key');
 }
 
 // Full replace: delete all existing role_permissions, insert new set.
@@ -195,16 +265,21 @@ module.exports = {
   invalidatePermissionCache,
   // Roles
   getRoles,
+  getRolesWithStats,
+  getRoleById,
   createRole,
   updateRole,
   deleteRole,
   getRolePermissions,
+  getAllPermissionsWithRoleFlag,
+  toggleRolePermission,
   setRolePermissions,
   // Permissions
   getPermissions,
   createPermission,
   updatePermission,
   // User overrides
+  getUserPermissionsForDisplay: getRolePermissionsForUser,
   getUserPermissionOverrides,
   setUserPermissionOverride,
   removeUserPermissionOverride,
