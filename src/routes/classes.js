@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/classes.controller');
 
@@ -15,7 +15,7 @@ const createClassSchema = z.object({
   course_id:       z.string().uuid('course_id must be a UUID'),
   course_level_id: z.string().uuid('course_level_id must be a UUID').optional(),
   max_capacity:    z.number().int().positive().optional(),
-  schedule_days:   z.string().optional(),  // e.g. "Mon,Wed,Fri"
+  schedule_days:   z.string().optional(),
   start_time:      z.string().regex(/^\d{2}:\d{2}$/, 'start_time must be HH:MM').optional(),
 });
 
@@ -60,19 +60,17 @@ const updateCriteriaSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// ── Classes ───────────────────────────────────────────────────────────────────
-
 router.get(
   '/centers/:center_id/classes',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('classes.view'),
   controller.listClasses,
 );
 
 router.post(
   '/centers/:center_id/classes',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('classes.create'),
   validate(createClassSchema),
   controller.createClass,
 );
@@ -80,56 +78,53 @@ router.post(
 router.get(
   '/classes/:class_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('classes.view'),
   controller.getClass,
 );
 
 router.patch(
   '/classes/:class_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('classes.edit'),
   validate(updateClassSchema),
   controller.updateClass,
 );
 
-// ── Teachers ──────────────────────────────────────────────────────────────────
-
+// Teachers
 router.get(
   '/classes/:class_id/teachers',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('classes.view'),
   controller.listTeachers,
 );
 
 router.post(
   '/classes/:class_id/teachers',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('classes.edit'),
   validate(assignTeacherSchema),
   controller.assignTeacher,
 );
 
-// :teacher_id = class_teachers.id (the assignment row PK, not the user's id)
 router.delete(
   '/classes/:class_id/teachers/:teacher_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('classes.edit'),
   controller.removeTeacher,
 );
 
-// ── Homework Criteria ─────────────────────────────────────────────────────────
-
+// Homework criteria
 router.get(
   '/classes/:class_id/homework-criteria',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('homework_criteria.view'),
   controller.listCriteria,
 );
 
 router.post(
   '/classes/:class_id/homework-criteria',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('homework_criteria.create'),
   validate(createCriteriaSchema),
   controller.createCriteria,
 );
@@ -137,16 +132,16 @@ router.post(
 router.patch(
   '/classes/:class_id/homework-criteria/:criteria_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('homework_criteria.edit'),
   validate(updateCriteriaSchema),
   controller.updateCriteria,
 );
 
-// Soft delete only — sets is_active=false; never removes the row.
+// Soft delete only — sets is_active=false
 router.delete(
   '/classes/:class_id/homework-criteria/:criteria_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('homework_criteria.deactivate'),
   controller.deleteCriteria,
 );
 

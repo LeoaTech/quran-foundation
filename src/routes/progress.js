@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/progress.controller');
 
@@ -60,54 +60,48 @@ const updateHomeworkScoreSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Log a classwork + homework session.
 router.post(
   '/progress-sessions',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('progress.create'),
   validate(createProgressSessionSchema),
   controller.createProgressSession,
 );
 
-// Get a single session with full homework entry and scores.
 router.get(
   '/progress-sessions/:session_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('progress.view'),
   controller.getProgressSession,
 );
 
-// Correct classwork fields on an existing session.
 router.patch(
   '/progress-sessions/:session_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('progress.edit'),
   validate(updateProgressSessionSchema),
   controller.updateProgressSession,
 );
 
-// Get a student's full progress history. Optionally include homework scores.
-// ?class_id=uuid  ?from=YYYY-MM-DD  ?to=YYYY-MM-DD  ?include=homework_scores
+// Any authenticated user can view a student's progress history
 router.get(
   '/students/:user_id/progress',
   requireAuth,
   controller.getStudentProgress,
 );
 
-// Update submission status or overall note on a homework entry.
 router.patch(
   '/homework-entries/:entry_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('homework.score'),
   validate(updateHomeworkEntrySchema),
   controller.updateHomeworkEntry,
 );
 
-// Correct a single homework score (re-validates against max_marks).
 router.patch(
   '/homework-entries/:entry_id/scores/:score_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('homework.correct'),
   validate(updateHomeworkScoreSchema),
   controller.updateHomeworkScore,
 );

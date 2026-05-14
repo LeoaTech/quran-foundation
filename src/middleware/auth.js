@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { AppError } = require('../utils/errors');
+const { AppError }             = require('../utils/errors');
+const { getCachedPermissions } = require('../repositories/permissions');
 
 function requireAuth(req, _res, next) {
   const header = req.headers.authorization;
@@ -14,10 +15,22 @@ function requireAuth(req, _res, next) {
       throw new Error('wrong token type');
     }
     req.user = {
-      id: payload.sub,
-      roles: payload.roles || [],
+      id:        payload.sub,
+      roles:     payload.roles || [],
       center_id: payload.center_id || null,
     };
+
+    // Lazy getter: first access triggers a Redis lookup (or DB fallback).
+    // Subsequent accesses on the same request reuse the same Promise.
+    let _permPromise = null;
+    Object.defineProperty(req, 'userPermissions', {
+      get() {
+        if (!_permPromise) _permPromise = getCachedPermissions(req.user.id);
+        return _permPromise;
+      },
+      configurable: true,
+    });
+
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

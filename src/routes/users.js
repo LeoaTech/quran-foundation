@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/users.controller');
 
@@ -9,9 +9,9 @@ const router = Router();
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
-const ROLES = ['super_admin', 'center_manager', 'teacher', 'student', 'guardian'];
+const ROLES   = ['super_admin', 'center_manager', 'teacher', 'student', 'guardian'];
 const GENDERS = ['male', 'female', 'other'];
-const LANGS = ['en', 'ur', 'ar'];
+const LANGS   = ['en', 'ur', 'ar'];
 
 const createUserSchema = z.object({
   full_name:      z.string().min(1, 'full_name is required'),
@@ -56,24 +56,26 @@ const linkGuardianSchema = z.object({
 router.get(
   '/users',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('users.view'),
   controller.listUsers,
 );
 
 router.post(
   '/users',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('users.create'),
   validate(createUserSchema),
   controller.createUser,
 );
 
+// Any authenticated user can view a profile (own + others within center scope)
 router.get(
   '/users/:user_id',
   requireAuth,
   controller.getUser,
 );
 
+// Any authenticated user can update own profile; controller enforces ownership
 router.patch(
   '/users/:user_id',
   requireAuth,
@@ -84,7 +86,7 @@ router.patch(
 router.post(
   '/users/:user_id/roles',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('roles.assign'),
   validate(assignRoleSchema),
   controller.assignRole,
 );
@@ -92,14 +94,14 @@ router.post(
 router.delete(
   '/users/:user_id/roles/:role_id',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('roles.assign'),
   controller.removeRole,
 );
 
 router.post(
   '/users/:user_id/guardians',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('users.edit'),
   validate(linkGuardianSchema),
   controller.linkGuardian,
 );
@@ -107,7 +109,7 @@ router.post(
 router.get(
   '/users/:user_id/guardians',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('users.view'),
   controller.listGuardians,
 );
 

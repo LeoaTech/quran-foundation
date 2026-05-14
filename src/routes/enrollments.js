@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission, requireAnyPermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/enrollments.controller');
 
@@ -28,35 +28,32 @@ const updateEnrollmentSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Enroll a student into a class.
 router.post(
   '/enrollments',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('enrollments.create'),
   validate(createEnrollmentSchema),
   controller.createEnrollment,
 );
 
-// List all enrollments for a class (?status=active|withdrawn).
 router.get(
   '/classes/:class_id/enrollments',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('enrollments.view'),
   controller.listEnrollmentsByClass,
 );
 
-// List all enrollments for a student.
+// Any authenticated user can view a student's enrollment history
 router.get(
   '/students/:user_id/enrollments',
   requireAuth,
   controller.listEnrollmentsByStudent,
 );
 
-// Update an enrollment (e.g. withdraw a student).
 router.patch(
   '/enrollments/:enrollment_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requireAnyPermission('enrollments.withdraw', 'enrollments.transfer'),
   validate(updateEnrollmentSchema),
   controller.updateEnrollment,
 );

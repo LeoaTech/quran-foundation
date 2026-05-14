@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { z } = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/centers.controller');
 
@@ -18,7 +18,6 @@ const createCenterSchema = z.object({
   phone:      z.string().optional(),
 });
 
-// PATCH accepts any subset of the same fields plus is_active for soft-deactivation.
 const updateCenterSchema = z.object({
   name:       z.string().min(1).optional(),
   name_ur:    z.string().optional(),
@@ -41,58 +40,54 @@ const createClassroomSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Organization
 router.get(
   '/org',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('org.view'),
   controller.getOrg,
 );
 
-// Centers list + create (super_admin only)
 router.get(
   '/centers',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('centers.view'),
   controller.listCenters,
 );
 
 router.post(
   '/centers',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('centers.create'),
   validate(createCenterSchema),
   controller.createCenter,
 );
 
-// Single center — super_admin or center_manager of that center
 router.get(
   '/centers/:center_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('centers.view'),
   controller.getCenter,
 );
 
 router.patch(
   '/centers/:center_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('centers.edit'),
   validate(updateCenterSchema),
   controller.updateCenter,
 );
 
-// Classrooms — manager/teacher of that center; create is manager-only
 router.get(
   '/centers/:center_id/classrooms',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('centers.view'),
   controller.listClassrooms,
 );
 
 router.post(
   '/centers/:center_id/classrooms',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('centers.edit'),
   validate(createClassroomSchema),
   controller.createClassroom,
 );

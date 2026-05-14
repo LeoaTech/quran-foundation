@@ -159,6 +159,12 @@
       >
         Assessments
       </div>
+      <div
+        class="tab"
+        onclick="show('rbac')"
+      >
+        RBAC ✱
+      </div>
     </div>
 
     <div
@@ -222,6 +228,21 @@
         <code>topic_tested_id</code> instead of surahs.
       </p>
       <div class="erd-container"><div id="erd-assess"></div></div>
+    </div>
+
+    <div
+      class="pane"
+      id="p-rbac"
+    >
+      <p class="note changed">
+        <strong>Added (migration 010_rbac).</strong>
+        <code>ROLES</code> extended with <code>is_system</code>, <code>color</code>, <code>created_by</code>.
+        New tables: <code>PERMISSIONS</code> (flat capability registry),
+        <code>ROLE_PERMISSIONS</code> (many-to-many role ↔ permission),
+        <code>USER_PERMISSIONS</code> (per-user grant/deny overrides).
+        55 permissions seeded across 15 modules; system roles marked <code>is_system = true</code>.
+      </p>
+      <div class="erd-container"><div id="erd-rbac"></div></div>
     </div>
 
     <script type="module">
@@ -536,6 +557,48 @@
     timestamp recorded_at
   }
   ASSESSMENTS ||--o{ ASSESSMENT_RESULTS : "yields"
+`,
+        "erd-rbac": `erDiagram
+  ROLES {
+    uuid id PK
+    varchar name "super_admin etc."
+    text description
+    boolean is_system "true locks deletion"
+    varchar color "hex e.g. #1D9E75"
+    uuid created_by FK "null for system roles"
+    boolean is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  PERMISSIONS {
+    uuid id PK
+    varchar key UK "centers.create"
+    varchar label "Create Centers"
+    varchar label_ur "اردو label"
+    varchar module "centers"
+    varchar action "create"
+    text description
+    boolean is_active
+    timestamp created_at
+  }
+  ROLE_PERMISSIONS {
+    uuid id PK
+    uuid role_id FK
+    uuid permission_id FK
+    uuid granted_by FK
+    timestamp granted_at
+  }
+  USER_PERMISSIONS {
+    uuid id PK
+    uuid user_id FK
+    uuid permission_id FK
+    boolean is_granted "true=grant false=deny"
+    uuid granted_by FK
+    timestamp granted_at
+  }
+  ROLES ||--o{ ROLE_PERMISSIONS : "has"
+  PERMISSIONS ||--o{ ROLE_PERMISSIONS : "assigned via"
+  PERMISSIONS ||--o{ USER_PERMISSIONS : "overridden via"
 `
       };
 

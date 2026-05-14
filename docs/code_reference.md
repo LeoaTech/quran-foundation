@@ -240,18 +240,53 @@ req.user = {
 }
 ```
 
+Also attaches a **lazy `req.userPermissions` getter** (added with `Object.defineProperty`). The first access on a given request fires `getCachedPermissions(userId)` (Redis-cached; 5-min TTL; DB fallback). Subsequent accesses reuse the same Promise via a closure variable.
+
 Error codes thrown: `UNAUTHORIZED` (missing token, 401), `TOKEN_EXPIRED` (401), `INVALID_TOKEN` (401).
 
-### `src/middleware/rbac.js` — `requireRoles(...roles)`
+### `src/middleware/rbac.js` — permission-based guards
 
-Factory middleware. `super_admin` always passes regardless of listed roles.
+Replaces the old `requireRoles` factory. Exports two functions:
+
+**`requirePermission(key)`** — passes if `req.userPermissions` (a `Set<string>`) contains `key`.
 
 ```js
-requireRoles('teacher', 'center_manager')
-// super_admin → next()
-// teacher at any center → next()
-// student → 403 FORBIDDEN
+requirePermission('centers.create')
+// user with centers.create in their resolved set → next()
+// user without it → 403 FORBIDDEN (code: 'FORBIDDEN')
 ```
+
+**`requireAnyPermission(...keys)`** — passes if the set contains at least one of the keys.
+
+```js
+requireAnyPermission('enrollments.withdraw', 'enrollments.transfer')
+```
+
+Permission resolution order (implemented in `permissions.repository.js → getCachedPermissions`):
+1. Aggregate all `role_permissions` for the user's roles.
+2. Apply `user_permissions` overrides: `is_granted = true` adds; `is_granted = false` removes.
+3. Cache the resulting `Set<string>` in Redis under `permissions:{userId}` for 5 minutes.
+4. Redis failure degrades to a direct DB lookup (never throws).
+
+### `src/repositories/permissions.js`
+
+| Export | Description |
+|--------|-------------|
+| `getUserPermissions(userId)` | DB-only resolver — returns `Set<string>` |
+| `getCachedPermissions(userId)` | Redis-cached wrapper — used by middleware |
+| `invalidatePermissionCache(userIds[])` | Deletes `permissions:{id}` keys for each userId; called automatically by write functions |
+| `getRoles(params)` | List roles with optional `is_active` filter |
+| `createRole(data)` | Insert a new role row |
+| `updateRole(roleId, data)` | Patch a role row |
+| `deleteRole(roleId)` | Hard-delete; throws `400 SYSTEM_ROLE` if `is_system = true` |
+| `getRolePermissions(roleId)` | Joined list of permissions assigned to a role |
+| `setRolePermissions(roleId, permissionIds, grantedBy?)` | Full replace in transaction; invalidates cache for all users carrying this role |
+| `getPermissions(params)` | List permissions with optional `module` / `is_active` filter |
+| `createPermission(data)` | Insert a new permission |
+| `updatePermission(permissionId, data)` | Patch a permission |
+| `getUserPermissionOverrides(userId)` | List explicit grants/denies for a user |
+| `setUserPermissionOverride(userId, permId, isGranted, grantedBy?)` | Upsert override; invalidates that user's cache |
+| `removeUserPermissionOverride(userId, permId)` | Delete override; invalidates that user's cache |
 
 ### `src/middleware/validate.js` — `validate(schema)`
 
@@ -1543,6 +1578,7 @@ Stub worker that registers a processor on the `notify-guardian` queue. Implement
 | `CLASS_FULL` | 409 | Active enrollment count ≥ `classes.max_capacity` |
 | `SESSION_EXISTS` | 409 | Attendance session already exists for this class on this date |
 | `RESULT_EXISTS` | 409 | A result already exists for this student in the assessment |
+| `SYSTEM_ROLE` | 400 | Attempt to delete a role with `is_system = true` |
 | `VALIDATION_ERROR` | 400 | Zod schema failure; includes `field` |
 | `RATE_LIMIT_EXCEEDED` | 429 | Express rate-limiter triggered |
 | `INTERNAL_SERVER_ERROR` | 500 | Unhandled exception |
@@ -1565,20 +1601,95 @@ All error responses follow this shape:
 
 ## RBAC Summary
 
-| Role | Center scope | Typical capabilities |
-|------|-------------|---------------------|
-| `super_admin` | None (`center_id = null` in user_roles) | Full access to all resources, all centers |
-| `center_manager` | Single center | Manage users/classrooms/classes within their center |
-| `teacher` | Single center | Read classrooms, log progress sessions for their classes |
-| `student` | Single center | Own profile only |
-| `guardian` | Via student | Own profile; receives notifications |
+### Role capabilities (seeded defaults)
 
-**Middleware chain pattern used on every protected route:**
+| Role | Center scope | Permission count | Key capabilities |
+|------|-------------|-----------------|-----------------|
+| `super_admin` | None (all centers) | 55 (all) | Full access to every resource |
+| `center_manager` | Single center | 32 | Classes, enrollment, attendance, reports, user management |
+| `teacher` | Single center | 19 | Mark attendance, log progress/homework, create assessments |
+| `student` | Single center | 5 | View own attendance, progress, homework, results |
+| `guardian` | Via student | 0 (override only) | Assigned via `user_permissions` as needed |
+
+### Middleware chain pattern
+
 ```js
-router.verb('/path', requireAuth, requireRoles('role1', 'role2'), validate(schema), controller.fn);
+// Single permission
+router.post('/centers', requireAuth, requirePermission('centers.create'), validate(schema), controller.fn);
+
+// Either permission passes
+router.patch('/enrollments/:id', requireAuth, requireAnyPermission('enrollments.withdraw', 'enrollments.transfer'), validate(schema), controller.fn);
+
+// Open to any authenticated user (no permission guard)
+router.get('/students/:id/attendance', requireAuth, controller.fn);
 ```
 
-**Service-level center enforcement** (beyond RBAC middleware):
+### Route → permission mapping
+
+| Route (method + path) | Permission key |
+|-----------------------|---------------|
+| GET /org | `org.view` |
+| GET /centers | `centers.view` |
+| POST /centers | `centers.create` |
+| GET /centers/:id | `centers.view` |
+| PATCH /centers/:id | `centers.edit` |
+| GET /centers/:id/classrooms | `centers.view` |
+| POST /centers/:id/classrooms | `centers.edit` |
+| GET /users | `users.view` |
+| POST /users | `users.create` |
+| POST /users/:id/roles | `roles.assign` |
+| DELETE /users/:id/roles/:rid | `roles.assign` |
+| POST /users/:id/guardians | `users.edit` |
+| GET /users/:id/guardians | `users.view` |
+| POST /courses | `courses.create` |
+| PATCH /courses/:id | `courses.edit` |
+| POST /courses/:id/levels | `courses.create` |
+| POST /courses/:id/topics | `topics.create` |
+| PATCH /courses/:id/topics/:id | `topics.edit` |
+| DELETE /courses/:id/topics/:id | `topics.delete` |
+| POST/PATCH/DELETE subtopics | `topics.create / .edit / .delete` |
+| GET /centers/:id/classes | `classes.view` |
+| POST /centers/:id/classes | `classes.create` |
+| GET /classes/:id | `classes.view` |
+| PATCH /classes/:id | `classes.edit` |
+| POST/DELETE /classes/:id/teachers | `classes.edit` |
+| GET /classes/:id/homework-criteria | `homework_criteria.view` |
+| POST /classes/:id/homework-criteria | `homework_criteria.create` |
+| PATCH /classes/:id/homework-criteria/:id | `homework_criteria.edit` |
+| DELETE /classes/:id/homework-criteria/:id | `homework_criteria.deactivate` |
+| POST /enrollments | `enrollments.create` |
+| GET /classes/:id/enrollments | `enrollments.view` |
+| PATCH /enrollments/:id | any of `enrollments.withdraw / .transfer` |
+| POST /classes/:id/attendance | `attendance.mark` |
+| GET /classes/:id/attendance | `attendance.view` |
+| PATCH /attendance/sessions/:id/records/:id | `attendance.correct` |
+| POST /progress-sessions | `progress.create` |
+| GET /progress-sessions/:id | `progress.view` |
+| PATCH /progress-sessions/:id | `progress.edit` |
+| PATCH /homework-entries/:id | `homework.score` |
+| PATCH /homework-entries/:id/scores/:id | `homework.correct` |
+| POST /classes/:id/assessments | `assessments.create` |
+| GET /classes/:id/assessments | `assessments.view` |
+| GET /assessments/:id | `assessments.view` |
+| POST /assessments/:id/results | `assessments.record_results` |
+| GET /assessments/:id/results | `assessments.view` |
+| PATCH /assessments/:id/results/:id | `assessments.record_results` |
+| GET /reports/org/overview | `reports.view_org` |
+| GET /reports/centers/:id/overview | `reports.view_center` |
+| GET /reports/classes/:id/homework-performance | any of `reports.view_center / .view_student` |
+
+Routes with no permission guard (only `requireAuth`): GET /users/:id, PATCH /users/:id, GET /students/:id/enrollments, GET /students/:id/attendance, GET /students/:id/progress, GET /students/:id/assessments, GET /reports/students/:id/summary.
+
+### Cache invalidation
+
+`invalidatePermissionCache(userIds[])` in `permissions.repository.js` deletes `permissions:{userId}` from Redis.
+
+Called automatically:
+- `setRolePermissions(roleId, ...)` → queries all users with that role, invalidates their caches
+- `setUserPermissionOverride(userId, ...)` → invalidates that user's cache
+- `removeUserPermissionOverride(userId, ...)` → invalidates that user's cache
+
+**Service-level center enforcement** (beyond permission guards):
 - `assertCenterAccess(user, centerId)` — centers module; checks `user.center_id === centerId`
 - `assertCenterScope(user, centerId)` — users module; same pattern, different name
 - Both: super_admin always passes; non-super_admin must match exactly
