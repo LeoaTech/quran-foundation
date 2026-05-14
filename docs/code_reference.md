@@ -2908,6 +2908,98 @@ Second tab in the RBAC section, accessible via `RBACTabs` navigation bar.
 - **Revoke button**: fires `toggleRolePermission(roleId, permId, false)` with per-role loading state
 - **Add to role dropdown**: shows only roles that DON'T already have the permission; fires `toggleRolePermission(roleId, permId, true)` on confirm
 
+---
+
+### User Permission Overrides — `src/pages/admin/Users/`
+
+Route: `/admin/users/:userId/permissions` · Guard: `ProtectedRoute roles={['super_admin']}`  
+Accessed via a tab on the user's profile page at `/admin/users/:userId`.
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/pages/admin/Users/UserProfilePage.jsx` | Stub profile page; shows name, Urdu name, phone, preferred language; "coming soon" card body |
+| `src/pages/admin/Users/UserProfileTabs.jsx` | Tab bar with "Profile" and "Permissions" tabs; active tab detected by `pathname === to` (exact) or `pathname.startsWith(to)` |
+| `src/pages/admin/Users/UserPermissionsPage.jsx` | Main three-column override view (see layout below) |
+| `src/pages/admin/Users/AddOverrideModal.jsx` | Searchable permission select + Grant/Deny toggle; upserts override via `useSetUserPermissionOverride` |
+
+Both `UserProfilePage` and `UserPermissionsPage` render `<UserProfileTabs userId={userId} />` at the top before their content.
+
+#### Routes added to `router/index.jsx`
+
+```jsx
+// Inside ProtectedRoute roles={['super_admin']}
+<Route path="/admin/users/:userId"             element={<UserProfilePage />} />
+<Route path="/admin/users/:userId/permissions" element={<UserPermissionsPage />} />
+```
+
+#### UserPermissionsPage — three-column layout
+
+Grid: `1fr 1fr 1.1fr`, gap 20px. Data fetched from `GET /users/:userId/permissions` via `useUserPermissions(userId)`.
+
+The API response shape:
+```js
+{
+  role_permissions: [{ id, key, label, module, action }],   // all perms from assigned roles
+  overrides:        [{ id, permission_id, key, is_granted, granted_at, granted_by }],
+  resolved:         ['key1', 'key2', ...]                   // final effective set
+}
+```
+
+**Column 1 — "Inherited from roles"**  
+Read-only list of `role_permissions`, grouped by module with module header badges. Opacity 0.75. Shows `{count} permissions from assigned roles` at top.
+
+**Column 2 — "User overrides"**  
+Two sub-sections:
+- *Extra grants* — overrides with `is_granted = true`; each shows `[Override ✓]` source tag + Remove ✕ button
+- *Explicit denies* — overrides with `is_granted = false`; shown with `--red` accent + Remove ✕ button
+
+Remove fires `DELETE /users/:userId/permissions/:permissionId` via `useRemoveUserPermissionOverride`.  
+"+ Add override" button opens `AddOverrideModal`.
+
+**Column 3 — "Final permission set"**  
+Derived from `resolved` keys + explicit denies. Grouped by module. Each key shows a `SourceTag`:
+- `[Role]` — inherited from role permissions
+- `[Override ✓]` — granted via user override
+- `[Override ✗]` — denied via user override (shown with strikethrough + red tint)
+
+Derivation:
+```js
+const overrideGrantKeys = new Set(overrides.filter(o =>  o.is_granted).map(o => o.key));
+const explicitDenies    = overrides.filter(o => !o.is_granted);
+
+const resolvedView = [
+  ...resolved.map(key => ({
+    key,
+    source: overrideGrantKeys.has(key) ? 'override_grant' : 'role',
+    denied: false,
+  })),
+  ...explicitDenies.map(o => ({ ...o, source: 'override_deny', denied: true })),
+];
+```
+
+**Audit trail** (collapsible, bottom of page)  
+Triggered by "Show audit trail" toggle. Lists each override with date (`granted_at` formatted as `DD MMM YYYY`) and who granted it (`granted_by`). Sorted newest-first.
+
+#### AddOverrideModal
+
+- **Permission search**: text input filters `allPerms` by `key` or `label` (case-insensitive)
+- **Permission select**: grouped `<select size={8}>` with `<optgroup>` per module; monospace 12px; shows `key  (label)`
+- **Update notice**: if selected permission key already exists in `existingOverrideKeys`, shows amber "— will update existing override" warning
+- **Override type toggle**: two-button toggle row — Grant (emerald bg + ✓) / Deny (red bg + ✕); default Grant
+- Submits via `setUserPermissionOverride({ userId, permissionId, isGranted })` → `PUT /users/:userId/permissions/:permId`
+
+#### New hooks in `usePermissions.js`
+
+| Hook | API call | Cache key | Description |
+|------|----------|-----------|-------------|
+| `useUserPermissions(userId)` | `GET /users/:id/permissions` | `['user-permissions', userId]` | Returns `{ role_permissions, overrides, resolved }` |
+| `useSetUserPermissionOverride()` | `PUT /users/:id/permissions/:permId` | invalidates `user-permissions` | Upsert override (grant or deny) |
+| `useRemoveUserPermissionOverride()` | `DELETE /users/:id/permissions/:permId` | invalidates `user-permissions` | Remove override entirely |
+
+---
+
 ### Design tokens (key values)
 
 Colors are defined as CSS variables in `tokens.css`:

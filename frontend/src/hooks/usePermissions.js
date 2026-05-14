@@ -99,6 +99,35 @@ export function useToggleRolePermission() {
   });
 }
 
+// ── User permission overrides ─────────────────────────────────────────────────
+
+export function useUserPermissions(userId) {
+  return useQuery({
+    queryKey: ['user-permissions', userId],
+    queryFn:  () => api.getUserPermissions(userId),
+    staleTime: 30_000,
+    enabled:  !!userId,
+  });
+}
+
+export function useSetUserPermissionOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, permissionId, isGranted }) =>
+      api.setUserPermissionOverride(userId, { permission_id: permissionId, is_granted: isGranted }),
+    onSuccess: (_, { userId }) => qc.invalidateQueries({ queryKey: ['user-permissions', userId] }),
+  });
+}
+
+export function useRemoveUserPermissionOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, permissionId }) =>
+      api.removeUserPermissionOverride(userId, permissionId),
+    onSuccess: (_, { userId }) => qc.invalidateQueries({ queryKey: ['user-permissions', userId] }),
+  });
+}
+
 // ── Permissions ───────────────────────────────────────────────────────────────
 
 export function useAllPermissions(params = {}) {
