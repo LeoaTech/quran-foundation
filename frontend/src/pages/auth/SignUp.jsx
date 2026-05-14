@@ -67,7 +67,7 @@ export default function SignUp() {
         <div className="auth-box">
           {/* Tab row (Sign up active) */}
           <div className="auth-tabs">
-            <Link to="/signin" style={{ flex: 1, textDecoration: 'none' }}>
+            <Link to="/auth/signin" style={{ flex: 1, textDecoration: 'none' }}>
               <button className="auth-tab" style={{ width: '100%' }}>Sign in</button>
             </Link>
             <button className="auth-tab active">Sign up</button>
@@ -82,7 +82,7 @@ export default function SignUp() {
               <div className="auth-subtitle" style={{ marginBottom: 24 }}>
                 Your account is pending approval by your center manager.
               </div>
-              <Link to="/signin">
+              <Link to="/auth/signin">
                 <button className="btn-auth" style={{ width: 'auto', padding: '12px 32px' }}>
                   Back to sign in
                 </button>

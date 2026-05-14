@@ -10,28 +10,28 @@ const NAV_CONFIG = {
       {
         title: 'Overview',
         items: [
-          { to: '/dashboard',    label: 'Dashboard', icon: '⊞' },
-          { to: '/admin/centers', label: 'Centers',   icon: '⊙' },
+          { to: '/admin/dashboard', label: 'Dashboard', icon: '⊞' },
+          { to: '/admin/centers',   label: 'Centers',   icon: '⊙' },
         ],
       },
       {
         title: 'Academic',
         items: [
-          { to: '/admin/courses', label: 'Courses', icon: '◈' },
-          { to: '/teachers', label: 'Teachers', icon: '◉' },
-          { to: '/students', label: 'Students', icon: '○' },
+          { to: '/admin/courses',   label: 'Courses',   icon: '◈' },
+          { to: '/admin/teachers',  label: 'Teachers',  icon: '◉' },
+          { to: '/admin/students',  label: 'Students',  icon: '○' },
         ],
       },
       {
-        title: 'Reports',
+        title: 'Reports & Settings',
         items: [
-          { to: '/reports',        label: 'Org Report',    icon: '▦' },
-          { to: '/reports/center', label: 'Center Report', icon: '◈' },
-          { to: '/admin/org',      label: 'Settings',      icon: '⚙' },
+          { to: '/admin/reports', label: 'Org Report', icon: '▦' },
+          { to: '/admin/org',     label: 'Settings',   icon: '⚙' },
         ],
       },
     ],
   },
+
   center_manager: {
     label: 'Center Manager',
     sub: 'My Center',
@@ -40,22 +40,22 @@ const NAV_CONFIG = {
       {
         title: 'My Center',
         items: [
-          { to: '/dashboard',  label: 'Dashboard',  icon: '⊞' },
-          { to: 'MY_CENTER',   label: 'My Center',  icon: '⊙' },
-          { to: '/classes',    label: 'Classes',    icon: '◈' },
-          { to: '/enrollment', label: 'Enrollment', icon: '○' },
-          { to: '/attendance', label: 'Attendance', icon: '☑' },
+          { to: '/manager/dashboard',   label: 'Dashboard',  icon: '⊞' },
+          { to: 'MY_CENTER',            label: 'My Center',  icon: '⊙' },
+          { to: '/manager/classes',     label: 'Classes',    icon: '◈' },
+          { to: '/manager/enrollments', label: 'Enrollment', icon: '○' },
+          { to: '/manager/attendance',  label: 'Attendance', icon: '☑' },
         ],
       },
       {
         title: 'Reports',
         items: [
-          { to: '/reports/center',  label: 'Center Report', icon: '▦' },
-          { to: '/reports/homework', label: 'HW Report',    icon: '◈' },
+          { to: '/manager/reports', label: 'Center Report', icon: '▦' },
         ],
       },
     ],
   },
+
   teacher: {
     label: 'Teacher',
     sub: 'My Classes',
@@ -64,21 +64,22 @@ const NAV_CONFIG = {
       {
         title: 'My Classes',
         items: [
-          { to: '/dashboard',       label: 'Dashboard',     icon: '⊞' },
-          { to: '/attendance',      label: 'Attendance',    icon: '☑' },
-          { to: '/progress',        label: 'Log Progress',  icon: '◈' },
-          { to: '/progress/class',  label: 'Class Overview', icon: '◉' },
-          { to: '/assessments',     label: 'Assessments',   icon: '▦' },
+          { to: '/teacher/dashboard',       label: 'Dashboard',     icon: '⊞' },
+          { to: '/teacher/attendance',      label: 'Attendance',    icon: '☑' },
+          { to: '/teacher/progress',        label: 'Log Progress',  icon: '◈' },
+          { to: '/teacher/progress/class',  label: 'Class Overview', icon: '◉' },
+          { to: '/teacher/assessments',     label: 'Assessments',   icon: '▦' },
         ],
       },
       {
         title: 'Reports',
         items: [
-          { to: '/reports/homework', label: 'HW Report', icon: '▦' },
+          { to: '/teacher/reports/homework', label: 'HW Report', icon: '▦' },
         ],
       },
     ],
   },
+
   student: {
     label: 'Student',
     sub: 'My Learning',
@@ -87,10 +88,10 @@ const NAV_CONFIG = {
       {
         title: 'My Learning',
         items: [
-          { to: '/progress/my',     label: 'My Progress', icon: '⊞' },
-          { to: '/attendance/my',   label: 'Attendance',  icon: '☑' },
-          { to: '/schedule',           label: 'Schedule',    icon: '◉' },
-          { to: '/assessments/my',  label: 'Results',     icon: '▦' },
+          { to: '/student/dashboard',  label: 'My Progress', icon: '⊞' },
+          { to: '/student/attendance', label: 'Attendance',  icon: '☑' },
+          { to: '/student/schedule',   label: 'Schedule',    icon: '◉' },
+          { to: '/student/results',    label: 'Results',     icon: '▦' },
         ],
       },
     ],
@@ -107,16 +108,20 @@ function initials(name = '') {
 }
 
 function pageTitle(pathname) {
-  const segment = pathname.split('/').filter(Boolean)[0] ?? 'dashboard';
-  return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
+  const parts = pathname.split('/').filter(Boolean);
+  // Use the last segment unless it's a UUID — then fall back to the one before
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const label   = [...parts].reverse().find((p) => !UUID_RE.test(p)) ?? parts[0] ?? 'Dashboard';
+  return label.charAt(0).toUpperCase() + label.slice(1).replace(/-/g, ' ');
 }
 
 export default function AppShell() {
   const { user, role, logout } = useAuth();
   const location = useLocation();
 
-  // For center_manager, replace the static center link with their own center URL
   const rawConfig = NAV_CONFIG[role ?? 'student'] ?? NAV_CONFIG.student;
+
+  // For center_manager, swap the MY_CENTER placeholder with their actual center URL
   const config = role === 'center_manager' && user?.center_id
     ? {
         ...rawConfig,

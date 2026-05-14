@@ -2295,17 +2295,23 @@ Set in `frontend/.env`.
 **Login:**
 1. `login({ phone, password })` calls `POST /auth/login`.
 2. Stores `access_token` in memory; sets `user` state from the response `user` object.
+3. `SignIn.jsx` reads `user.roles[0]` from the returned user and navigates to `ROLE_DASHBOARDS[role]` (imported from `src/router/index.jsx`).
 
 **Logout:**
 1. `logout()` calls `POST /auth/logout` (sends the httpOnly cookie so the server can revoke it).
 2. Clears in-memory `access_token`; nulls `user` state.
-3. React Router detects `isAuthenticated = false` and redirects to `/signin`.
+3. React Router detects `isAuthenticated = false` → `ProtectedRoute` redirects to `/auth/signin`.
 
 **Automatic silent refresh on 401:**
 - The axios response interceptor catches 401 responses.
 - Attempts `POST /auth/refresh` using a raw `axios` call (bypasses the interceptor to avoid infinite loops).
 - Concurrent requests that arrive during the refresh are queued and replayed once the new token is available.
-- If the refresh itself fails, dispatches a `auth:logout` DOM event. `AuthProvider` listens for this event and clears state, triggering a redirect.
+- If the refresh itself fails, dispatches `auth:logout` DOM event → `AuthProvider` clears state → redirect to `/auth/signin`.
+
+**403 handling:**
+- The axios response interceptor catches 403 responses **before** the 401 block.
+- Calls `window.location.replace('/403')` — hard navigation to the standalone Forbidden page.
+- This handles API-level authorization failures (e.g., center_manager accessing another center's data) distinct from the route-level role check in `ProtectedRoute`.
 
 **`AuthContext` values:**
 
@@ -2318,77 +2324,150 @@ Set in `frontend/.env`.
 | `login(credentials)` | `async fn` | Calls API, stores token, sets user |
 | `logout()` | `async fn` | Calls API, clears token and user |
 
+### Centralized router — `src/router/index.jsx`
+
+All route definitions live in one file. `App.jsx` is reduced to just providers + `<BrowserRouter><AppRoutes /></BrowserRouter>`.
+
+```
+src/
+  router/
+    index.jsx       ← AppRoutes component + ROLE_DASHBOARDS map + RootRedirect
+  App.jsx           ← providers only
+```
+
+**`ROLE_DASHBOARDS` export** — shared between router and `SignIn.jsx` for the post-login redirect:
+
+```js
+export const ROLE_DASHBOARDS = {
+  super_admin:    '/admin/dashboard',
+  center_manager: '/manager/dashboard',
+  teacher:        '/teacher/dashboard',
+  student:        '/student/dashboard',
+};
+```
+
+**`RootRedirect`** — lives inside `AppRoutes` at path `/`:
+- `loading = true` → renders nothing.
+- Not authenticated → `<Navigate to="/auth/signin" replace />`.
+- Authenticated → `<Navigate to={ROLE_DASHBOARDS[role]} replace />`.
+
 ### Route protection
 
 `ProtectedRoute` is a react-router v6 layout route (renders `<Outlet />`):
 
 ```jsx
-// All authenticated users
+// Any authenticated user
 <Route element={<ProtectedRoute />}>
   <Route element={<AppShell />}>
-    <Route path="/dashboard" element={<AdminDashboard />} />
-    ...
+    ...role subtrees...
   </Route>
 </Route>
 
 // Role-restricted sub-tree
 <Route element={<ProtectedRoute roles={['super_admin']} />}>
-  <Route path="/centers" element={<Centers />} />
+  <Route path="/admin/dashboard" element={<AdminDashboard />} />
 </Route>
 ```
 
 Behaviour:
 - `loading = true` → renders nothing (waits for session restore).
-- `!isAuthenticated` → `<Navigate to="/signin" replace />`.
-- `roles` provided but `role` not in list → inline 403 view (no redirect).
+- `!isAuthenticated` → `<Navigate to="/auth/signin" replace />`.
+- `roles` provided but `role` not in list → `<Navigate to="/403" replace />`.
 - Otherwise → `<Outlet />`.
 
 ### Routing table
 
-| Path | Component | Guard |
+Routes are grouped by role prefix. Each role's subtree is wrapped in a `ProtectedRoute roles={[...]}` layout route inside the shared `AppShell` wrapper.
+
+#### Public / error
+
+| Path | Component | Notes |
 |------|-----------|-------|
-| `/` | `RootRedirect` | → `/dashboard` if authed, `/signin` otherwise |
-| `/signin` | `SignIn` | `AuthLayout` (redirects authed users away) |
-| `/signup` | `SignUp` | `AuthLayout` |
-| `/dashboard` | `AdminDashboard` | `ProtectedRoute` (any role) |
-| `/admin/centers` | `CentersList` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager is redirected to their own center |
-| `/admin/centers/:id` | `CenterDetail` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager enforced to own center_id |
-| `/admin/org` | `OrgSettings` | `ProtectedRoute roles={['super_admin']}` |
-| `/admin/courses` | `CoursesList` | `ProtectedRoute` (any authenticated role) |
-| `/admin/courses/:id` | `CourseDetail` | `ProtectedRoute` (any authenticated role) |
-| `/classes` | `ClassesList` | `ProtectedRoute roles={['center_manager','teacher']}` — center_manager scoped to user.center_id |
-| `/classes/:id` | `ClassDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/enrollment` | `EnrollmentsList` | `ProtectedRoute roles={['center_manager']}` |
-| `/enrollment/new` | `EnrollmentForm` | `ProtectedRoute roles={['center_manager']}` |
-| `/attendance` | `MarkAttendance` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/attendance/sheet` | `AttendanceSheet` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/attendance/my` | `MyAttendance` | `ProtectedRoute roles={['student']}` |
-| `/progress` | `ProgressLogger` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/progress/class` | `ClassProgress` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/progress/my` | `MyProgress` | `ProtectedRoute roles={['student']}` |
-| `/assessments` | `AssessmentsList` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/assessments/:id` | `AssessmentDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/assessments/my` | `MyAssessments` | `ProtectedRoute roles={['student']}` |
-| `/reports` | `OrgReport` | `ProtectedRoute roles={['super_admin']}` |
-| `/reports/center` | `CenterReport` | `ProtectedRoute roles={['super_admin','center_manager']}` |
-| `/reports/homework` | `HomeworkReport` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/reports/students/:userId` | `StudentReport` | `ProtectedRoute roles={['center_manager','teacher','student','guardian']}` |
-| `/results` | redirect | → `/assessments/my` |
-| `/centers` | redirect | → `/admin/centers` (legacy redirect) |
-| `/courses` | redirect | → `/admin/courses` (legacy redirect) |
-| `/settings` | redirect | → `/admin/org` (legacy redirect) |
-| `/teachers`, `/students` | `Placeholder` | `ProtectedRoute` (any role) |
+| `/` | `RootRedirect` | → role dashboard if authed, `/auth/signin` otherwise |
+| `/auth/signin` | `SignIn` | `AuthLayout` (redirects authed users away) |
+| `/auth/signup` | `SignUp` | `AuthLayout` |
+| `/signin`, `/signup` | redirect | → `/auth/signin`, `/auth/signup` (legacy compat) |
+| `/403` | `Forbidden` | No auth wrapper — accessible always |
+| `*` | `NotFound` | No auth wrapper |
+
+#### Super admin (`roles={['super_admin']}`)
+
+| Path | Component |
+|------|-----------|
+| `/admin/dashboard` | `AdminDashboard` |
+| `/admin/centers` | `CentersList` |
+| `/admin/centers/:id` | `CenterDetail` |
+| `/admin/org` | `OrgSettings` |
+| `/admin/courses` | `CoursesList` |
+| `/admin/courses/:id` | `CourseDetail` |
+| `/admin/teachers` | `TeachersList` (stub) |
+| `/admin/students` | `StudentsList` (stub) |
+| `/admin/reports` | `OrgReport` |
+
+#### Center manager (`roles={['center_manager']}`)
+
+| Path | Component |
+|------|-----------|
+| `/manager/dashboard` | `ManagerDashboard` |
+| `/manager/classes` | `ClassesList` |
+| `/manager/classes/:id` | `ClassDetail` |
+| `/manager/enrollment` | `EnrollmentForm` |
+| `/manager/enrollments` | `EnrollmentsList` |
+| `/manager/attendance` | `AttendanceSheet` |
+| `/manager/reports` | `CenterReport` |
+
+#### Teacher (`roles={['teacher']}`)
+
+| Path | Component |
+|------|-----------|
+| `/teacher/dashboard` | `TeacherDashboard` |
+| `/teacher/attendance` | `MarkAttendance` |
+| `/teacher/attendance/sheet` | `AttendanceSheet` |
+| `/teacher/progress` | `ProgressLogger` |
+| `/teacher/progress/class` | `ClassProgress` |
+| `/teacher/assessments` | `AssessmentsList` |
+| `/teacher/assessments/:id` | `AssessmentDetail` |
+| `/teacher/reports/homework` | `HomeworkReport` |
+
+#### Student (`roles={['student']}`)
+
+| Path | Component |
+|------|-----------|
+| `/student/dashboard` | `MyProgress` (reused) |
+| `/student/attendance` | `MyAttendance` |
+| `/student/schedule` | `Schedule` (stub) |
+| `/student/results` | `MyAssessments` |
+
+#### Shared (any authenticated role)
+
+| Path | Component |
+|------|-----------|
+| `/reports/students/:userId` | `StudentReport` |
+
+### New pages added
+
+| File | Description |
+|------|-------------|
+| `src/pages/errors/NotFound.jsx` | 404 — "صفحہ نہیں ملا", back-to-dashboard link, no auth wrapper |
+| `src/pages/errors/Forbidden.jsx` | 403 — "آپ کو یہ صفحہ دیکھنے کی اجازت نہیں ہے", no auth wrapper |
+| `src/pages/manager/Dashboard.jsx` | Center manager home — live 4-metric overview via `useCenterReport(user.center_id, currentMonth())` |
+| `src/pages/teacher/Dashboard.jsx` | Teacher home — quick-access card grid linking to all teacher workflows |
+| `src/pages/admin/Teachers/TeachersList.jsx` | Stub (coming soon) |
+| `src/pages/admin/Students/StudentsList.jsx` | Stub (coming soon) |
+| `src/pages/student/Schedule.jsx` | Stub (coming soon) |
 
 ### Role-based sidebar nav
 
-`AppShell` reads `role` from `useAuth()` and selects from `NAV_CONFIG`:
+`AppShell` reads `role` from `useAuth()` and selects from `NAV_CONFIG`. All nav paths match the role-prefixed routing exactly:
 
-| Role | Nav sections |
-|------|-------------|
-| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Org Report → `/reports`, Center Report → `/reports/center`, Settings → `/admin/org`) |
-| `center_manager` | My Center (Dashboard, My Center, Classes, Enrollment, Attendance), Reports (Center Report → `/reports/center`, HW Report → `/reports/homework`) |
-| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Class Overview, Assessments), Reports (HW Report → `/reports/homework`) |
-| `student` | My Learning (My Progress, Attendance, Schedule, Results) |
+| Role | Sections & paths |
+|------|-----------------|
+| `super_admin` | **Overview**: Dashboard `/admin/dashboard`, Centers `/admin/centers` · **Academic**: Courses `/admin/courses`, Teachers `/admin/teachers`, Students `/admin/students` · **Reports & Settings**: Org Report `/admin/reports`, Settings `/admin/org` |
+| `center_manager` | **My Center**: Dashboard `/manager/dashboard`, My Center `/admin/centers/:id`, Classes `/manager/classes`, Enrollment `/manager/enrollments`, Attendance `/manager/attendance` · **Reports**: Center Report `/manager/reports` |
+| `teacher` | **My Classes**: Dashboard `/teacher/dashboard`, Attendance `/teacher/attendance`, Log Progress `/teacher/progress`, Class Overview `/teacher/progress/class`, Assessments `/teacher/assessments` · **Reports**: HW Report `/teacher/reports/homework` |
+| `student` | **My Learning**: My Progress `/student/dashboard`, Attendance `/student/attendance`, Schedule `/student/schedule`, Results `/student/results` |
+
+`pageTitle()` in `AppShell` derives the topbar title from the last non-UUID URL segment (UUID regex: `/^[0-9a-f]{8}-...-[0-9a-f]{12}$/i`), falling back to `'Dashboard'`.
 
 ### Design tokens (key values)
 

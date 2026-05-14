@@ -82,7 +82,7 @@ export default function EnrollmentsList() {
             {search ? ' matching search' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/enrollment/new')}>+ Enroll student</Button>
+        <Button variant="primary" onClick={() => navigate('/manager/enrollment')}>+ Enroll student</Button>
       </div>
 
       {/* Filter bar */}
@@ -140,7 +140,7 @@ export default function EnrollmentsList() {
           icon="○"
           title="No classes found"
           description="Create a class first before enrolling students."
-          action={<Button variant="outline" onClick={() => navigate('/classes')}>Go to Classes</Button>}
+          action={<Button variant="outline" onClick={() => navigate('/manager/classes')}>Go to Classes</Button>}
         />
       ) : isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
@@ -151,7 +151,7 @@ export default function EnrollmentsList() {
           icon="○"
           title="No enrollments found"
           description={search ? 'No students match your search.' : statusFilter === 'active' ? 'No active enrollments in this class.' : 'No records found.'}
-          action={<Button variant="primary" onClick={() => navigate('/enrollment/new')}>+ Enroll student</Button>}
+          action={<Button variant="primary" onClick={() => navigate('/manager/enrollment')}>+ Enroll student</Button>}
         />
       ) : (
         <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>

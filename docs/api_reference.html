@@ -129,6 +129,42 @@ h1{font-size:20px;font-weight:500;margin-bottom:2px;}
           <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{ "refresh_token": "eyJ..." }</div></div>
         </div>
       </div>
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method POST">POST</span><span class="ep-path">/auth/signup</span><span class="ep-desc">Self-register with a center approval code</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-public">Public</span></div>
+          <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{
+  "full_name": "Hamza Rauf",
+  "full_name_ur": "حمزہ رؤف",
+  "phone": "+923001234567",
+  "password": "string (min 8 chars)",
+  "approval_code": "GUL-2026"  // issued by center manager
+}</div></div>
+          <div class="ep-section"><div class="ep-section-title">Response 201</div><div class="code-block">{
+  "id": "uuid",
+  "full_name": "Hamza Rauf",
+  "status": "pending_approval"
+}</div></div>
+          <div class="ep-section"><div class="ep-section-title">Notes</div><div class="code-block">Account is created with status=pending_approval.
+Center manager must activate it before the user can sign in.
+Returns 400 INVALID_APPROVAL_CODE if the code is unknown or expired.</div></div>
+        </div>
+      </div>
+      <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method GET">GET</span><span class="ep-path">/auth/me</span><span class="ep-desc">Get own profile (session restore)</span></div>
+        <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-any">Any authenticated</span></div>
+          <div class="ep-section"><div class="ep-section-title">Response 200</div><div class="code-block">{
+  "user": {
+    "id": "uuid",
+    "full_name": "Ustad Tariq",
+    "full_name_ur": "استاد طارق",
+    "preferred_lang": "ur",
+    "roles": ["teacher"],
+    "center_id": "uuid"
+  }
+}</div></div>
+          <div class="ep-section"><div class="ep-section-title">Notes</div><div class="code-block">Called by the frontend immediately after a successful /auth/refresh
+to populate user state without requiring a full login.
+Returns 401 if the access token is missing or invalid.</div></div>
+        </div>
+      </div>
       <div class="endpoint"><div class="ep-header" onclick="toggle(this)"><span class="method POST">POST</span><span class="ep-path">/auth/change-password</span><span class="ep-desc">Change own password</span></div>
         <div class="ep-body"><div class="badge-row"><span class="auth-badge auth-any">Any authenticated</span></div>
           <div class="ep-section"><div class="ep-section-title">Request body</div><div class="code-block">{

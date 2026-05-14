@@ -390,7 +390,7 @@ export default function AssessmentDetail() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <button
-          onClick={() => navigate('/assessments')}
+          onClick={() => navigate('/teacher/assessments')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 13, padding: 0, marginBottom: 10 }}
         >
           ← Assessments

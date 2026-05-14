@@ -635,7 +635,7 @@ export default function ClassDetail() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <button
-          onClick={() => navigate('/classes')}
+          onClick={() => navigate('/manager/classes')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 13, padding: 0, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}
         >
           ← Classes
