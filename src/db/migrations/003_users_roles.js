@@ -13,7 +13,7 @@ exports.up = async (knex) => {
 
   await knex.schema.createTable('users', (t) => {
     t.uuid('id').primary().defaultTo(knex.raw('uuid_generate_v4()'));
-    t.string('email', 255).notNullable().unique();
+    t.string('email', 255).unique();
     t.string('password_hash', 255).notNullable();
     t.string('full_name', 255).notNullable();
     t.string('full_name_ur', 255);
