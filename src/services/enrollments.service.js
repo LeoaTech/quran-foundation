@@ -189,7 +189,7 @@ async function enrollNewStudent({ user, body }) {
     const [newUser] = await trx('users').insert({
       full_name,
       full_name_ur: full_name_ur || null,
-      email:        `student_${require('crypto').randomBytes(4).toString('hex')}@qf.local`,
+      email:        null,
       phone:        phone || null,
       whatsapp:     whatsapp || null,
       date_of_birth: date_of_birth || null,

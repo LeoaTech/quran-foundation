@@ -180,14 +180,11 @@ async function signup({ full_name, full_name_ur, phone, password, center_id }) {
 
   // 4. Transactional: create user + assign student role
   const newUser = await db.transaction(async (trx) => {
-    // Generate a placeholder email from phone (email column is NOT NULL in the DB)
-    const emailPlaceholder = `${phone.replace(/[^0-9]/g, '')}@student.qf.local`;
-
     const [user] = await trx('users').insert({
       full_name,
       full_name_ur: full_name_ur || null,
       phone,
-      email: emailPlaceholder,
+      email: null,
       password_hash,
       preferred_lang: 'ur',
       is_active: true,
