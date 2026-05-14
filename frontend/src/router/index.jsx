@@ -24,6 +24,7 @@ import CourseDetail   from '../pages/admin/Courses/CourseDetail';
 import TeachersList   from '../pages/admin/Teachers/TeachersList';
 import StudentsList   from '../pages/admin/Students/StudentsList';
 import OrgReport      from '../pages/admin/Reports/OrgReport';
+import RBACPage      from '../pages/admin/RBAC/RBACPage';
 
 // Center manager
 import ManagerDashboard from '../pages/manager/Dashboard';
@@ -96,6 +97,7 @@ export default function AppRoutes() {
             <Route path="/admin/teachers"    element={<TeachersList />} />
             <Route path="/admin/students"    element={<StudentsList />} />
             <Route path="/admin/reports"     element={<OrgReport />} />
+            <Route path="/admin/rbac"        element={<RBACPage />} />
           </Route>
 
           {/* ── Center Manager ── */}

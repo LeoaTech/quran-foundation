@@ -4,7 +4,8 @@
       "Bash(npm create *)",
       "Bash(npm install *)",
       "Bash(npm run *)",
-      "PowerShell(New-Item -ItemType Directory -Force -Path \"e:\\\\Quran Foundation\\\\Quran Foundation LMS\\\\frontend\\\\src\\\\pages\\\\teacher\\\\Reports\")"
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"e:\\\\Quran Foundation\\\\Quran Foundation LMS\\\\frontend\\\\src\\\\pages\\\\teacher\\\\Reports\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"e:\\\\Quran Foundation\\\\Quran Foundation LMS\\\\frontend\\\\src\\\\pages\\\\admin\\\\RBAC\")"
     ]
   }
 }

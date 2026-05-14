@@ -25,8 +25,9 @@ const NAV_CONFIG = {
       {
         title: 'Reports & Settings',
         items: [
-          { to: '/admin/reports', label: 'Org Report', icon: '▦' },
-          { to: '/admin/org',     label: 'Settings',   icon: '⚙' },
+          { to: '/admin/reports', label: 'Org Report',        icon: '▦' },
+          { to: '/admin/rbac',    label: 'Roles & Perms',     icon: '⚙' },
+          { to: '/admin/org',     label: 'Settings',          icon: '⚙' },
         ],
       },
     ],

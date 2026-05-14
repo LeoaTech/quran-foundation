@@ -2645,7 +2645,7 @@ Routes are grouped by role prefix. Each role's subtree is wrapped in a `Protecte
 |------|-----------|
 | `/reports/students/:userId` | `StudentReport` |
 
-### New pages added
+### New pages added (includes RBAC)
 
 | File | Description |
 |------|-------------|
@@ -2669,6 +2669,74 @@ Routes are grouped by role prefix. Each role's subtree is wrapped in a `Protecte
 | `student` | **My Learning**: My Progress `/student/dashboard`, Attendance `/student/attendance`, Schedule `/student/schedule`, Results `/student/results` |
 
 `pageTitle()` in `AppShell` derives the topbar title from the last non-UUID URL segment (UUID regex: `/^[0-9a-f]{8}-...-[0-9a-f]{12}$/i`), falling back to `'Dashboard'`.
+
+### RBAC Control Panel — `src/pages/admin/RBAC/`
+
+Route: `/admin/rbac` · Guard: `ProtectedRoute roles={['super_admin']}`
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/api/rbac.js` | All Axios helpers: roles CRUD, permission toggles, user overrides |
+| `src/hooks/usePermissions.js` | React Query wrappers: `useRoles`, `useRolePermissions`, `useCreateRole`, `useUpdateRole`, `useDeleteRole`, `useSetRolePermissions`, `useToggleRolePermission` |
+| `src/pages/admin/RBAC/RBACPage.jsx` | Main two-panel page: roles list (left) + permission matrix (right) |
+| `src/pages/admin/RBAC/CreateRoleModal.jsx` | Create role form with color picker + copy-permissions-from toggle |
+| `src/pages/admin/RBAC/EditRoleModal.jsx` | Edit role metadata; name is read-only for system roles |
+| `src/pages/admin/RBAC/DeleteRoleModal.jsx` | Type-to-confirm delete with user-count warning |
+
+#### Layout
+
+Two-panel grid (`300px left | 1fr right`):
+- **Left panel**: sticky role card list — colored border dot, user/permission count, 🔒 badge for system roles
+- **Right panel**: permission matrix for selected role
+
+#### Left panel — role cards
+
+Each card shows: colored dot (role.color), role name in bold, optional `label_ur` (Amiri RTL), user count, permission count, 🔒 if `is_system`. Click selects the role and loads the permission matrix.
+
+#### Right panel — permission matrix
+
+**Header**: role name + color swatch + user count + Edit button + Delete button (hidden for system roles).
+
+**Summary line**: `n permissions across m modules`.
+
+**Module sections** (all expanded by default, collapsible):
+- Module header: icon + label + `{granted}/{total}` chip (green/gold/neutral) + **Grant all** + **Revoke all** buttons
+- Permission rows: label | label_ur (RTL Amiri) | action chip | `Toggle`
+- `Toggle` is a CSS switch (40×22px, emerald when ON, sand-deep when OFF), shows `···` spinner when in-flight
+
+**Unsaved changes bar** (`position: sticky; bottom: 0`): appears when `pendingCount > 0`. Dark background with "N unsaved changes" + **Discard** + **Save all** buttons.
+
+#### Permission state management
+
+```
+localGranted:  Set<id>  – current UI state
+initGranted:   Set<id>  – last server-synced state
+inFlight:      Set<id>  – per-toggle PATCH in-progress
+pendingCount:  count of IDs where localGranted ≠ initGranted
+```
+
+- **Individual toggle** → optimistic update + `PATCH /rbac/roles/:id/permissions/:permId`; on success: `initGranted` updated (no longer pending); on failure: revert + error toast.
+- **Grant all / Revoke all** → updates `localGranted` only; counts as pending (no PATCH fired).
+- **Save all** → `PUT /rbac/roles/:id/permissions` with `[...localGranted]`; on success: `initGranted = localGranted`.
+- **Discard** → resets `localGranted = initGranted`.
+
+#### CreateRoleModal
+
+- Live `snake_case` validation: `/^[a-z][a-z0-9_]*$/`
+- Color picker: 8 preset swatches + hex text input with live preview
+- **Copy permissions from** checkbox → role selector → after create, calls `getRolePermissions(copyRoleId)` + `setRolePermissions(newRoleId, ids)` in one flow
+
+#### DeleteRoleModal
+
+- Shows user count with Urdu warning text if `user_count > 0`
+- Type-to-confirm pattern: Delete button disabled until typed name matches `role.name`
+- After deletion: clears `selectedRoleId` if deleted role was selected
+
+#### AppShell nav update
+
+`super_admin` "Reports & Settings" section now includes `{ to: '/admin/rbac', label: 'Roles & Perms', icon: '⚙' }`.
 
 ### Design tokens (key values)
 
