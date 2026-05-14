@@ -55,8 +55,39 @@ export function useSetRolePermissions() {
 }
 
 export function useToggleRolePermission() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ roleId, permissionId, isGranted }) =>
       api.toggleRolePermission(roleId, permissionId, isGranted),
+    onSuccess: (_, { roleId }) => {
+      qc.invalidateQueries({ queryKey: ['rbac-roles'] });
+      qc.invalidateQueries({ queryKey: ['rbac-role-perms', roleId] });
+    },
+  });
+}
+
+// ── Permissions ───────────────────────────────────────────────────────────────
+
+export function useAllPermissions(params = {}) {
+  return useQuery({
+    queryKey: ['rbac-all-permissions', params],
+    queryFn:  () => api.getPermissions(params),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreatePermission() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createPermission,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rbac-all-permissions'] }),
+  });
+}
+
+export function useUpdatePermission() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ permissionId, data }) => api.updatePermission(permissionId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rbac-all-permissions'] }),
   });
 }

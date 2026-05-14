@@ -3,6 +3,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import Button from '../../../components/Button';
 import { useRoles, useRolePermissions, useToggleRolePermission, useSetRolePermissions } from '../../../hooks/usePermissions';
 import { useToast } from '../../../hooks/useToast';
+import RBACTabs       from './RBACTabs';
 import CreateRoleModal from './CreateRoleModal';
 import EditRoleModal   from './EditRoleModal';
 import DeleteRoleModal from './DeleteRoleModal';
@@ -213,6 +214,9 @@ export default function RBACPage() {
 
   return (
     <div>
+      {/* Tab navigation */}
+      <RBACTabs />
+
       {/* Page header */}
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>

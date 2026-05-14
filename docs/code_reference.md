@@ -2736,7 +2736,79 @@ pendingCount:  count of IDs where localGranted ≠ initGranted
 
 #### AppShell nav update
 
-`super_admin` "Reports & Settings" section now includes `{ to: '/admin/rbac', label: 'Roles & Perms', icon: '⚙' }`.
+`super_admin` "Reports & Settings" section includes `{ to: '/admin/rbac', label: 'Roles & Perms', icon: '⚙' }`.
+
+---
+
+### Permissions Management Page — `src/pages/admin/RBAC/PermissionsPage.jsx`
+
+Route: `/admin/rbac/permissions` · Guard: `ProtectedRoute roles={['super_admin']}`  
+Second tab in the RBAC section, accessible via `RBACTabs` navigation bar.
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/pages/admin/RBAC/RBACTabs.jsx` | Tab bar used by both RBACPage and PermissionsPage — links `/admin/rbac` and `/admin/rbac/permissions` |
+| `src/pages/admin/RBAC/PermissionsPage.jsx` | Filterable permission table grouped by module with status toggle and edit |
+| `src/pages/admin/RBAC/AddPermissionModal.jsx` | Create permission with live key preview + multi-role assignment |
+| `src/pages/admin/RBAC/EditPermissionModal.jsx` | Edit labels/description/status; key/module/action read-only |
+| `src/pages/admin/RBAC/RoleImpactPanel.jsx` | Slide-in panel showing which roles have a permission; revoke/grant from here |
+
+#### New hooks added to `usePermissions.js`
+
+| Hook | Description |
+|------|-------------|
+| `useAllPermissions(params)` | `GET /rbac/permissions` — cached 60s; returns grouped object |
+| `useCreatePermission()` | `POST /rbac/permissions`; invalidates `rbac-all-permissions` |
+| `useUpdatePermission()` | `PATCH /rbac/permissions/:id`; invalidates `rbac-all-permissions` |
+| `useToggleRolePermission` (updated) | Now also invalidates `rbac-roles` and `rbac-role-perms` on success |
+
+#### PermissionsPage — filter state
+
+| Filter | Control | Effect |
+|--------|---------|--------|
+| Module | `<select>` derived from data | Filters to one module group |
+| Action | `<select>` derived from data | Filters to one action type |
+| Status | Two-button toggle (Active only / All) | Default: active only |
+| Search | Text input | Filters by `key` or `label` (case-insensitive) |
+
+**Flat permissions** are derived from the grouped API response: `Object.entries(grouped).flatMap(([mod, perms]) => perms.map(p => ({...p, module: mod})))`.
+
+**Role counts** per permission are computed from `useRoles({ include: 'permissions' })` — no extra API call.
+
+#### PermissionsPage — table columns
+
+| Column | Notes |
+|--------|-------|
+| Key | Monospace, `{module}.{action}` |
+| Label | English label |
+| اردو | Amiri RTL, label_ur |
+| Action | Colored chip: view=blue, create=green, edit=gold, delete=red, export/others=sand |
+| Roles | `RolesChip` — shows count; hover tooltip lists role names; click opens `RoleImpactPanel` |
+| Status | `StatusDot` — click toggles `is_active` via `updatePermission`; optimistic via loading state |
+| Edit | ✎ icon — opens `EditPermissionModal` |
+
+#### AddPermissionModal
+
+- **Module select**: predefined list + `— New module… —` option that reveals a text input (snake_case)
+- **Action select**: predefined list + `— Custom… —` option
+- **Key preview**: live `{module}.{action}` with ✓ (unique) or ✕ (exists) indicator
+- **Assign to roles**: checkbox list of all roles; on save, fires `toggleRolePermission` for each checked role
+- Success toast format: `"Permission 'x.y' created and assigned to N roles"`
+
+#### EditPermissionModal
+
+- `key`, `module`, `action` shown as read-only monospace fields with immutability banner
+- Editable: `label`, `label_ur` (RTLInput), `description`, `is_active` checkbox
+
+#### RoleImpactPanel
+
+- Rendered via `createPortal` — fixed-position (380px wide, full height) with semi-transparent backdrop
+- **Slide-in animation**: `transform: translateX(100% → 0)` via CSS transition triggered 10ms after mount
+- **Roles list**: derived from `useRoles({ include: 'permissions' })` — no extra API call
+- **Revoke button**: fires `toggleRolePermission(roleId, permId, false)` with per-role loading state
+- **Add to role dropdown**: shows only roles that DON'T already have the permission; fires `toggleRolePermission(roleId, permId, true)` on confirm
 
 ### Design tokens (key values)
 
