@@ -1403,6 +1403,97 @@ return result;
 
 **`getHomeworkPerformance`** — validates class exists + `assertCenterAccess` before querying. Not cached.
 
+### Frontend — Reports Module
+
+#### Files
+
+| File | Role |
+|------|------|
+| `frontend/src/api/reports.js` | 4 Axios helpers: `getOrgOverview`, `getCenterOverview(centerId, month)`, `getStudentSummary(userId)`, `getHomeworkPerformance(classId, params)` |
+| `frontend/src/hooks/useReports.js` | 4 React Query hooks (5-minute stale time): `useOrgReport`, `useCenterReport(centerId, month)`, `useStudentReport(userId)`, `useHomeworkReport(classId, dateRange)` |
+| `frontend/src/styles/print.css` | `@media print` stylesheet — hides sidebar, topbar, buttons, selects; sets `margin-left: 0`; `page-break-before: always` on `.report-section`; forces chip colors |
+| `frontend/src/pages/admin/Reports/OrgReport.jsx` | Super-admin org-wide report |
+| `frontend/src/pages/admin/Reports/CenterReport.jsx` | Center-level monthly report (super_admin selects center; center_manager scoped to own center) |
+| `frontend/src/pages/shared/Reports/StudentReport.jsx` | Printable student report card accessed via `/reports/students/:userId` |
+| `frontend/src/pages/teacher/Reports/HomeworkReport.jsx` | Per-class homework criterion breakdown for teachers |
+
+#### Routes
+
+| Path | Component | Guard |
+|------|-----------|-------|
+| `/reports` | `OrgReport` | `ProtectedRoute roles={['super_admin']}` |
+| `/reports/center` | `CenterReport` | `ProtectedRoute roles={['super_admin','center_manager']}` |
+| `/reports/homework` | `HomeworkReport` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/reports/students/:userId` | `StudentReport` | `ProtectedRoute roles={['center_manager','teacher','student','guardian']}` |
+
+#### Sidebar nav for Reports
+
+| Role | Section | Items added |
+|------|---------|-------------|
+| `super_admin` | Reports | Org Report → `/reports`, Center Report → `/reports/center`, Settings → `/admin/org` |
+| `center_manager` | Reports | Center Report → `/reports/center`, HW Report → `/reports/homework` |
+| `teacher` | Reports | HW Report → `/reports/homework` |
+
+#### OrgReport.jsx
+
+- `useOrgReport()` — org-wide stats (total students, centers, avg attendance, teachers).
+- `useQuery(['centers'], getCenters)` — populates center list for trend table.
+- `useQueries` (N×6 queries) — per-center per-month attendance for 6-month trend grid, fired in parallel.
+- Row 1: 4 `MetricCard`s — total students, active centers, avg attendance (color-coded), teachers.
+- Row 2 (2-col grid):
+  - Enrollments by course — `ProgressBar` per course relative to max enrollment.
+  - Centers ranked by attendance for selected `month` — sorted table with `ProgressBar` + colored % badge.
+- Row 3: Monthly attendance trend — matrix table (rows = centers, cols = last 6 months); each cell is a colored pill using `attendanceBg`/`attendanceColor`.
+- Print button → `window.print()`.
+
+#### CenterReport.jsx
+
+- `useCenterReport(centerId, month)` — center overview stats.
+- super_admin sees a center `<select>`; center_manager is auto-scoped via `user.center_id`.
+- `useQuery(['center', centerId], getCenter)` — resolves center name for the heading.
+- Section 1: 4 `MetricCard`s — students, active classes, attendance %, new enrollments.
+- Section 2 — Class breakdown table: class / teacher / students / avg attendance (inline `ProgressBar`) / avg HW% / topics covered.
+- Section 3 — Homework criteria breakdown: `label_ur` RTL with Amiri font, class avg color-coded green/gold/red, highest/lowest columns.
+- Export CSV button (semicolon-safe quoting) + Print button.
+
+#### StudentReport.jsx
+
+- Uses `useParams()` for `:userId`; calls `useStudentReport(userId)`.
+- Header: student name (English + Urdu), center / class / teacher / date, attendance % badge (color-coded).
+- Section 1 (Attendance): large % figure + `ProgressBar` + 3-month calendar dot grid (10×10 px colored dots per day present/absent/late, derived from `report.attendance_by_date`).
+- Section 2 (Academic Progress): topics covered list with ✓ icons + `GradesBreakdown` — 4 colored boxes (Excellent / Good / Average / Needs Revision) with counts.
+- Section 3 (Homework Performance): large avg % + per-criterion table with `TrendArrow` component.
+- Section 4 (Assessments): table of all assessment scores.
+- Section 5 (Teacher Remarks): last 3 session notes rendered as RTL Amiri block-quotes.
+- Print button → `window.print()`.
+
+#### HomeworkReport.jsx
+
+- Controls: class `<select>` + `from`/`to` date inputs (default: last 30 days).
+- `useHomeworkReport(classId, { from, to })` — fires only when a class is selected.
+- Summary row: 4 `MetricCard`s — sessions logged, avg HW% (color variant), top performer name, needs-attention student name.
+- Per-criterion card grid (`auto-fill minmax(280px,1fr)`):
+  - Card header: `label_ur` (Amiri, RTL) + max marks label.
+  - Circular avg % badge with `avgBg`/`avgColor` background (green/gold/red).
+  - Highest (emerald box) / Lowest (red or neutral box) side by side.
+  - "Needs attention" mini list — up to 3 `bottom_students` from API, name + avg score.
+- Export CSV button + Print button.
+
+#### print.css highlights
+
+```css
+@media print {
+  .sidebar, .topbar, .no-print, [data-no-print] { display: none !important; }
+  .app-main { margin-left: 0 !important; }
+  .content-area { padding: 0 !important; background: white !important; }
+  .report-section { page-break-before: always; }
+  .report-section:first-of-type { page-break-before: avoid; }
+  .card, .metric-card { page-break-inside: avoid; box-shadow: none !important; border: 1px solid #ccc !important; }
+  button, select, input[type="date"], .filter-bar { display: none !important; }
+  -webkit-print-color-adjust: exact; /* forces background-colors and chip fills */
+}
+```
+
 ---
 
 ## Jobs & Workers
@@ -1533,6 +1624,10 @@ frontend/
                           updateEnrollment
       attendance.js       createAttendanceSession, getClassAttendance, getSessionRecords,
                           updateRecord, getStudentAttendance
+      progress.js         createSession, getSession, updateSession, getStudentProgress,
+                          updateHomeworkEntry, updateHomeworkScore
+      assessments.js      getClassAssessments, createAssessment, getAssessment, updateAssessment,
+                          submitResults, updateResult, getAssessmentResults, getStudentAssessments
 
     context/
       AuthContext.jsx     AuthProvider — access_token in memory only; silent refresh on mount
@@ -1543,6 +1638,8 @@ frontend/
       useAuth.js          Thin useContext(AuthContext) wrapper
       useToast.js         { success, error, warning, toast } helpers over ToastContext
       useAttendance.js    useClassAttendance, useStudentAttendance, useMarkAttendance, useCorrectRecord
+      useProgress.js      useStudentProgress, useHomeworkCriteria, useCreateSession, useClassProgress,
+                          useClassEnrollments
 
     components/
       ProtectedRoute.jsx  Layout route guard — redirects to /signin if unauthenticated;
@@ -1604,10 +1701,27 @@ frontend/
                                live summary header; sticky bottom bar; gold banner if editing existing session
           AttendanceSheet.jsx  Week/month grid; per-student % column; per-day % header; inline record correction;
                                CSV export with BOM for Urdu text
+        Progress/
+          ProgressLogger.jsx   Class+student selector (searchable dropdown with last-session preview);
+                               grade toggle buttons (4 colors); RTLInput note fields; per-criterion score rows
+                               with running total; sticky submit bar; confetti burst on success
+          ClassProgress.jsx    Card grid of all enrolled students; per-student last session + HW avg ProgressBar;
+                               "Log today" button navigates to ProgressLogger pre-filled
       student/
         Attendance/
           MyAttendance.jsx     4 MetricCards (Present/Absent/Late/Attendance%); monthly calendar grid;
                                scrollable session history table (descending date order)
+        Progress/
+          MyProgress.jsx       3 MetricCards; topic progress section (expandable subtopic rows with ✓/○);
+                               session history table (expandable row shows per-criterion scores)
+        Assessments/
+          MyAssessments.jsx    Read-only table sorted by date desc; score color-coded by %; Urdu remarks RTL
+      teacher/
+        Assessments/
+          AssessmentsList.jsx  Class selector + type filter; row-click navigates to AssessmentDetail
+          AssessmentDetail.jsx 2 tabs: Enter Results (per-student score/grade form) + Results Overview
+                               (summary MetricCards + sortable table + CSV export)
+          CreateAssessmentModal.jsx  max_score hidden when type=oral; blue info banner shown for oral type
       Placeholder.jsx        Stub for routes not yet implemented
 
     styles/
@@ -2040,6 +2154,121 @@ Wraps `Modal` (size `sm`). Confirms the student name and class name, accepts a w
 - **Monthly calendar grid**: 7-column Monday-anchored grid. Days with sessions are colored (green=present, red=absent, gold=late). Hover shows date + status. Month navigation ← → changes the displayed month (year-level data already loaded).
 - **Sessions table**: descending date order, columns Date / Status (Badge) / Note (Urdu RTL). Capped at 480px height with scroll.
 
+### Progress & Homework frontend module
+
+#### `frontend/src/api/progress.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `createSession(payload)` | `POST /progress-sessions` | Log classwork + homework scores in one call |
+| `getSession(sessionId)` | `GET /progress-sessions/:id` | Single session with scores |
+| `updateSession(sessionId, payload)` | `PATCH /progress-sessions/:id` | Correct classwork entry |
+| `getStudentProgress(userId, params)` | `GET /students/:id/progress` | Full history; `?class_id`, `?from`, `?to`, `?include=homework_scores` |
+| `updateHomeworkEntry(entryId, payload)` | `PATCH /homework-entries/:id` | Update submission status or overall note |
+| `updateHomeworkScore(entryId, scoreId, payload)` | `PATCH /homework-entries/:id/scores/:sid` | Correct a single score |
+
+#### `frontend/src/hooks/useProgress.js` — hook exports
+
+| Hook | Returns | Description |
+|------|---------|-------------|
+| `useStudentProgress(userId, params)` | `useQuery` | Student progress history + aggregate stats |
+| `useHomeworkCriteria(classId)` | `useQuery` | Active and inactive criteria for a class |
+| `useCreateSession()` | `useMutation` | `mutateAsync(payload)` — invalidates student progress + class enrollments on success |
+| `useClassProgress(classId, dateRange)` | `useQuery` | Class-level attendance reused for overview |
+| `useClassEnrollments(classId)` | `useQuery` | Active enrollments with student names |
+
+#### `ProgressLogger.jsx` — teacher daily workflow
+
+This is the highest-usage screen. Layout:
+
+1. **Select student** (top card): class selector → searchable dropdown of enrolled students. Each dropdown item shows name, Urdu name, and last session date. Selected student shows a summary banner with their most recent topic + grade.
+
+2. **Left column — Classwork card:**
+   - Topic select (options show `title_ur / title`); changing topic resets subtopic
+   - Subtopic select (conditional — only appears when topic has subtopics)
+   - **Grade buttons:** 4 large toggle buttons in a 2×2 grid: Excellent (emerald), Good (blue), Average (amber), Needs Revision (red). Fill on selection.
+   - Teacher note Urdu (RTLInput multiline, Amiri font)
+   - Collapsible Arabic note section (hidden by default)
+
+3. **Right column — Homework Scores card:**
+   - Each active criterion rendered as `ScoreRow`: label_ur (RTL), topic chip, `/ max` label, number input (validated on blur to prevent over-max), expandable Urdu note field (revealed via ✎ button)
+   - **Running total footer**: `{total} / {maxTotal}` + live `(pct%)` in color (green ≥ 80%, amber 60–79%, red <60%)
+   - Homework due date picker
+   - Overall homework note (RTLInput)
+
+4. **Sticky submit bar**: shows `{student} · {class} · {date}`. Disabled until a grade is selected. On success: confetti burst (24 colored particles, CSS animation), toast, form resets to student selection. On error: shows `message_ur` from API alongside English message.
+
+**`createSession` payload:**
+```json
+{
+  "enrollment_id": "uuid",
+  "class_id": "uuid",
+  "session_date": "YYYY-MM-DD",
+  "classwork": { "topic_id", "subtopic_id", "grade", "note_ur", "note_ar" },
+  "homework": { "due_date", "overall_note_ur", "scores": [{ "criteria_id", "marks_obtained", "note_ur" }] }
+}
+```
+
+#### `ClassProgress.jsx` — class overview
+
+- Class selector + last 7/30/90 days toggle.
+- Fetches enrollments then **`useQueries`** for per-student progress in parallel (one query per student).
+- Cards in a responsive auto-fill grid. Each card: name + Urdu name, last session date + grade chip, topic name (RTL), mini ProgressBar for HW avg.
+- "Log today →" button navigates to `/progress?enrollment=...&class=...` so ProgressLogger can pre-fill the student selector.
+
+#### `MyProgress.jsx` — student read-only view
+
+- Fetches `GET /students/:id/progress?include=homework_scores&from=YYYY-01-01&to=YYYY-MM-DD`.
+- **3 MetricCards**: Topics covered, Attendance %, Homework avg (color-coded).
+- **Topic progress** (left column): one bar per topic. `pct = subtopics_covered / total_subtopics`. Clicking a topic with subtopics expands an inline list showing ✓ (covered) or ○ (not yet) per subtopic, using Amiri font for Urdu names.
+- **Session history table** (right column): Date / Topic / Subtopic / Grade / HW % / Teacher note. Clicking a row (when it has homework scores) expands an inline scores breakdown showing `marks / max` per criterion.
+
+### Assessments frontend module
+
+#### `frontend/src/api/assessments.js` — full export list
+
+| Export | HTTP | Description |
+|--------|------|-------------|
+| `getClassAssessments(classId)` | `GET /classes/:id/assessments` | List assessments for a class |
+| `createAssessment(classId, payload)` | `POST /classes/:id/assessments` | Create assessment |
+| `getAssessment(assessmentId)` | `GET /assessments/:id` | Single assessment with metadata |
+| `updateAssessment(assessmentId, payload)` | `PATCH /assessments/:id` | Edit assessment |
+| `submitResults(assessmentId, results)` | `POST /assessments/:id/results` | Bulk-submit results array |
+| `updateResult(assessmentId, resultId, payload)` | `PATCH /assessments/:id/results/:rid` | Correct one result |
+| `getAssessmentResults(assessmentId)` | `GET /assessments/:id/results` | All results for an assessment |
+| `getStudentAssessments(userId)` | `GET /students/:id/assessments` | Student's full assessment history |
+
+#### `AssessmentsList.jsx`
+
+- Class selector + type filter toggle (All / Written / Oral / Topic test).
+- Fetches `getClassAssessments(classId)` — `results_recorded / total_students` shown in the Results column, colored green when fully complete.
+- Row click navigates to `/assessments/:id`. "Create assessment" button opens `CreateAssessmentModal` and, on creation, navigates directly to the new detail page.
+
+#### `AssessmentDetail.jsx` — two tabs
+
+**Tab 1 — Enter results:**
+- Fetches active enrollments + existing results in parallel on mount.
+- Per-student row: name + Urdu name, then either a numeric score input (for written/topic_test) or 4 oral grade buttons (Excellent/Good/Average/Fail, color-coded), plus an optional topic-tested dropdown and Urdu remarks RTLInput.
+- Students with already-saved results show a green ✓ next to their name; editing marks them unsaved.
+- "Save all results" calls `submitResults(assessmentId, results[])` with only non-empty entries.
+
+**Tab 2 — Results overview:**
+- Written/topic_test: 4 MetricCards (avg score, highest, lowest, students above 60%).
+- Table sorted by score descending; score shown in color (green ≥ 80%, amber 60–79%, red <60%); oral grades show colored chips.
+- **CSV export** with BOM includes Student, Urdu name, score/grade, topic, remarks.
+
+#### `CreateAssessmentModal.jsx`
+
+- `max_score` field is dynamically hidden when `type === 'oral'`.
+- When oral is selected, a blue info banner explains that oral evaluations use grades instead of scores.
+- On create: invalidates `['class-assessments', classId]`, navigates to new assessment detail.
+
+#### `MyAssessments.jsx` (student)
+
+- Fetches `GET /students/:id/assessments`.
+- Table sorted descending by date. Each row: date, assessment title + Urdu title stacked, type chip, score/percentage (color-coded) or oral grade chip, topic (Amiri/RTL), remarks (Amiri/RTL).
+- No interaction — fully read-only.
+
 ### Token audit result
 
 All 29 CSS custom properties from `design.html` are present in `tokens.css`. The file `quran-foundation-lms-design.html` does not exist — the four docs files are `design.html`, `api_reference.html`, `database_schema.html`, `wireframes.html`.
@@ -2134,10 +2363,21 @@ Behaviour:
 | `/attendance` | `MarkAttendance` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/attendance/sheet` | `AttendanceSheet` | `ProtectedRoute roles={['center_manager','teacher']}` |
 | `/attendance/my` | `MyAttendance` | `ProtectedRoute roles={['student']}` |
+| `/progress` | `ProgressLogger` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/progress/class` | `ClassProgress` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/progress/my` | `MyProgress` | `ProtectedRoute roles={['student']}` |
+| `/assessments` | `AssessmentsList` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/assessments/:id` | `AssessmentDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/assessments/my` | `MyAssessments` | `ProtectedRoute roles={['student']}` |
+| `/reports` | `OrgReport` | `ProtectedRoute roles={['super_admin']}` |
+| `/reports/center` | `CenterReport` | `ProtectedRoute roles={['super_admin','center_manager']}` |
+| `/reports/homework` | `HomeworkReport` | `ProtectedRoute roles={['center_manager','teacher']}` |
+| `/reports/students/:userId` | `StudentReport` | `ProtectedRoute roles={['center_manager','teacher','student','guardian']}` |
+| `/results` | redirect | → `/assessments/my` |
 | `/centers` | redirect | → `/admin/centers` (legacy redirect) |
 | `/courses` | redirect | → `/admin/courses` (legacy redirect) |
 | `/settings` | redirect | → `/admin/org` (legacy redirect) |
-| `/teachers`, `/students`, `/reports`, etc. | `Placeholder` | `ProtectedRoute` (any role) |
+| `/teachers`, `/students` | `Placeholder` | `ProtectedRoute` (any role) |
 
 ### Role-based sidebar nav
 
@@ -2145,9 +2385,9 @@ Behaviour:
 
 | Role | Nav sections |
 |------|-------------|
-| `super_admin` | Overview (Dashboard → `/dashboard`, Centers → `/admin/centers`), Academic (Courses → `/admin/courses`, Teachers, Students), Reports (Reports, Settings → `/admin/org`) |
-| `center_manager` | My Center (Dashboard, Classes, Enrollment, Attendance), Admin (Reports) |
-| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Assessments) |
+| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Org Report → `/reports`, Center Report → `/reports/center`, Settings → `/admin/org`) |
+| `center_manager` | My Center (Dashboard, My Center, Classes, Enrollment, Attendance), Reports (Center Report → `/reports/center`, HW Report → `/reports/homework`) |
+| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Class Overview, Assessments), Reports (HW Report → `/reports/homework`) |
 | `student` | My Learning (My Progress, Attendance, Schedule, Results) |
 
 ### Design tokens (key values)

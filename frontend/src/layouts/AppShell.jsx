@@ -31,8 +31,9 @@ const NAV_CONFIG = {
       {
         title: 'Reports',
         items: [
-          { to: '/reports',   label: 'Reports',  icon: '▦' },
-          { to: '/admin/org', label: 'Settings', icon: '⚙' },
+          { to: '/reports',        label: 'Org Report',    icon: '▦' },
+          { to: '/reports/center', label: 'Center Report', icon: '◈' },
+          { to: '/admin/org',      label: 'Settings',      icon: '⚙' },
         ],
       },
     ],
@@ -59,9 +60,10 @@ const NAV_CONFIG = {
         ],
       },
       {
-        title: 'Admin',
+        title: 'Reports',
         items: [
-          { to: '/reports', label: 'Reports', icon: '▦' },
+          { to: '/reports/center',  label: 'Center Report', icon: '▦' },
+          { to: '/reports/homework', label: 'HW Report',    icon: '◈' },
         ],
       },
     ],
@@ -74,10 +76,17 @@ const NAV_CONFIG = {
       {
         title: 'My Classes',
         items: [
-          { to: '/dashboard',   label: 'Dashboard',     icon: '⊞' },
-          { to: '/attendance',  label: 'Attendance',    icon: '☑' },
-          { to: '/progress',    label: 'Log Progress',  icon: '◈' },
-          { to: '/assessments', label: 'Assessments',   icon: '▦' },
+          { to: '/dashboard',       label: 'Dashboard',     icon: '⊞' },
+          { to: '/attendance',      label: 'Attendance',    icon: '☑' },
+          { to: '/progress',        label: 'Log Progress',  icon: '◈' },
+          { to: '/progress/class',  label: 'Class Overview', icon: '◉' },
+          { to: '/assessments',     label: 'Assessments',   icon: '▦' },
+        ],
+      },
+      {
+        title: 'Reports',
+        items: [
+          { to: '/reports/homework', label: 'HW Report', icon: '▦' },
         ],
       },
     ],
@@ -90,10 +99,10 @@ const NAV_CONFIG = {
       {
         title: 'My Learning',
         items: [
-          { to: '/dashboard',       label: 'My Progress', icon: '⊞' },
+          { to: '/progress/my',     label: 'My Progress', icon: '⊞' },
           { to: '/attendance/my',   label: 'Attendance',  icon: '☑' },
-          { to: '/schedule',        label: 'Schedule',    icon: '◉' },
-          { to: '/results',         label: 'Results',     icon: '▦' },
+          { to: '/schedule',           label: 'Schedule',    icon: '◉' },
+          { to: '/assessments/my',  label: 'Results',     icon: '▦' },
         ],
       },
     ],

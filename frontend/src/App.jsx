@@ -34,6 +34,19 @@ import MyAttendance      from './pages/student/Attendance/MyAttendance';
 
 import Enrollment     from './pages/manager/Enrollment';
 
+import ProgressLogger    from './pages/teacher/Progress/ProgressLogger';
+import ClassProgress     from './pages/teacher/Progress/ClassProgress';
+import MyProgress        from './pages/student/Progress/MyProgress';
+
+import AssessmentsList   from './pages/teacher/Assessments/AssessmentsList';
+import AssessmentDetail  from './pages/teacher/Assessments/AssessmentDetail';
+import MyAssessments     from './pages/student/Assessments/MyAssessments';
+
+import OrgReport      from './pages/admin/Reports/OrgReport';
+import CenterReport   from './pages/admin/Reports/CenterReport';
+import StudentReport  from './pages/shared/Reports/StudentReport';
+import HomeworkReport from './pages/teacher/Reports/HomeworkReport';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -116,16 +129,47 @@ export default function App() {
                     <Route path="/attendance/my" element={<MyAttendance />} />
                   </Route>
 
+                  {/* Progress — teacher logging + class overview */}
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/progress"       element={<ProgressLogger />} />
+                    <Route path="/progress/class" element={<ClassProgress />} />
+                  </Route>
+                  {/* Student's own progress */}
+                  <Route element={<ProtectedRoute roles={['student']} />}>
+                    <Route path="/progress/my" element={<MyProgress />} />
+                  </Route>
+
+                  {/* Assessments — teacher + center_manager create/view */}
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/assessments"     element={<AssessmentsList />} />
+                    <Route path="/assessments/:id" element={<AssessmentDetail />} />
+                  </Route>
+                  {/* Student's own results */}
+                  <Route element={<ProtectedRoute roles={['student']} />}>
+                    <Route path="/assessments/my" element={<MyAssessments />} />
+                  </Route>
+
+                  {/* Reports — role-split */}
+                  <Route element={<ProtectedRoute roles={['super_admin']} />}>
+                    <Route path="/reports"        element={<OrgReport />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['super_admin', 'center_manager']} />}>
+                    <Route path="/reports/center" element={<CenterReport />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
+                    <Route path="/reports/homework" element={<HomeworkReport />} />
+                  </Route>
+                  <Route element={<ProtectedRoute roles={['center_manager', 'teacher', 'student', 'guardian']} />}>
+                    <Route path="/reports/students/:userId" element={<StudentReport />} />
+                  </Route>
+
                   <Route path="/teachers"    element={<Placeholder />} />
                   <Route path="/students"    element={<Placeholder />} />
-                  <Route path="/reports"     element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
                   <Route path="/classes"     element={<Placeholder />} />
                   <Route path="/attendance"  element={<Placeholder />} />
-                  <Route path="/progress"    element={<Placeholder />} />
-                  <Route path="/assessments" element={<Placeholder />} />
                   <Route path="/schedule"    element={<Placeholder />} />
-                  <Route path="/results"     element={<Placeholder />} />
+                  <Route path="/results"     element={<Navigate to="/assessments/my" replace />} />
 
                 </Route>
               </Route>

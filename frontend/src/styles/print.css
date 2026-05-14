@@ -1,0 +1,81 @@
+@media print {
+  /* ── Hide shell chrome ── */
+  .sidebar,
+  .topbar,
+  .no-print,
+  [data-no-print],
+  .sidebar-footer,
+  .app-main > .topbar {
+    display: none !important;
+  }
+
+  /* ── Full width, no margin-left from sidebar ── */
+  .app-main {
+    margin-left: 0 !important;
+  }
+
+  .content-area {
+    padding: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── Report card sections ── */
+  .report-section {
+    page-break-before: always;
+  }
+
+  .report-section:first-of-type {
+    page-break-before: avoid;
+  }
+
+  .report-header {
+    page-break-inside: avoid;
+  }
+
+  /* ── Cards should not break across pages ── */
+  .card,
+  .metric-card {
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  /* ── Tables ── */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* ── Links ── */
+  a[href]::after {
+    content: none !important;
+  }
+
+  /* ── Hide interactive controls ── */
+  button,
+  select,
+  input[type="date"],
+  input[type="text"],
+  .filter-bar,
+  .tab-bar-print-hide {
+    display: none !important;
+  }
+
+  /* ── Ensure colors print ── */
+  .chip-green  { background: #d4f0e8 !important; color: #1a6b52 !important; }
+  .chip-gold   { background: #faefd8 !important; color: #b07a1a !important; }
+  .chip-blue   { background: #e3eef9 !important; color: #1e5fa8 !important; }
+  .chip-red    { background: #fdecea !important; color: #c0392b !important; }
+}
