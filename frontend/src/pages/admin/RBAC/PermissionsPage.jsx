@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import { useAllPermissions, useUpdatePermission, useRoles } from '../../../hooks/usePermissions';
 import { useToast } from '../../../hooks/useToast';
 import RBACTabs from './RBACTabs';
@@ -197,7 +198,9 @@ export default function PermissionsPage() {
             {permsLoading ? 'Loading…' : `${flatPerms.length} total permissions across ${modules.length} modules`}
           </p>
         </div>
-        <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add permission</Button>
+        <Can permission="permissions.manage">
+          <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add permission</Button>
+        </Can>
       </div>
 
       {/* Filter bar */}

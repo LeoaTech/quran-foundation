@@ -1618,6 +1618,78 @@ All endpoints require JWT auth + a specific permission key (no role-based guards
 | Code | Status | Condition |
 |------|--------|-----------|
 | `ROLE_IN_USE` | 409 | DELETE attempted on a role that still has users; response body includes `user_count` |
+| `SYSTEM_ROLE` | 400 | Attempting to delete a role where `is_system = true` |
+
+---
+
+### RBAC wiring — final status
+
+#### Sidebar nav gating (`AppShell.jsx`)
+
+Each nav item carries an optional `requires` field (string or string[]).
+`canSeeItem()` hides the item when permissions are loaded AND the user lacks all keys.
+While permissions are still loading, all items are shown to prevent flash.
+
+Current `requires` mappings (super_admin section):
+
+| Nav item | `requires` |
+|----------|-----------|
+| Centers | `centers.view` |
+| Courses | `courses.view` |
+| Teachers | `users.view` |
+| Students | `users.view` |
+| Org Report | `reports.view_org` |
+| Roles & Perms | `roles.view` |
+| Settings | `org.edit` |
+
+#### API 403 handling (`src/api/client.js` + `App.jsx`)
+
+Any API response with `status: 403` triggers:
+1. `console.warn('Permission denied:', url, code)` — logged for debugging
+2. `window.dispatchEvent(new CustomEvent('api:forbidden', { detail: { url, code } }))` — DOM event
+
+A `PermissionAlert` component (rendered inside `<ToastProvider>` in `App.jsx`) listens for `api:forbidden` and shows a bilingual error toast:
+> "You don't have permission to do this. — آپ کو یہ کام کرنے کی اجازت نہیں ہے"
+
+The 403 response **does NOT redirect** to `/403` anymore — the page stays, the action is blocked. The `/403` error page is still accessible via `ProtectedRoute` role checks.
+
+#### `Can` component wrapping — permission map
+
+All mutating action buttons are wrapped with `<Can permission="...">`. The table below maps each button to its permission key:
+
+| Button | Page / Component | Permission |
+|--------|-----------------|------------|
+| + Add center | `CentersList` | `centers.create` |
+| + Add classroom, Save (settings) | `CenterDetail` | `centers.edit` |
+| + New course | `CoursesList` | `courses.create` |
+| Edit (course card) | `CoursesList` | `courses.edit` |
+| + Add level, Edit level | `CourseDetail` → `LevelsTab` | `courses.edit` |
+| + Add (topic), ✎ Edit topic | `TopicManager` | `topics.create` / `topics.edit` |
+| + Add subtopic | `TopicManager` → `TopicPanel` | `topics.create` |
+| ✎ Edit subtopic | `TopicManager` → `SubtopicRow` | `topics.edit` |
+| ✕ Delete topic / subtopic | `TopicManager` | `topics.delete` |
+| + Add class | `ClassesList` | `classes.create` |
+| + Assign teacher, Remove teacher | `ClassDetail` → `TeachersTab` | `classes.edit` |
+| + Add criterion | `ClassDetail` → `HomeworkCriteriaTab` | `homework_criteria.create` |
+| Edit criterion, Deactivate criterion | `ClassDetail` → `HomeworkCriteriaTab` | `homework_criteria.edit` |
+| + Enroll student (list + form submit) | `EnrollmentsList`, `EnrollmentForm` | `enrollments.create` |
+| Withdraw | `EnrollmentsList` | `enrollments.edit` |
+| Save attendance | `MarkAttendance` | `attendance.mark` |
+| Export CSV | `AttendanceSheet` | `attendance.export` |
+| Inline attendance correction | `AttendanceSheet` → `StatusCell` | `attendance.correct` (via `editable` prop) |
+| Save progress log | `ProgressLogger` | `progress.create` |
+| + Create assessment | `AssessmentsList` | `assessments.create` |
+| Save all results | `AssessmentDetail` → `EnterResultsTab` | `assessments.record` |
+| Export CSV (assessment) | `AssessmentDetail` → `ResultsOverviewTab` | `assessments.export` |
+| Print report | `OrgReport`, `CenterReport`, `HomeworkReport` | `reports.export` |
+| Export CSV (center/homework reports) | `CenterReport`, `HomeworkReport` | `reports.export` |
+| + New role | `RBACPage` | `roles.create` |
+| ✎ Edit role | `RBACPage` | `roles.edit` |
+| 🗑 Delete role | `RBACPage` | `roles.delete` |
+| + Add permission | `PermissionsPage` | `permissions.manage` |
+| + Add override, ✕ Remove override | `UserPermissionsPage` | `roles.assign` |
+
+**`AttendanceSheet` — `editable` prop pattern**: `StatusCell` accepts `editable={can('attendance.correct')}`. When `false`, the cell is non-clickable (cursor: default, no title). This avoids hiding the read-only attendance data while still preventing unauthorized corrections.
 
 ---
 

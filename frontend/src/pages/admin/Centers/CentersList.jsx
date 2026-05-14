@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermissions';
 import PageHeader from '../../../components/PageHeader';
 import Badge from '../../../components/Badge';
 import ProgressBar from '../../../components/ProgressBar';
@@ -12,6 +13,7 @@ import { getCenters, getCenterOverview } from '../../../api/centers';
 
 export default function CentersList() {
   const { role, user } = useAuth();
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const [showAdd, setShowAdd] = useState(false);
 
@@ -58,7 +60,7 @@ export default function CentersList() {
       <PageHeader
         title="Centers"
         subtitle="All Quran Foundation learning centers"
-        action={role === 'super_admin' ? { label: '+ Add center', onClick: () => setShowAdd(true) } : undefined}
+        action={can('centers.create') ? { label: '+ Add center', onClick: () => setShowAdd(true) } : undefined}
       />
 
       {error && (
@@ -73,7 +75,7 @@ export default function CentersList() {
             icon="⊙"
             title="No centers yet"
             description="Create the first center to get started."
-            action={role === 'super_admin' ? { label: '+ Add center', onClick: () => setShowAdd(true) } : undefined}
+            action={can('centers.create') ? { label: '+ Add center', onClick: () => setShowAdd(true) } : undefined}
           />
         ) : (
           <div style={{ overflowX: 'auto' }}>

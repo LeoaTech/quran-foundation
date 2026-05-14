@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import Badge from '../../../components/Badge';
 import RTLInput from '../../../components/RTLInput';
 import LoadingSpinner from '../../../components/LoadingSpinner';
@@ -141,9 +142,11 @@ function EnterResultsTab({ assessment }) {
           {students.length} student{students.length !== 1 ? 's' : ''}
           {assessment.type !== 'oral' && ` · Max: ${assessment.max_score}`}
         </span>
-        <Button variant="primary" disabled={busy} onClick={handleSave}>
-          {busy ? 'Saving…' : 'Save all results'}
-        </Button>
+        <Can permission="assessments.record">
+          <Button variant="primary" disabled={busy} onClick={handleSave}>
+            {busy ? 'Saving…' : 'Save all results'}
+          </Button>
+        </Can>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -228,9 +231,11 @@ function EnterResultsTab({ assessment }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-        <Button variant="primary" disabled={busy} onClick={handleSave}>
-          {busy ? 'Saving…' : 'Save all results'}
-        </Button>
+        <Can permission="assessments.record">
+          <Button variant="primary" disabled={busy} onClick={handleSave}>
+            {busy ? 'Saving…' : 'Save all results'}
+          </Button>
+        </Can>
       </div>
     </>
   );
@@ -306,7 +311,9 @@ function ResultsOverviewTab({ assessment }) {
       ) : (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <Button size="sm" variant="outline" onClick={exportCSV}>Export CSV</Button>
+            <Can permission="assessments.export">
+              <Button size="sm" variant="outline" onClick={exportCSV}>Export CSV</Button>
+            </Can>
           </div>
           <div style={{ background: 'var(--white)', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

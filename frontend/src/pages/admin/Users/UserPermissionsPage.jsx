@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import { useUserPermissions, useRemoveUserPermissionOverride } from '../../../hooks/usePermissions';
 import { useToast } from '../../../hooks/useToast';
 import { getUser } from '../../../api/users';
@@ -245,9 +246,11 @@ export default function UserPermissionsPage() {
           title="User overrides"
           count={overrides.length}
           action={
-            <Button variant="primary" size="sm" onClick={() => setAddOpen(true)} style={{ fontSize: 11, padding: '4px 10px' }}>
-              + Add override
-            </Button>
+            <Can permission="roles.assign">
+              <Button variant="primary" size="sm" onClick={() => setAddOpen(true)} style={{ fontSize: 11, padding: '4px 10px' }}>
+                + Add override
+              </Button>
+            </Can>
           }
         >
           {/* Extra grants */}
@@ -415,19 +418,21 @@ function OverrideRow({ override, isLast, busy, onRemove }) {
       }}>
         {override.is_granted ? 'Grant' : 'Deny'}
       </span>
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={busy}
-        title="Remove override"
-        style={{
-          background: 'none', border: 'none', cursor: busy ? 'default' : 'pointer',
-          color: 'var(--ink-pale)', fontSize: 14, padding: '2px 5px',
-          opacity: busy ? 0.4 : 1, lineHeight: 1, flexShrink: 0,
-        }}
-      >
-        {busy ? '…' : '✕'}
-      </button>
+      <Can permission="roles.assign">
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={busy}
+          title="Remove override"
+          style={{
+            background: 'none', border: 'none', cursor: busy ? 'default' : 'pointer',
+            color: 'var(--ink-pale)', fontSize: 14, padding: '2px 5px',
+            opacity: busy ? 0.4 : 1, lineHeight: 1, flexShrink: 0,
+          }}
+        >
+          {busy ? '…' : '✕'}
+        </button>
+      </Can>
     </div>
   );
 }

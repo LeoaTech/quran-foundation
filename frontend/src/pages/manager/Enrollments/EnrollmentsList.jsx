@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
@@ -82,7 +83,9 @@ export default function EnrollmentsList() {
             {search ? ' matching search' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/manager/enrollment')}>+ Enroll student</Button>
+        <Can permission="enrollments.create">
+          <Button variant="primary" onClick={() => navigate('/manager/enrollment')}>+ Enroll student</Button>
+        </Can>
       </div>
 
       {/* Filter bar */}
@@ -191,14 +194,16 @@ export default function EnrollmentsList() {
                     <td style={tdStyle(!isLast)}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                            onClick={() => setWithdrawTarget(en)}
-                          >
-                            Withdraw
-                          </Button>
+                          <Can permission="enrollments.edit">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                              onClick={() => setWithdrawTarget(en)}
+                            >
+                              Withdraw
+                            </Button>
+                          </Can>
                         )}
                         <Button
                           size="sm"

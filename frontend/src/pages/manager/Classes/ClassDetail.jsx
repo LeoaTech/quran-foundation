@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import Badge from '../../../components/Badge';
 import RTLInput from '../../../components/RTLInput';
 import LoadingSpinner from '../../../components/LoadingSpinner';
@@ -193,7 +194,9 @@ function TeachersTab({ classId, centerId }) {
     <>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         {!assigning && (
-          <Button size="sm" variant="primary" onClick={() => setAssigning(true)}>+ Assign teacher</Button>
+          <Can permission="classes.edit">
+            <Button size="sm" variant="primary" onClick={() => setAssigning(true)}>+ Assign teacher</Button>
+          </Can>
         )}
       </div>
 
@@ -253,7 +256,9 @@ function TeachersTab({ classId, centerId }) {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {t.is_primary && <Badge variant="green">Primary</Badge>}
-                <Button size="sm" variant="outline" onClick={() => setConfirmRemove(t)}>Remove</Button>
+                <Can permission="classes.edit">
+                  <Button size="sm" variant="outline" onClick={() => setConfirmRemove(t)}>Remove</Button>
+                </Can>
               </div>
             </div>
           ))}
@@ -464,13 +469,19 @@ function HomeworkCriteriaTab({ classId, courseId }) {
           icon="▦"
           title="No homework criteria"
           description="Add criteria to define what gets scored in each homework session."
-          action={<Button size="sm" variant="primary" onClick={openAdd}>+ Add criterion</Button>}
+          action={
+            <Can permission="homework_criteria.create">
+              <Button size="sm" variant="primary" onClick={openAdd}>+ Add criterion</Button>
+            </Can>
+          }
         />
       ) : (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
             {!addOpen && (
-              <Button size="sm" variant="primary" onClick={openAdd}>+ Add criterion</Button>
+              <Can permission="homework_criteria.create">
+                <Button size="sm" variant="primary" onClick={openAdd}>+ Add criterion</Button>
+              </Can>
             )}
           </div>
           <div style={{ border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
@@ -503,11 +514,15 @@ function HomeworkCriteriaTab({ classId, courseId }) {
                     </td>
                     <td style={{ padding: '10px 14px', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>Edit</Button>
+                        <Can permission="homework_criteria.edit">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>Edit</Button>
+                        </Can>
                         {c.is_active && (
-                          <Button size="sm" variant="outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={() => handleDeactivate(c)} disabled={busy}>
-                            Deactivate
-                          </Button>
+                          <Can permission="homework_criteria.edit">
+                            <Button size="sm" variant="outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={() => handleDeactivate(c)} disabled={busy}>
+                              Deactivate
+                            </Button>
+                          </Can>
                         )}
                       </div>
                     </td>

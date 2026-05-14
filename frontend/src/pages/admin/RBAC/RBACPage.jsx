@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import { useRoles, useRolePermissions, useToggleRolePermission, useSetRolePermissions } from '../../../hooks/usePermissions';
 import { useToast } from '../../../hooks/useToast';
 import RBACTabs       from './RBACTabs';
@@ -240,14 +241,16 @@ export default function RBACPage() {
           {/* Roles header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid var(--sand-mid)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Roles</span>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-              style={{ fontSize: 11, padding: '5px 12px' }}
-            >
-              + New role
-            </Button>
+            <Can permission="roles.create">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setCreateOpen(true)}
+                style={{ fontSize: 11, padding: '5px 12px' }}
+              >
+                + New role
+              </Button>
+            </Can>
           </div>
 
           {rolesLoading ? (
@@ -289,18 +292,22 @@ export default function RBACPage() {
                     {selectedRole.user_count} users · {selectedRole.permission_count} permissions
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setEditRole(selectedRole)} style={{ fontSize: 11 }}>
-                  ✎ Edit
-                </Button>
-                {!selectedRole.is_system && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeleteRole(selectedRole)}
-                    style={{ fontSize: 11, borderColor: 'var(--red-light)', color: 'var(--red)' }}
-                  >
-                    🗑 Delete
+                <Can permission="roles.edit">
+                  <Button variant="outline" size="sm" onClick={() => setEditRole(selectedRole)} style={{ fontSize: 11 }}>
+                    ✎ Edit
                   </Button>
+                </Can>
+                {!selectedRole.is_system && (
+                  <Can permission="roles.delete">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeleteRole(selectedRole)}
+                      style={{ fontSize: 11, borderColor: 'var(--red-light)', color: 'var(--red)' }}
+                    >
+                      🗑 Delete
+                    </Button>
+                  </Can>
                 )}
               </div>
 

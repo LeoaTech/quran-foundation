@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
+import Can from '../../../components/Can';
 import MetricCard from '../../../components/MetricCard';
 import ProgressBar from '../../../components/ProgressBar';
 import LoadingSpinner from '../../../components/LoadingSpinner';
@@ -89,8 +90,10 @@ export default function CenterReport() {
             </select>
           )}
           <input className="f-input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: 160 }} />
-          <Button variant="outline" onClick={() => exportCSV(stats, centerName, month)}>Export CSV</Button>
-          <Button variant="outline" onClick={() => window.print()}>Print</Button>
+          <Can permission="reports.export">
+            <Button variant="outline" onClick={() => exportCSV(stats, centerName, month)}>Export CSV</Button>
+            <Button variant="outline" onClick={() => window.print()}>Print</Button>
+          </Can>
         </div>
       </div>
 

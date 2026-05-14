@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Can from '../../../components/Can';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import MetricCard from '../../../components/MetricCard';
 import ProgressBar from '../../../components/ProgressBar';
@@ -101,7 +102,9 @@ export default function OrgReport() {
         </div>
         <div className="no-print" style={{ display: 'flex', gap: 10 }}>
           <input className="f-input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: 160 }} />
-          <Button variant="outline" onClick={() => window.print()}>Print report</Button>
+          <Can permission="reports.export">
+            <Button variant="outline" onClick={() => window.print()}>Print report</Button>
+          </Can>
         </div>
       </div>
 

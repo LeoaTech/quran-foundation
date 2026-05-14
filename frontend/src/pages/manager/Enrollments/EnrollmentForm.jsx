@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import RTLInput from '../../../components/RTLInput';
 import { useToast } from '../../../hooks/useToast';
 import { createEnrollment } from '../../../api/enrollments';
@@ -299,9 +300,11 @@ export default function EnrollmentForm() {
               </CardBody>
             </Card>
 
-            <Button type="submit" variant="primary" disabled={busy} style={{ width: '100%', padding: '13px' }}>
-              {busy ? 'Enrolling…' : 'Enroll student'}
-            </Button>
+            <Can permission="enrollments.create">
+              <Button type="submit" variant="primary" disabled={busy} style={{ width: '100%', padding: '13px' }}>
+                {busy ? 'Enrolling…' : 'Enroll student'}
+              </Button>
+            </Can>
           </div>
         </div>
       </form>

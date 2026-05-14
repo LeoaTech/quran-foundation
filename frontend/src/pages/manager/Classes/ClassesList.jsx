@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
@@ -98,7 +99,9 @@ export default function ClassesList() {
             {!showAll ? ' (active)' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add class</Button>
+        <Can permission="classes.create">
+          <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add class</Button>
+        </Can>
       </div>
 
       {/* Filter bar */}
