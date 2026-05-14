@@ -1,5 +1,38 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../api/rbac';
+import { useAuth } from './useAuth';
+
+// ── Client-side permission checker ────────────────────────────────────────────
+//
+// usePermissions() reads the resolved permission set stored in AuthContext
+// (fetched once after login from GET /users/:id/permissions).
+//
+// When permissions === null (not yet fetched, or fetch failed for non-admin
+// users), all can() checks return false BUT the `loaded` flag is also false,
+// so Can components and nav filters treat the state as "show everything".
+//
+// This ensures no UI flash or blank sidebar while permissions load.
+
+export function usePermissions() {
+  const { permissions } = useAuth(); // null | string[]
+
+  const permSet = useMemo(() => new Set(permissions ?? []), [permissions]);
+  const loaded  = permissions !== null;
+
+  return {
+    // Returns true if the user has the given permission key.
+    can:     (key)      => loaded && permSet.has(key),
+    // Returns true if the user has ANY of the given keys.
+    canAny:  (...keys)  => loaded && keys.some((k) => permSet.has(k)),
+    // Returns true if the user has ALL of the given keys.
+    canAll:  (...keys)  => loaded && keys.every((k) => permSet.has(k)),
+    // Full sorted list (empty array when not loaded or no permissions).
+    permissions: permissions ?? [],
+    // true once the first fetch attempt completes (success or failure).
+    loaded,
+  };
+}
 
 // ── Roles ──────────────────────────────────────────────────────────────────────
 

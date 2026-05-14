@@ -2514,6 +2514,104 @@ Set in `frontend/.env`.
 - Calls `window.location.replace('/403')` — hard navigation to the standalone Forbidden page.
 - This handles API-level authorization failures (e.g., center_manager accessing another center's data) distinct from the route-level role check in `ProtectedRoute`.
 
+### Client-side permission system
+
+#### `AuthContext` — `permissions: string[] | null`
+
+After login and silent refresh, `AuthProvider` calls `GET /users/:id/permissions` and stores `data.resolved` (a sorted `string[]` of permission keys) in context.
+
+- **`null`** = not yet fetched OR fetch failed (graceful degradation — UI shows everything)
+- **`[]`** = loaded, user has no permissions (rare; backend still enforces real access)
+- **`['centers.view', ...]`** = loaded, apply UI filtering
+
+The fetch is fire-and-forget (does not block the post-login redirect). `logout()` and `auth:logout` event both reset permissions to `null`.
+
+> **Backend note**: `GET /users/:userId/permissions` requires `roles.assign`. For non-admin users who lack this permission, the fetch returns 403 and `permissions` stays `null` → all nav items and `Can` checks show content (safe degradation — the backend middleware still enforces actual authorization on every API call). A future `/auth/permissions` endpoint that allows own-user access would remove this limitation.
+
+#### `usePermissions()` — `src/hooks/usePermissions.js`
+
+Reads `permissions` from `AuthContext` (via `useAuth()`). Returns:
+
+```js
+const { can, canAny, canAll, permissions, loaded } = usePermissions();
+
+can('centers.create')           // → boolean (false when not loaded)
+canAny('reports.view_org', 'reports.view_center') // → boolean
+canAll('roles.create', 'roles.edit')              // → boolean
+permissions // string[] (empty when null or not loaded)
+loaded      // true once first fetch attempt completes
+```
+
+When `loaded === false` (permissions not yet fetched), all `can*()` return `false` — but `Can` and the nav filter both treat `!loaded` as "show everything" to prevent layout flash.
+
+#### `Can` component — `src/components/Can.jsx`
+
+```jsx
+// Single permission
+<Can permission="centers.create">
+  <Button>Add center</Button>
+</Can>
+
+// Any of multiple permissions
+<Can anyOf={['reports.view_org', 'reports.view_center']}>
+  <ReportsLink />
+</Can>
+
+// All permissions required
+<Can allOf={['roles.create', 'roles.edit']}>
+  <FullRoleEditor />
+</Can>
+
+// With fallback
+<Can permission="roles.delete" fallback={<span style={{color:'var(--ink-pale)'}}>No access</span>}>
+  <DeleteRoleButton />
+</Can>
+```
+
+**Render logic:**
+1. No `permission`/`anyOf`/`allOf` → always render `children`
+2. `!loaded` → render `children` (prevent flash while permissions load)
+3. `loaded` → render `children` if allowed, `fallback` (default `null`) otherwise
+
+#### `AppShell` — permission-gated nav items
+
+Each nav item in `NAV_CONFIG` accepts an optional `requires` field (string or string[]):
+
+```js
+{ to: '/admin/rbac',  label: 'Roles & Perms', icon: '⚙', requires: 'roles.view' }
+{ to: '/admin/reports', label: 'Org Report', icon: '▦', requires: 'reports.view_org' }
+```
+
+**`canSeeItem(item)` logic** (evaluated at render time):
+- `!item.requires` → always show
+- `!loaded` → show (permissions not ready yet)
+- `loaded` → show only if `can(anyKey)` returns true
+
+Empty sections (all items hidden) are suppressed entirely.
+
+**Nav item → permission mapping:**
+
+| Nav item | Required permission |
+|----------|-------------------|
+| Dashboard (all roles) | — (always shown) |
+| Centers | `centers.view` |
+| Courses | `courses.view` |
+| Teachers, Students | `users.view` |
+| Org Report | `reports.view_org` |
+| Roles & Perms | `roles.view` |
+| Settings | `org.edit` |
+| My Center (manager) | `centers.view` |
+| Classes | `classes.view` |
+| Enrollment | `enrollments.view` |
+| Attendance (manager/teacher) | `attendance.view` / `attendance.mark` |
+| Center Report | `reports.view_center` |
+| Log Progress | `progress.create` |
+| Class Overview | `progress.view` |
+| Assessments | `assessments.view` |
+| HW Report | `reports.view_student` |
+| Student Results | `assessments.view` |
+| Schedule | — (always shown) |
+
 **`AuthContext` values:**
 
 | Value | Type | Description |
