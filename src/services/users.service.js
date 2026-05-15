@@ -1,6 +1,7 @@
 const crypto    = require('crypto');
 const bcrypt    = require('bcryptjs');
 const repo      = require('../repositories/users.repository');
+const activityLog = require('./activityLog.service');
 const db        = require('../db/knex');
 const { AppError } = require('../utils/errors');
 
@@ -37,7 +38,7 @@ function generateTempPassword() {
   return `Qf${crypto.randomBytes(4).toString('hex')}`;
 }
 
-const VALID_ROLES = ['super_admin', 'center_manager', 'teacher', 'student', 'guardian'];
+const VALID_ROLES = ['super_admin', 'center_manager', 'finance_manager', 'teacher', 'student', 'guardian'];
 
 // ── Users ──────────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ async function getUser({ user: caller, userId }) {
 }
 
 async function createUser({ user: caller, body }) {
-  const { role, center_id: centerId, ...userData } = body;
+  const { role, center_id: centerId, base_salary, joining_date, payment_method, bank_name, account_number, ...userData } = body;
 
   // center_manager may only create users in their own center
   assertCenterScope(caller, centerId);
@@ -101,10 +102,20 @@ async function createUser({ user: caller, body }) {
 
   const newUser = await db.transaction((trx) =>
     repo.createUser(
-      { userData: { ...userData, password_hash }, roleData: { role, center_id: centerId } },
+      { userData: { ...userData, password_hash }, roleData: { role, center_id: centerId }, staffData: { base_salary, joining_date, payment_method, bank_name, account_number } },
       trx,
     ),
   );
+
+  activityLog.log({
+    actor:       caller,
+    action:      'user.create',
+    entity_type: 'user',
+    entity_id:   newUser.id,
+    center_id:   centerId || null,
+    summary_en:  `Created user "${newUser.full_name}" with role "${role}"`,
+    metadata:    { full_name: newUser.full_name, role, center_id: centerId },
+  }).catch(() => {});
 
   return { id: newUser.id, full_name: newUser.full_name, temp_password: tempPassword };
 }
@@ -165,7 +176,17 @@ async function assignRole({ user: caller, userId, body }) {
     );
   }
 
-  return repo.assignRole({ userId, roleId: roleRow.id, centerId: centerId || null });
+  const assignment = await repo.assignRole({ userId, roleId: roleRow.id, centerId: centerId || null });
+  activityLog.log({
+    actor:       caller,
+    action:      'user.role_assign',
+    entity_type: 'user_role',
+    entity_id:   userId,
+    center_id:   centerId || null,
+    summary_en:  `Assigned role "${role}" to user (id: ${userId})`,
+    metadata:    { target_user_id: userId, role, center_id: centerId },
+  }).catch(() => {});
+  return assignment;
 }
 
 async function removeRole({ user: caller, userId, userRoleId }) {
@@ -177,6 +198,27 @@ async function removeRole({ user: caller, userId, userRoleId }) {
   if (!target) throw notFound();
 
   await repo.removeRole(userRoleId);
+}
+
+async function removeUserFromCenter({ user: caller, userId, centerId }) {
+  assertCenterScope(caller, centerId);
+
+  const target = await repo.getUserById(userId);
+  if (!target) throw notFound();
+
+  await db.transaction(async (trx) => {
+    await trx('staff_details').where({ user_id: userId, center_id: centerId }).delete();
+    await trx('user_roles').where({ user_id: userId, center_id: centerId }).delete();
+  });
+
+  activityLog.log({
+    actor:       caller,
+    action:      'user.remove_center',
+    entity_type: 'user',
+    entity_id:   userId,
+    center_id:   centerId,
+    summary_en:  `Removed user "${target.full_name}" from center`,
+  }).catch(() => {});
 }
 
 // ── Guardians ──────────────────────────────────────────────────────────────────
@@ -224,7 +266,7 @@ module.exports = {
   createUser,
   updateUser,
   assignRole,
-  removeRole,
   linkGuardian,
   listGuardians,
+  removeUserFromCenter,
 };

@@ -9,7 +9,7 @@ const router = Router();
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
-const ROLES = ['super_admin', 'center_manager', 'teacher', 'student', 'guardian'];
+const ROLES = ['super_admin', 'center_manager', 'finance_manager', 'teacher', 'student', 'guardian'];
 const GENDERS = ['male', 'female', 'other'];
 const LANGS = ['en', 'ur', 'ar'];
 
@@ -24,6 +24,7 @@ const createUserSchema = z.object({
   preferred_lang: z.enum(LANGS).optional(),
   role:           z.enum(ROLES, { errorMap: () => ({ message: `role must be one of: ${ROLES.join(', ')}` }) }),
   center_id:      z.string().uuid('center_id must be a UUID').optional(),
+  base_salary:    z.number().min(0).optional(),
 });
 
 const updateUserSchema = z.object({
@@ -94,6 +95,13 @@ router.delete(
   requireAuth,
   requireRoles('super_admin'),
   controller.removeRole,
+);
+
+router.delete(
+  '/users/:user_id/center/:center_id',
+  requireAuth,
+  requireRoles('super_admin', 'center_manager'),
+  controller.removeUserFromCenter,
 );
 
 router.post(

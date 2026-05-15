@@ -49,6 +49,15 @@ async function removeRole(req, res, next) {
   }
 }
 
+async function removeUserFromCenter(req, res, next) {
+  try {
+    await service.removeUserFromCenter({ user: req.user, userId: req.params.user_id, centerId: req.params.center_id });
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function linkGuardian(req, res, next) {
   try {
     res.status(201).json(await service.linkGuardian({ user: req.user, userId: req.params.user_id, body: req.body }));
@@ -74,4 +83,5 @@ module.exports = {
   removeRole,
   linkGuardian,
   listGuardians,
+  removeUserFromCenter,
 };

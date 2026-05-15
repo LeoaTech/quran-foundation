@@ -72,7 +72,7 @@ function getUserWithRoles(userId) {
     });
 }
 
-async function createUser({ userData, roleData }, trx) {
+async function createUser({ userData, roleData, staffData }, trx) {
   const t = trx || db;
 
   const [user] = await t('users')
@@ -98,6 +98,20 @@ async function createUser({ userData, roleData }, trx) {
     role_id:   roleRow.id,
     center_id: roleData.center_id || null,
   });
+
+  if (staffData && roleData.center_id) {
+    const insertData = {
+      user_id: user.id,
+      center_id: roleData.center_id,
+      base_salary: staffData.base_salary || 0,
+    };
+    if (staffData.joining_date) insertData.joining_date = staffData.joining_date;
+    if (staffData.payment_method) insertData.payment_method = staffData.payment_method;
+    if (staffData.bank_name) insertData.bank_name = staffData.bank_name;
+    if (staffData.account_number) insertData.account_number = staffData.account_number;
+
+    await t('staff_details').insert(insertData);
+  }
 
   return user;
 }
