@@ -150,8 +150,8 @@ export default function RecordDonation() {
           {(donorType === 'student' || donorType === 'teacher') ? (
             <div className="field">
               <label>Select {donorType === 'student' ? 'Student' : 'Teacher'} <span style={{ color: 'var(--red)' }}>*</span></label>
-              <select 
-                value={donorUserId} 
+              <select
+                value={donorUserId}
                 onChange={e => handleUserSelect(e.target.value)}
                 disabled={usersLoading}
                 required
@@ -245,17 +245,11 @@ export default function RecordDonation() {
           />
         </div>
 
-        <div style={{ background: 'var(--emerald-pale)', border: '1px solid var(--emerald-light)', borderRadius: 'var(--radius-md)', padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center', marginBottom: 24 }}>
-          <span style={{ fontSize: 20 }}>🧾</span>
-          <span style={{ fontSize: 13, color: 'var(--emerald)', lineHeight: 1.4 }}>
-            A receipt is generated and the amount added to the center's donation ledger. Donor name can be kept anonymous.
-          </span>
-        </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <Button type="button" variant="outline" onClick={() => navigate('/donations')}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={isSubmitting} style={{ background: 'var(--emerald)', borderColor: 'var(--emerald)' }}>
-            {isSubmitting ? 'Recording...' : 'Record Donation & Generate Receipt'}
+            {isSubmitting ? 'Recording...' : 'Record Donation'}
           </Button>
         </div>
       </form>

@@ -47,6 +47,8 @@ import CenterReport   from './pages/admin/Reports/CenterReport';
 import StudentReport  from './pages/shared/Reports/StudentReport';
 import HomeworkReport from './pages/teacher/Reports/HomeworkReport';
 
+import TeachersList     from './pages/manager/Teachers/TeachersList';
+
 import Placeholder    from './pages/Placeholder';
 
 const queryClient = new QueryClient({
@@ -111,14 +113,19 @@ export default function App() {
                     <Route path="/classes/:id" element={<ClassDetail />} />
                   </Route>
 
-                  {/* Enrollments & Finance — center_manager only */}
-                  <Route element={<ProtectedRoute roles={['center_manager']} />}>
+                  {/* Enrollments — center_manager + finance_manager */}
+                  <Route element={<ProtectedRoute roles={['center_manager', 'finance_manager']} />}>
                     <Route path="/enrollment"     element={<EnrollmentsList />} />
                     <Route path="/enrollment/new" element={<EnrollmentForm />} />
-                    
+                  </Route>
+                  
+                  {/* Donations — super_admin + center_manager + finance_manager */}
+                  <Route element={<ProtectedRoute roles={['super_admin', 'center_manager', 'finance_manager']} />}>
                     <Route path="/donations"     element={<DonationsList />} />
                     <Route path="/donations/new" element={<RecordDonation />} />
                   </Route>
+
+
 
                   {/* Attendance — role-split */}
                   <Route element={<ProtectedRoute roles={['center_manager', 'teacher']} />}>
@@ -163,7 +170,11 @@ export default function App() {
                     <Route path="/reports/students/:userId" element={<StudentReport />} />
                   </Route>
 
-                  <Route path="/teachers"    element={<Placeholder />} />
+                  {/* Teachers — super_admin + center_manager */}
+                  <Route element={<ProtectedRoute roles={['super_admin', 'center_manager']} />}>
+                    <Route path="/teachers" element={<TeachersList />} />
+                  </Route>
+
                   <Route path="/students"    element={<Placeholder />} />
                   <Route path="/settings"    element={<Navigate to="/admin/org" replace />} />
                   <Route path="/classes"     element={<Placeholder />} />
