@@ -20,6 +20,7 @@ async function log({ actor, action, entity_type, entity_id, center_id, org_id, s
     const actor_role = (actor.roles && actor.roles[0]) || 'unknown';
     await repo.insertLog({
       actor_user_id: actor.id,
+      actor_full_name: actor.full_name || 'Unknown',
       actor_role,
       action,
       entity_type,
