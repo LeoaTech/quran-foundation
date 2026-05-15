@@ -1,6 +1,7 @@
 const db          = require('../db/knex');
 const repo        = require('../repositories/attendance.repository');
 const classRepo   = require('../repositories/classes.repository');
+const activityLog = require('./activityLog.service');
 const reportCache = require('../utils/reportCache');
 const { AppError } = require('../utils/errors');
 
@@ -95,6 +96,16 @@ async function createAttendanceSession({ user, classId, body }) {
   reportCache.invalidateCenterReports(cls.center_id)
     .catch((err) => console.error('[reportCache] invalidation failed:', err.message));
 
+  activityLog.log({
+    actor:       user,
+    action:      'attendance.mark',
+    entity_type: 'attendance_session',
+    entity_id:   session.id,
+    center_id:   cls.center_id,
+    summary_en:  `Marked attendance for class (${total} students: ${present} present, ${absent} absent, ${late} late) on ${new Date(session.session_date).toISOString().split('T')[0]}`,
+    metadata:    { class_id: classId, session_date: session.session_date, total, present, absent, late },
+  }).catch(() => {});
+
   return {
     session_id:   session.id,
     session_date: session.session_date,
@@ -137,12 +148,22 @@ async function correctRecord({ user, sessionId, recordId, body }) {
   assertCenterAccess(user, cls.center_id);
   await assertTeacherOwnership(user, session.class_id);
 
-  return repo.updateAttendanceRecord(recordId, {
+  const corrected = await repo.updateAttendanceRecord(recordId, {
     status:       body.status   ?? record.status,
     note_ur:      body.note_ur  !== undefined ? body.note_ur : record.note_ur,
     corrected_by: user.id,
     corrected_at: new Date(),
   });
+  activityLog.log({
+    actor:       user,
+    action:      'attendance.correction',
+    entity_type: 'attendance_record',
+    entity_id:   recordId,
+    center_id:   cls.center_id,
+    summary_en:  `Corrected attendance record to "${body.status ?? record.status}"`,
+    metadata:    { session_id: sessionId, record_id: recordId, new_status: body.status ?? record.status },
+  }).catch(() => {});
+  return corrected;
 }
 
 // Rule 2: summary object with attendance_pct rounded to 1 decimal place.
