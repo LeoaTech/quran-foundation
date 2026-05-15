@@ -25,7 +25,7 @@ const NAV_CONFIG = {
       {
         title: 'Finance',
         items: [
-          { to: '/donations', label: 'Donations', icon: '💸' },
+          { to: '/donations', label: 'Donations', icon: '◈' },
         ],
       },
       {
@@ -49,6 +49,7 @@ const NAV_CONFIG = {
           { to: '/dashboard',  label: 'Dashboard',  icon: '⊞' },
           { to: 'MY_CENTER',   label: 'My Center',  icon: '⊙' },
           { to: '/classes',    label: 'Classes',    icon: '◈' },
+          { to: '/teachers',   label: 'Teachers',   icon: '◉' },
           { to: '/enrollment', label: 'Enrollment', icon: '○' },
           { to: '/attendance', label: 'Attendance', icon: '☑' },
         ],
@@ -56,7 +57,7 @@ const NAV_CONFIG = {
       {
         title: 'Finance',
         items: [
-          { to: '/donations', label: 'Donations', icon: '💸' },
+          { to: '/donations', label: 'Donations', icon: '◈' },
         ],
       },
       {
