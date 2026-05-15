@@ -13,6 +13,9 @@ export const createUser = (payload) =>
 export const updateUser = (userId, payload) =>
   client.patch(`/users/${userId}`, payload).then((r) => r.data);
 
+export const removeUserFromCenter = (userId, centerId) =>
+  client.delete(`/users/${userId}/center/${centerId}`).then((r) => r.data);
+
 export async function getStudents(params = {}) {
   const { role = 'student', search = '', page = 1, perPage = 100 } = params;
   
