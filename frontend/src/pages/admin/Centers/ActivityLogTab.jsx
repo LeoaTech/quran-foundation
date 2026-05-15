@@ -9,6 +9,7 @@ import Button from '../../../components/Button';
 const ROLE_STYLES = {
   super_admin:    { background: '#ede9fe', color: '#5b21b6' },
   center_manager: { background: 'var(--emerald-light)', color: 'var(--emerald)' },
+  finance_manager:{ background: '#dbeafe', color: '#1e40af' },
   teacher:        { background: 'var(--gold-light)',    color: 'var(--amber)' },
   student:        { background: 'var(--sand-mid)',      color: 'var(--ink-soft)' },
 };
@@ -131,17 +132,14 @@ function LogRow({ log, isLast }) {
 
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Actor + role */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
-            {log.actor_full_name}
-          </span>
+        {/* Role badge */}
+        <div style={{ marginBottom: 6 }}>
           <RoleBadge role={log.actor_role} />
         </div>
 
-        {/* Summary */}
-        <p style={{ fontSize: 13, color: 'var(--ink-mid)', lineHeight: 1.5, marginBottom: 6 }}>
-          {log.summary_en}
+        {/* Summary sentence starting with Actor Name */}
+        <p style={{ fontSize: 13, color: 'var(--ink-mid)', lineHeight: 1.5, marginBottom: 8 }}>
+          <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>{log.actor_full_name}</strong> {log.summary_en}
         </p>
 
         {/* Action tag + time */}
