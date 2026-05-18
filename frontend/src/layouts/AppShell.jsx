@@ -18,7 +18,7 @@ const NAV_CONFIG = {
         title: 'Academic',
         items: [
           { to: '/admin/courses', label: 'Courses', icon: '◈' },
-          { to: '/teachers', label: 'Teachers', icon: '◉' },
+          { to: '/teachers', label: 'Staff', icon: '◉' },
           { to: '/students', label: 'Students', icon: '○' },
         ],
       },
