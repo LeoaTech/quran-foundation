@@ -2,14 +2,18 @@ const db = require('../db/knex');
 
 async function listStaffDetails(centerId, filterRoles = ['teacher', 'center_manager', 'finance_manager']) {
   // Join users, user_roles, roles, and staff_details
-  return db('users as u')
+  const query = db('users as u')
     .join('user_roles as ur', 'ur.user_id', 'u.id')
     .join('roles as r', 'r.id', 'ur.role_id')
     .leftJoin('staff_details as sd', function() {
       this.on('sd.user_id', '=', 'u.id').andOn('sd.center_id', '=', 'ur.center_id');
-    })
-    .where('ur.center_id', centerId)
-    .whereIn('r.name', filterRoles)
+    });
+
+  if (centerId && centerId !== 'all') {
+    query.where('ur.center_id', centerId);
+  }
+
+  return query.whereIn('r.name', filterRoles)
     .select(
       'u.id as user_id',
       'u.full_name',
@@ -19,7 +23,8 @@ async function listStaffDetails(centerId, filterRoles = ['teacher', 'center_mana
       'sd.joining_date',
       'sd.payment_method',
       'sd.bank_name',
-      'sd.account_number'
+      'sd.account_number',
+      'ur.center_id'
     )
     .orderBy('u.full_name', 'asc');
 }
