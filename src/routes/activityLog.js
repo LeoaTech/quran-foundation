@@ -1,21 +1,21 @@
 const router = require('express').Router();
-const requireAuth    = require('../middleware/auth');
-const requireRoles   = require('../middleware/rbac');
-const ctrl           = require('../controllers/activityLog.controller');
+const requireAuth = require('../middleware/auth');
+const { requirePermission } = require('../middleware/rbac');
+const ctrl = require('../controllers/activityLog.controller');
 
-// Per-center activity feed — visible to super_admin and center_manager
+// Per-center activity feed — visible to roles with activity.view permission
 router.get(
   '/centers/:center_id/activity',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('activity.view'),
   ctrl.listCenterActivity,
 );
 
-// Org-wide activity feed — super_admin only
+// Org-wide activity feed — requires activity.view permission
 router.get(
   '/activity',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('activity.view'),
   ctrl.listOrgActivity,
 );
 
