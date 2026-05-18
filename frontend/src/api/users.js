@@ -13,6 +13,9 @@ export const createUser = (payload) =>
 export const updateUser = (userId, payload) =>
   client.patch(`/users/${userId}`, payload).then((r) => r.data);
 
+export const updateStaffProfile = (userId, centerId, payload) =>
+  client.patch(`/users/${userId}/center/${centerId}/staff_profile`, payload).then((r) => r.data);
+
 export const removeUserFromCenter = (userId, centerId) =>
   client.delete(`/users/${userId}/center/${centerId}`).then((r) => r.data);
 
