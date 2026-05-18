@@ -74,11 +74,25 @@ async function listGuardians(req, res, next) {
   }
 }
 
+async function updateStaffProfile(req, res, next) {
+  try {
+    res.json(await service.updateStaffProfile({ 
+      user: req.user, 
+      userId: req.params.user_id, 
+      oldCenterId: req.params.center_id,
+      body: req.body 
+    }));
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listUsers,
   getUser,
   createUser,
   updateUser,
+  updateStaffProfile,
   assignRole,
   removeRole,
   linkGuardian,

@@ -48,7 +48,7 @@ async function listUsers({ user, query = {} } = {}) {
 
   // center_managers may only see users in their own center
   let centerId = query.center_id;
-  if (!user.roles.includes('super_admin')) {
+  if (!user.roles.includes('super_admin') && !user.roles.includes('finance_manager')) {
     centerId = user.center_id;
   }
 
@@ -145,6 +145,67 @@ async function updateUser({ user: caller, userId, body }) {
   return updated;
 }
 
+async function updateStaffProfile({ user: caller, userId, oldCenterId, body }) {
+  const { role, center_id: newCenterId, base_salary, joining_date, payment_method, bank_name, account_number, ...userData } = body;
+
+  const target = await repo.getUserById(userId);
+  if (!target) throw notFound();
+
+  // Validate permission on the *old* center
+  assertCenterScope(caller, oldCenterId);
+
+  // If they are changing the center, validate permission on the *new* center
+  if (newCenterId && newCenterId !== oldCenterId) {
+    assertCenterScope(caller, newCenterId);
+  }
+
+  // Determine what role we are dealing with if no new role was provided
+  let roleData = {};
+  if (role || newCenterId !== undefined) {
+    // We need to fetch the existing role if they are only changing center
+    if (!role && newCenterId) {
+      const existingRoles = await db('user_roles as ur').join('roles as r', 'r.id', 'ur.role_id').where('ur.user_id', userId).where('ur.center_id', oldCenterId).select('r.name as role');
+      if (existingRoles.length > 0) roleData.role = existingRoles[0].role;
+    } else {
+      roleData.role = role;
+    }
+
+    if (roleData.role) {
+      if (!VALID_ROLES.includes(roleData.role)) {
+        throw new AppError('VALIDATION_ERROR', `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}.`, 'غیر درست کردار۔', 400, 'role');
+      }
+      // center_manager cannot assign or manage super_admin
+      if (roleData.role === 'super_admin' && !caller.roles.includes('super_admin')) {
+        throw forbidden();
+      }
+    }
+    if (newCenterId !== undefined) roleData.center_id = newCenterId;
+  }
+
+  const staffData = {};
+  if (base_salary !== undefined) staffData.base_salary = base_salary;
+  if (joining_date !== undefined) staffData.joining_date = joining_date;
+  if (payment_method !== undefined) staffData.payment_method = payment_method;
+  if (bank_name !== undefined) staffData.bank_name = bank_name;
+  if (account_number !== undefined) staffData.account_number = account_number;
+
+  delete userData.password_hash;
+  delete userData.password;
+
+  const updated = await repo.updateStaffProfile(userId, oldCenterId, { userData, roleData, staffData });
+
+  activityLog.log({
+    actor: caller,
+    action: 'staff.update',
+    entity_type: 'user',
+    entity_id: userId,
+    center_id: newCenterId || oldCenterId,
+    summary_en: `Updated staff profile for "${target.full_name}"`,
+  }).catch(() => {});
+
+  return updated;
+}
+
 // ── Role assignments ────────────────────────────────────────────────────────────
 
 async function assignRole({ user: caller, userId, body }) {
@@ -183,7 +244,7 @@ async function assignRole({ user: caller, userId, body }) {
     entity_type: 'user_role',
     entity_id:   userId,
     center_id:   centerId || null,
-    summary_en:  `Assigned role "${role}" to user (id: ${userId})`,
+    summary_en:  `Assigned role "${role}" to "${target.full_name}"`,
     metadata:    { target_user_id: userId, role, center_id: centerId },
   }).catch(() => {});
   return assignment;
@@ -265,6 +326,7 @@ module.exports = {
   getUser,
   createUser,
   updateUser,
+  updateStaffProfile,
   assignRole,
   linkGuardian,
   listGuardians,

@@ -22,7 +22,7 @@ function listUsers({ centerId, role, search, isActive, page = 1, perPage = 20 } 
     )
     .orderBy('u.full_name', 'asc');
 
-  if (centerId !== undefined) query.where('ur.center_id', centerId);
+  if (centerId !== undefined && centerId !== 'all') query.where('ur.center_id', centerId);
   if (role !== undefined) query.where('r.name', role);
   if (isActive !== undefined) query.where('u.is_active', isActive);
   if (search) {
@@ -41,7 +41,7 @@ function countUsers({ centerId, role, search, isActive } = {}) {
     .join('roles as r', 'r.id', 'ur.role_id')
     .countDistinct('u.id as total');
 
-  if (centerId !== undefined) query.where('ur.center_id', centerId);
+  if (centerId !== undefined && centerId !== 'all') query.where('ur.center_id', centerId);
   if (role !== undefined) query.where('r.name', role);
   if (isActive !== undefined) query.where('u.is_active', isActive);
   if (search) {
@@ -114,6 +114,54 @@ async function createUser({ userData, roleData, staffData }, trx) {
   }
 
   return user;
+}
+
+async function updateStaffProfile(userId, oldCenterId, { userData, roleData, staffData }) {
+  return db.transaction(async (trx) => {
+    // 1. Update user
+    if (Object.keys(userData).length > 0) {
+      await trx('users').where({ id: userId }).update({ ...userData, updated_at: trx.fn.now() });
+    }
+
+    // 2. Update role/center
+    if (Object.keys(roleData).length > 0) {
+      const roleRow = await trx('roles').where({ name: roleData.role }).first();
+      if (!roleRow) throw new Error(`Role '${roleData.role}' not found`);
+
+      await trx('user_roles')
+        .where({ user_id: userId, center_id: oldCenterId || null })
+        .update({ role_id: roleRow.id, center_id: roleData.center_id || null });
+    }
+
+    // 3. Update staff details
+    if (Object.keys(staffData).length > 0 || (roleData && roleData.center_id !== oldCenterId)) {
+      const newCenterId = roleData.center_id !== undefined ? roleData.center_id : oldCenterId;
+      
+      const existing = await trx('staff_details')
+        .where({ user_id: userId, center_id: oldCenterId })
+        .first();
+
+      if (existing) {
+        // Update existing (including changing center_id if needed)
+        await trx('staff_details')
+          .where({ user_id: userId, center_id: oldCenterId })
+          .update({ ...staffData, center_id: newCenterId, updated_at: trx.fn.now() });
+      } else if (newCenterId) {
+        // Insert if it didn't exist but now we have a center
+        await trx('staff_details').insert({
+          user_id: userId,
+          center_id: newCenterId,
+          base_salary: staffData.base_salary || 0,
+          joining_date: staffData.joining_date || trx.fn.now(),
+          payment_method: staffData.payment_method || 'cash',
+          bank_name: staffData.bank_name,
+          account_number: staffData.account_number
+        });
+      }
+    }
+
+    return trx('users').where({ id: userId }).first();
+  });
 }
 
 async function updateUser(userId, data) {
@@ -194,6 +242,7 @@ module.exports = {
   getUserWithRoles,
   createUser,
   updateUser,
+  updateStaffProfile,
   getRoleByName,
   getUserRoleEntry,
   assignRole,

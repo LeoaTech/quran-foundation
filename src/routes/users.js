@@ -25,6 +25,10 @@ const createUserSchema = z.object({
   role:           z.enum(ROLES, { errorMap: () => ({ message: `role must be one of: ${ROLES.join(', ')}` }) }),
   center_id:      z.string().uuid('center_id must be a UUID').optional(),
   base_salary:    z.number().min(0).optional(),
+  joining_date:   z.string().date().optional(),
+  payment_method: z.string().optional(),
+  bank_name:      z.string().optional(),
+  account_number: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -37,6 +41,20 @@ const updateUserSchema = z.object({
   gender:         z.enum(GENDERS).optional(),
   preferred_lang: z.enum(LANGS).optional(),
   is_active:      z.boolean().optional(),
+}).refine((b) => Object.keys(b).length > 0, {
+  message: 'Request body must contain at least one field to update.',
+});
+
+const updateStaffProfileSchema = z.object({
+  full_name:      z.string().min(1).optional(),
+  phone:          z.string().optional(),
+  role:           z.enum(ROLES).optional(),
+  center_id:      z.string().uuid().optional(),
+  base_salary:    z.number().min(0).optional(),
+  joining_date:   z.string().date().optional(),
+  payment_method: z.string().optional(),
+  bank_name:      z.string().optional(),
+  account_number: z.string().optional(),
 }).refine((b) => Object.keys(b).length > 0, {
   message: 'Request body must contain at least one field to update.',
 });
@@ -80,6 +98,14 @@ router.patch(
   requireAuth,
   validate(updateUserSchema),
   controller.updateUser,
+);
+
+router.patch(
+  '/users/:user_id/center/:center_id/staff_profile',
+  requireAuth,
+  requireRoles('super_admin', 'center_manager'),
+  validate(updateStaffProfileSchema),
+  controller.updateStaffProfile,
 );
 
 router.post(
