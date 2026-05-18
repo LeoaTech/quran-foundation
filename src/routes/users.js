@@ -105,7 +105,7 @@ router.patch(
 router.patch(
   '/users/:user_id/center/:center_id/staff_profile',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('users.edit'),
   validate(updateStaffProfileSchema),
   controller.updateStaffProfile,
 );
@@ -128,7 +128,7 @@ router.delete(
 router.delete(
   '/users/:user_id/center/:center_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('users.edit'),
   controller.removeUserFromCenter,
 );
 
