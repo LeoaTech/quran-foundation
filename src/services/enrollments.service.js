@@ -310,13 +310,14 @@ async function updateEnrollment({ user, enrollmentId, body }) {
   }
 
   const updated = await repo.updateEnrollment(enrollmentId, updates);
+  const student = await db('users').where({ id: enrollment.student_user_id }).first();
   activityLog.log({
     actor:       user,
     action:      'enrollment.update',
     entity_type: 'enrollment',
     entity_id:   enrollmentId,
     center_id:   enrollment.center_id,
-    summary_en:  `Updated enrollment status to "${updates.status || enrollment.status}"`,
+    summary_en:  `Updated enrollment status for ${student?.full_name || 'Student'} to "${updates.status || enrollment.status}"`,
     metadata:    { enrollment_id: enrollmentId, status: updates.status || enrollment.status },
   }).catch(() => {});
   return updated;
