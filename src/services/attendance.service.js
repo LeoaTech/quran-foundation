@@ -154,13 +154,14 @@ async function correctRecord({ user, sessionId, recordId, body }) {
     corrected_by: user.id,
     corrected_at: new Date(),
   });
+  const student = await db('users').where({ id: record.student_user_id }).first();
   activityLog.log({
     actor:       user,
     action:      'attendance.correction',
     entity_type: 'attendance_record',
     entity_id:   recordId,
     center_id:   cls.center_id,
-    summary_en:  `Corrected attendance record to "${body.status ?? record.status}"`,
+    summary_en:  `Corrected attendance record for ${student?.full_name || 'Student'} to "${body.status ?? record.status}"`,
     metadata:    { session_id: sessionId, record_id: recordId, new_status: body.status ?? record.status },
   }).catch(() => {});
   return corrected;
