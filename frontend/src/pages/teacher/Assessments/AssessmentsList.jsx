@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
@@ -67,9 +68,11 @@ export default function AssessmentsList() {
             </p>
           )}
         </div>
-        <Button variant="primary" disabled={!classId} onClick={() => setAddOpen(true)}>
-          + Create assessment
-        </Button>
+        <Can permission="assessments.create">
+          <Button variant="primary" disabled={!classId} onClick={() => setAddOpen(true)}>
+            + Create assessment
+          </Button>
+        </Can>
       </div>
 
       {/* Filter bar */}

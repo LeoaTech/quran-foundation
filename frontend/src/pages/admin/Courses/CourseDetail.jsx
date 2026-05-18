@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import RTLInput from '../../../components/RTLInput';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
@@ -132,7 +133,9 @@ function LevelsTab({ courseId }) {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button size="sm" variant="primary" onClick={openAdd}>+ Add level</Button>
+        <Can permission="courses.edit">
+          <Button size="sm" variant="primary" onClick={openAdd}>+ Add level</Button>
+        </Can>
       </div>
 
       {addOpen && (
@@ -211,7 +214,9 @@ function LevelsTab({ courseId }) {
                   </td>
                   <td style={{ fontSize: 12, color: 'var(--ink-soft)', direction: 'rtl', textAlign: 'right' }}>{lv.description_ur}</td>
                   <td>
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(lv)}>Edit</Button>
+                    <Can permission="courses.edit">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(lv)}>Edit</Button>
+                    </Can>
                   </td>
                 </tr>
               ))}

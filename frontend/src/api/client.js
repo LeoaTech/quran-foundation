@@ -27,6 +27,13 @@ client.interceptors.response.use(
   async (err) => {
     const original = err.config;
 
+    if (err.response?.status === 403) {
+      const code = err.response?.data?.error?.code;
+      console.warn('Permission denied:', err.config?.url, code ?? '');
+      window.dispatchEvent(new CustomEvent('api:forbidden', { detail: { url: err.config?.url, code } }));
+      return Promise.reject(err);
+    }
+
     if (err.response?.status !== 401 || original._retry) {
       return Promise.reject(err);
     }

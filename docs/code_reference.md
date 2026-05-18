@@ -240,18 +240,53 @@ req.user = {
 }
 ```
 
+Also attaches a **lazy `req.userPermissions` getter** (added with `Object.defineProperty`). The first access on a given request fires `getCachedPermissions(userId)` (Redis-cached; 5-min TTL; DB fallback). Subsequent accesses reuse the same Promise via a closure variable.
+
 Error codes thrown: `UNAUTHORIZED` (missing token, 401), `TOKEN_EXPIRED` (401), `INVALID_TOKEN` (401).
 
-### `src/middleware/rbac.js` — `requireRoles(...roles)`
+### `src/middleware/rbac.js` — permission-based guards
 
-Factory middleware. `super_admin` always passes regardless of listed roles.
+Replaces the old `requireRoles` factory. Exports two functions:
+
+**`requirePermission(key)`** — passes if `req.userPermissions` (a `Set<string>`) contains `key`.
 
 ```js
-requireRoles('teacher', 'center_manager')
-// super_admin → next()
-// teacher at any center → next()
-// student → 403 FORBIDDEN
+requirePermission('centers.create')
+// user with centers.create in their resolved set → next()
+// user without it → 403 FORBIDDEN (code: 'FORBIDDEN')
 ```
+
+**`requireAnyPermission(...keys)`** — passes if the set contains at least one of the keys.
+
+```js
+requireAnyPermission('enrollments.withdraw', 'enrollments.transfer')
+```
+
+Permission resolution order (implemented in `permissions.repository.js → getCachedPermissions`):
+1. Aggregate all `role_permissions` for the user's roles.
+2. Apply `user_permissions` overrides: `is_granted = true` adds; `is_granted = false` removes.
+3. Cache the resulting `Set<string>` in Redis under `permissions:{userId}` for 5 minutes.
+4. Redis failure degrades to a direct DB lookup (never throws).
+
+### `src/repositories/permissions.js`
+
+| Export | Description |
+|--------|-------------|
+| `getUserPermissions(userId)` | DB-only resolver — returns `Set<string>` |
+| `getCachedPermissions(userId)` | Redis-cached wrapper — used by middleware |
+| `invalidatePermissionCache(userIds[])` | Deletes `permissions:{id}` keys for each userId; called automatically by write functions |
+| `getRoles(params)` | List roles with optional `is_active` filter |
+| `createRole(data)` | Insert a new role row |
+| `updateRole(roleId, data)` | Patch a role row |
+| `deleteRole(roleId)` | Hard-delete; throws `400 SYSTEM_ROLE` if `is_system = true` |
+| `getRolePermissions(roleId)` | Joined list of permissions assigned to a role |
+| `setRolePermissions(roleId, permissionIds, grantedBy?)` | Full replace in transaction; invalidates cache for all users carrying this role |
+| `getPermissions(params)` | List permissions with optional `module` / `is_active` filter |
+| `createPermission(data)` | Insert a new permission |
+| `updatePermission(permissionId, data)` | Patch a permission |
+| `getUserPermissionOverrides(userId)` | List explicit grants/denies for a user |
+| `setUserPermissionOverride(userId, permId, isGranted, grantedBy?)` | Upsert override; invalidates that user's cache |
+| `removeUserPermissionOverride(userId, permId)` | Delete override; invalidates that user's cache |
 
 ### `src/middleware/validate.js` — `validate(schema)`
 
@@ -1496,6 +1531,168 @@ return result;
 
 ---
 
+## RBAC API Module
+
+**Route prefix:** `/api/v1/rbac` (roles + permissions) and `/api/v1/users/:userId/permissions` (overrides)  
+**Mount:** `app.use('/api/v1', require('./routes/rbac'))`  
+All endpoints require JWT auth + a specific permission key (no role-based guards).
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/routes/rbac.js` | Route definitions + Zod validation schemas |
+| `src/controllers/rbac.controller.js` | Thin controllers — parse req, call service, send res |
+| `src/services/rbac.service.js` | Business logic — validation, count queries, assembly |
+| `src/repositories/permissions.js` | All DB queries (extended for RBAC API) |
+
+### Route → permission map
+
+| Method | Path | Permission |
+|--------|------|-----------|
+| GET | `/rbac/roles` | `roles.view` |
+| POST | `/rbac/roles` | `roles.create` |
+| GET | `/rbac/roles/:roleId` | `roles.view` |
+| PATCH | `/rbac/roles/:roleId` | `roles.edit` |
+| DELETE | `/rbac/roles/:roleId` | `roles.delete` |
+| GET | `/rbac/roles/:roleId/permissions` | `roles.view` |
+| PUT | `/rbac/roles/:roleId/permissions` | `roles.edit` |
+| PATCH | `/rbac/roles/:roleId/permissions/:permissionId` | `roles.edit` |
+| GET | `/rbac/permissions` | `permissions.view` |
+| POST | `/rbac/permissions` | `permissions.assign` |
+| PATCH | `/rbac/permissions/:permissionId` | `permissions.assign` |
+| GET | `/users/:userId/permissions` | `roles.assign` |
+| POST | `/users/:userId/permissions` | `roles.assign` |
+| DELETE | `/users/:userId/permissions/:permissionId` | `roles.assign` |
+
+### Key business rules (enforced in `rbac.service.js`)
+
+- **`POST /rbac/roles`**: `name` must be `/^[a-z][a-z0-9_]*$/`; uniqueness checked before insert; `is_system` forced to `false`.
+- **`PATCH /rbac/roles/:roleId`**: system roles (`is_system = true`) accept only `description`, `label_ur`, `color`. `name` and `is_system` are immutable via API.
+- **`DELETE /rbac/roles/:roleId`**: throws `400 SYSTEM_ROLE` if `is_system = true`; throws `409 ROLE_IN_USE` (with `user_count`) if any `user_roles` rows reference this role.
+- **`PUT /rbac/roles/:roleId/permissions`**: validates all supplied UUIDs exist in `permissions`; wrapped in a transaction; calls `invalidatePermissionCache` for all users carrying the role.
+- **`PATCH .../permissions/:permissionId`** (toggle): calls `repo.toggleRolePermission` which upserts/deletes the `role_permissions` row and invalidates affected users.
+- **`POST /rbac/permissions`**: validates `key === "{module}.{action}"` — key, module, and action must be self-consistent.
+- **`PATCH /rbac/permissions/:permissionId`**: only `label`, `label_ur`, `description`, `is_active` are patchable; `key`, `module`, `action` are silently ignored.
+- **`POST /users/:userId/permissions`**: upserts `user_permissions`; immediately invalidates that user's Redis cache.
+- **`DELETE /users/:userId/permissions/:permissionId`**: removes the override row; user's effective permission reverts to role grants.
+
+### New repository functions (in `permissions.repository.js`)
+
+| Function | Description |
+|----------|-------------|
+| `getRolesWithStats(params)` | Roles with correlated subquery counts: `user_count`, `permission_count` |
+| `getRoleById(roleId)` | Single role lookup — returns `null` if not found |
+| `getAllPermissionsWithRoleFlag(roleId)` | All active permissions with `is_granted` boolean derived via `EXISTS` subquery |
+| `toggleRolePermission(roleId, permId, isGranted, grantedBy)` | Insert or delete single `role_permissions` row; bulk-invalidates affected user caches |
+| `getRolePermissionsForUser(userId)` | Role-granted permissions with `granted_via_role` name, used for the display endpoint |
+
+### `GET /rbac/permissions` response shape
+
+```json
+{
+  "centers": [
+    { "id": "uuid", "key": "centers.create", "label": "Create Centers",
+      "label_ur": "مرکز بنائیں", "action": "create", "is_active": true }
+  ],
+  "courses": [ ... ]
+}
+```
+
+### `GET /users/:userId/permissions` response shape
+
+```json
+{
+  "role_permissions": [
+    { "key": "centers.view", "label": "View Centers", "granted_via_role": "center_manager" }
+  ],
+  "overrides": [
+    { "key": "centers.delete", "label": "Delete Centers", "is_granted": true }
+  ],
+  "resolved": ["centers.delete", "centers.view", "courses.view"]
+}
+```
+
+### New error codes
+
+| Code | Status | Condition |
+|------|--------|-----------|
+| `ROLE_IN_USE` | 409 | DELETE attempted on a role that still has users; response body includes `user_count` |
+| `SYSTEM_ROLE` | 400 | Attempting to delete a role where `is_system = true` |
+
+---
+
+### RBAC wiring — final status
+
+#### Sidebar nav gating (`AppShell.jsx`)
+
+Each nav item carries an optional `requires` field (string or string[]).
+`canSeeItem()` hides the item when permissions are loaded AND the user lacks all keys.
+While permissions are still loading, all items are shown to prevent flash.
+
+Current `requires` mappings (super_admin section):
+
+| Nav item | `requires` |
+|----------|-----------|
+| Centers | `centers.view` |
+| Courses | `courses.view` |
+| Teachers | `users.view` |
+| Students | `users.view` |
+| Org Report | `reports.view_org` |
+| Roles & Perms | `roles.view` |
+| Settings | `org.edit` |
+
+#### API 403 handling (`src/api/client.js` + `App.jsx`)
+
+Any API response with `status: 403` triggers:
+1. `console.warn('Permission denied:', url, code)` — logged for debugging
+2. `window.dispatchEvent(new CustomEvent('api:forbidden', { detail: { url, code } }))` — DOM event
+
+A `PermissionAlert` component (rendered inside `<ToastProvider>` in `App.jsx`) listens for `api:forbidden` and shows a bilingual error toast:
+> "You don't have permission to do this. — آپ کو یہ کام کرنے کی اجازت نہیں ہے"
+
+The 403 response **does NOT redirect** to `/403` anymore — the page stays, the action is blocked. The `/403` error page is still accessible via `ProtectedRoute` role checks.
+
+#### `Can` component wrapping — permission map
+
+All mutating action buttons are wrapped with `<Can permission="...">`. The table below maps each button to its permission key:
+
+| Button | Page / Component | Permission |
+|--------|-----------------|------------|
+| + Add center | `CentersList` | `centers.create` |
+| + Add classroom, Save (settings) | `CenterDetail` | `centers.edit` |
+| + New course | `CoursesList` | `courses.create` |
+| Edit (course card) | `CoursesList` | `courses.edit` |
+| + Add level, Edit level | `CourseDetail` → `LevelsTab` | `courses.edit` |
+| + Add (topic), ✎ Edit topic | `TopicManager` | `topics.create` / `topics.edit` |
+| + Add subtopic | `TopicManager` → `TopicPanel` | `topics.create` |
+| ✎ Edit subtopic | `TopicManager` → `SubtopicRow` | `topics.edit` |
+| ✕ Delete topic / subtopic | `TopicManager` | `topics.delete` |
+| + Add class | `ClassesList` | `classes.create` |
+| + Assign teacher, Remove teacher | `ClassDetail` → `TeachersTab` | `classes.edit` |
+| + Add criterion | `ClassDetail` → `HomeworkCriteriaTab` | `homework_criteria.create` |
+| Edit criterion, Deactivate criterion | `ClassDetail` → `HomeworkCriteriaTab` | `homework_criteria.edit` |
+| + Enroll student (list + form submit) | `EnrollmentsList`, `EnrollmentForm` | `enrollments.create` |
+| Withdraw | `EnrollmentsList` | `enrollments.edit` |
+| Save attendance | `MarkAttendance` | `attendance.mark` |
+| Export CSV | `AttendanceSheet` | `attendance.export` |
+| Inline attendance correction | `AttendanceSheet` → `StatusCell` | `attendance.correct` (via `editable` prop) |
+| Save progress log | `ProgressLogger` | `progress.create` |
+| + Create assessment | `AssessmentsList` | `assessments.create` |
+| Save all results | `AssessmentDetail` → `EnterResultsTab` | `assessments.record` |
+| Export CSV (assessment) | `AssessmentDetail` → `ResultsOverviewTab` | `assessments.export` |
+| Print report | `OrgReport`, `CenterReport`, `HomeworkReport` | `reports.export` |
+| Export CSV (center/homework reports) | `CenterReport`, `HomeworkReport` | `reports.export` |
+| + New role | `RBACPage` | `roles.create` |
+| ✎ Edit role | `RBACPage` | `roles.edit` |
+| 🗑 Delete role | `RBACPage` | `roles.delete` |
+| + Add permission | `PermissionsPage` | `permissions.manage` |
+| + Add override, ✕ Remove override | `UserPermissionsPage` | `roles.assign` |
+
+**`AttendanceSheet` — `editable` prop pattern**: `StatusCell` accepts `editable={can('attendance.correct')}`. When `false`, the cell is non-clickable (cursor: default, no title). This avoids hiding the read-only attendance data while still preventing unauthorized corrections.
+
+---
+
 ## Jobs & Workers
 
 ### `src/jobs/notifyGuardian.js`
@@ -1543,6 +1740,7 @@ Stub worker that registers a processor on the `notify-guardian` queue. Implement
 | `CLASS_FULL` | 409 | Active enrollment count ≥ `classes.max_capacity` |
 | `SESSION_EXISTS` | 409 | Attendance session already exists for this class on this date |
 | `RESULT_EXISTS` | 409 | A result already exists for this student in the assessment |
+| `SYSTEM_ROLE` | 400 | Attempt to delete a role with `is_system = true` |
 | `VALIDATION_ERROR` | 400 | Zod schema failure; includes `field` |
 | `RATE_LIMIT_EXCEEDED` | 429 | Express rate-limiter triggered |
 | `INTERNAL_SERVER_ERROR` | 500 | Unhandled exception |
@@ -1565,20 +1763,95 @@ All error responses follow this shape:
 
 ## RBAC Summary
 
-| Role | Center scope | Typical capabilities |
-|------|-------------|---------------------|
-| `super_admin` | None (`center_id = null` in user_roles) | Full access to all resources, all centers |
-| `center_manager` | Single center | Manage users/classrooms/classes within their center |
-| `teacher` | Single center | Read classrooms, log progress sessions for their classes |
-| `student` | Single center | Own profile only |
-| `guardian` | Via student | Own profile; receives notifications |
+### Role capabilities (seeded defaults)
 
-**Middleware chain pattern used on every protected route:**
+| Role | Center scope | Permission count | Key capabilities |
+|------|-------------|-----------------|-----------------|
+| `super_admin` | None (all centers) | 55 (all) | Full access to every resource |
+| `center_manager` | Single center | 32 | Classes, enrollment, attendance, reports, user management |
+| `teacher` | Single center | 19 | Mark attendance, log progress/homework, create assessments |
+| `student` | Single center | 5 | View own attendance, progress, homework, results |
+| `guardian` | Via student | 0 (override only) | Assigned via `user_permissions` as needed |
+
+### Middleware chain pattern
+
 ```js
-router.verb('/path', requireAuth, requireRoles('role1', 'role2'), validate(schema), controller.fn);
+// Single permission
+router.post('/centers', requireAuth, requirePermission('centers.create'), validate(schema), controller.fn);
+
+// Either permission passes
+router.patch('/enrollments/:id', requireAuth, requireAnyPermission('enrollments.withdraw', 'enrollments.transfer'), validate(schema), controller.fn);
+
+// Open to any authenticated user (no permission guard)
+router.get('/students/:id/attendance', requireAuth, controller.fn);
 ```
 
-**Service-level center enforcement** (beyond RBAC middleware):
+### Route → permission mapping
+
+| Route (method + path) | Permission key |
+|-----------------------|---------------|
+| GET /org | `org.view` |
+| GET /centers | `centers.view` |
+| POST /centers | `centers.create` |
+| GET /centers/:id | `centers.view` |
+| PATCH /centers/:id | `centers.edit` |
+| GET /centers/:id/classrooms | `centers.view` |
+| POST /centers/:id/classrooms | `centers.edit` |
+| GET /users | `users.view` |
+| POST /users | `users.create` |
+| POST /users/:id/roles | `roles.assign` |
+| DELETE /users/:id/roles/:rid | `roles.assign` |
+| POST /users/:id/guardians | `users.edit` |
+| GET /users/:id/guardians | `users.view` |
+| POST /courses | `courses.create` |
+| PATCH /courses/:id | `courses.edit` |
+| POST /courses/:id/levels | `courses.create` |
+| POST /courses/:id/topics | `topics.create` |
+| PATCH /courses/:id/topics/:id | `topics.edit` |
+| DELETE /courses/:id/topics/:id | `topics.delete` |
+| POST/PATCH/DELETE subtopics | `topics.create / .edit / .delete` |
+| GET /centers/:id/classes | `classes.view` |
+| POST /centers/:id/classes | `classes.create` |
+| GET /classes/:id | `classes.view` |
+| PATCH /classes/:id | `classes.edit` |
+| POST/DELETE /classes/:id/teachers | `classes.edit` |
+| GET /classes/:id/homework-criteria | `homework_criteria.view` |
+| POST /classes/:id/homework-criteria | `homework_criteria.create` |
+| PATCH /classes/:id/homework-criteria/:id | `homework_criteria.edit` |
+| DELETE /classes/:id/homework-criteria/:id | `homework_criteria.deactivate` |
+| POST /enrollments | `enrollments.create` |
+| GET /classes/:id/enrollments | `enrollments.view` |
+| PATCH /enrollments/:id | any of `enrollments.withdraw / .transfer` |
+| POST /classes/:id/attendance | `attendance.mark` |
+| GET /classes/:id/attendance | `attendance.view` |
+| PATCH /attendance/sessions/:id/records/:id | `attendance.correct` |
+| POST /progress-sessions | `progress.create` |
+| GET /progress-sessions/:id | `progress.view` |
+| PATCH /progress-sessions/:id | `progress.edit` |
+| PATCH /homework-entries/:id | `homework.score` |
+| PATCH /homework-entries/:id/scores/:id | `homework.correct` |
+| POST /classes/:id/assessments | `assessments.create` |
+| GET /classes/:id/assessments | `assessments.view` |
+| GET /assessments/:id | `assessments.view` |
+| POST /assessments/:id/results | `assessments.record_results` |
+| GET /assessments/:id/results | `assessments.view` |
+| PATCH /assessments/:id/results/:id | `assessments.record_results` |
+| GET /reports/org/overview | `reports.view_org` |
+| GET /reports/centers/:id/overview | `reports.view_center` |
+| GET /reports/classes/:id/homework-performance | any of `reports.view_center / .view_student` |
+
+Routes with no permission guard (only `requireAuth`): GET /users/:id, PATCH /users/:id, GET /students/:id/enrollments, GET /students/:id/attendance, GET /students/:id/progress, GET /students/:id/assessments, GET /reports/students/:id/summary.
+
+### Cache invalidation
+
+`invalidatePermissionCache(userIds[])` in `permissions.repository.js` deletes `permissions:{userId}` from Redis.
+
+Called automatically:
+- `setRolePermissions(roleId, ...)` → queries all users with that role, invalidates their caches
+- `setUserPermissionOverride(userId, ...)` → invalidates that user's cache
+- `removeUserPermissionOverride(userId, ...)` → invalidates that user's cache
+
+**Service-level center enforcement** (beyond permission guards):
 - `assertCenterAccess(user, centerId)` — centers module; checks `user.center_id === centerId`
 - `assertCenterScope(user, centerId)` — users module; same pattern, different name
 - Both: super_admin always passes; non-super_admin must match exactly
@@ -2295,17 +2568,121 @@ Set in `frontend/.env`.
 **Login:**
 1. `login({ phone, password })` calls `POST /auth/login`.
 2. Stores `access_token` in memory; sets `user` state from the response `user` object.
+3. `SignIn.jsx` reads `user.roles[0]` from the returned user and navigates to `ROLE_DASHBOARDS[role]` (imported from `src/router/index.jsx`).
 
 **Logout:**
 1. `logout()` calls `POST /auth/logout` (sends the httpOnly cookie so the server can revoke it).
 2. Clears in-memory `access_token`; nulls `user` state.
-3. React Router detects `isAuthenticated = false` and redirects to `/signin`.
+3. React Router detects `isAuthenticated = false` → `ProtectedRoute` redirects to `/auth/signin`.
 
 **Automatic silent refresh on 401:**
 - The axios response interceptor catches 401 responses.
 - Attempts `POST /auth/refresh` using a raw `axios` call (bypasses the interceptor to avoid infinite loops).
 - Concurrent requests that arrive during the refresh are queued and replayed once the new token is available.
-- If the refresh itself fails, dispatches a `auth:logout` DOM event. `AuthProvider` listens for this event and clears state, triggering a redirect.
+- If the refresh itself fails, dispatches `auth:logout` DOM event → `AuthProvider` clears state → redirect to `/auth/signin`.
+
+**403 handling:**
+- The axios response interceptor catches 403 responses **before** the 401 block.
+- Calls `window.location.replace('/403')` — hard navigation to the standalone Forbidden page.
+- This handles API-level authorization failures (e.g., center_manager accessing another center's data) distinct from the route-level role check in `ProtectedRoute`.
+
+### Client-side permission system
+
+#### `AuthContext` — `permissions: string[] | null`
+
+After login and silent refresh, `AuthProvider` calls `GET /users/:id/permissions` and stores `data.resolved` (a sorted `string[]` of permission keys) in context.
+
+- **`null`** = not yet fetched OR fetch failed (graceful degradation — UI shows everything)
+- **`[]`** = loaded, user has no permissions (rare; backend still enforces real access)
+- **`['centers.view', ...]`** = loaded, apply UI filtering
+
+The fetch is fire-and-forget (does not block the post-login redirect). `logout()` and `auth:logout` event both reset permissions to `null`.
+
+> **Backend note**: `GET /users/:userId/permissions` requires `roles.assign`. For non-admin users who lack this permission, the fetch returns 403 and `permissions` stays `null` → all nav items and `Can` checks show content (safe degradation — the backend middleware still enforces actual authorization on every API call). A future `/auth/permissions` endpoint that allows own-user access would remove this limitation.
+
+#### `usePermissions()` — `src/hooks/usePermissions.js`
+
+Reads `permissions` from `AuthContext` (via `useAuth()`). Returns:
+
+```js
+const { can, canAny, canAll, permissions, loaded } = usePermissions();
+
+can('centers.create')           // → boolean (false when not loaded)
+canAny('reports.view_org', 'reports.view_center') // → boolean
+canAll('roles.create', 'roles.edit')              // → boolean
+permissions // string[] (empty when null or not loaded)
+loaded      // true once first fetch attempt completes
+```
+
+When `loaded === false` (permissions not yet fetched), all `can*()` return `false` — but `Can` and the nav filter both treat `!loaded` as "show everything" to prevent layout flash.
+
+#### `Can` component — `src/components/Can.jsx`
+
+```jsx
+// Single permission
+<Can permission="centers.create">
+  <Button>Add center</Button>
+</Can>
+
+// Any of multiple permissions
+<Can anyOf={['reports.view_org', 'reports.view_center']}>
+  <ReportsLink />
+</Can>
+
+// All permissions required
+<Can allOf={['roles.create', 'roles.edit']}>
+  <FullRoleEditor />
+</Can>
+
+// With fallback
+<Can permission="roles.delete" fallback={<span style={{color:'var(--ink-pale)'}}>No access</span>}>
+  <DeleteRoleButton />
+</Can>
+```
+
+**Render logic:**
+1. No `permission`/`anyOf`/`allOf` → always render `children`
+2. `!loaded` → render `children` (prevent flash while permissions load)
+3. `loaded` → render `children` if allowed, `fallback` (default `null`) otherwise
+
+#### `AppShell` — permission-gated nav items
+
+Each nav item in `NAV_CONFIG` accepts an optional `requires` field (string or string[]):
+
+```js
+{ to: '/admin/rbac',  label: 'Roles & Perms', icon: '⚙', requires: 'roles.view' }
+{ to: '/admin/reports', label: 'Org Report', icon: '▦', requires: 'reports.view_org' }
+```
+
+**`canSeeItem(item)` logic** (evaluated at render time):
+- `!item.requires` → always show
+- `!loaded` → show (permissions not ready yet)
+- `loaded` → show only if `can(anyKey)` returns true
+
+Empty sections (all items hidden) are suppressed entirely.
+
+**Nav item → permission mapping:**
+
+| Nav item | Required permission |
+|----------|-------------------|
+| Dashboard (all roles) | — (always shown) |
+| Centers | `centers.view` |
+| Courses | `courses.view` |
+| Teachers, Students | `users.view` |
+| Org Report | `reports.view_org` |
+| Roles & Perms | `roles.view` |
+| Settings | `org.edit` |
+| My Center (manager) | `centers.view` |
+| Classes | `classes.view` |
+| Enrollment | `enrollments.view` |
+| Attendance (manager/teacher) | `attendance.view` / `attendance.mark` |
+| Center Report | `reports.view_center` |
+| Log Progress | `progress.create` |
+| Class Overview | `progress.view` |
+| Assessments | `assessments.view` |
+| HW Report | `reports.view_student` |
+| Student Results | `assessments.view` |
+| Schedule | — (always shown) |
 
 **`AuthContext` values:**
 
@@ -2318,77 +2695,382 @@ Set in `frontend/.env`.
 | `login(credentials)` | `async fn` | Calls API, stores token, sets user |
 | `logout()` | `async fn` | Calls API, clears token and user |
 
+### Centralized router — `src/router/index.jsx`
+
+All route definitions live in one file. `App.jsx` is reduced to just providers + `<BrowserRouter><AppRoutes /></BrowserRouter>`.
+
+```
+src/
+  router/
+    index.jsx       ← AppRoutes component + ROLE_DASHBOARDS map + RootRedirect
+  App.jsx           ← providers only
+```
+
+**`ROLE_DASHBOARDS` export** — shared between router and `SignIn.jsx` for the post-login redirect:
+
+```js
+export const ROLE_DASHBOARDS = {
+  super_admin:    '/admin/dashboard',
+  center_manager: '/manager/dashboard',
+  teacher:        '/teacher/dashboard',
+  student:        '/student/dashboard',
+};
+```
+
+**`RootRedirect`** — lives inside `AppRoutes` at path `/`:
+- `loading = true` → renders nothing.
+- Not authenticated → `<Navigate to="/auth/signin" replace />`.
+- Authenticated → `<Navigate to={ROLE_DASHBOARDS[role]} replace />`.
+
 ### Route protection
 
 `ProtectedRoute` is a react-router v6 layout route (renders `<Outlet />`):
 
 ```jsx
-// All authenticated users
+// Any authenticated user
 <Route element={<ProtectedRoute />}>
   <Route element={<AppShell />}>
-    <Route path="/dashboard" element={<AdminDashboard />} />
-    ...
+    ...role subtrees...
   </Route>
 </Route>
 
 // Role-restricted sub-tree
 <Route element={<ProtectedRoute roles={['super_admin']} />}>
-  <Route path="/centers" element={<Centers />} />
+  <Route path="/admin/dashboard" element={<AdminDashboard />} />
 </Route>
 ```
 
 Behaviour:
 - `loading = true` → renders nothing (waits for session restore).
-- `!isAuthenticated` → `<Navigate to="/signin" replace />`.
-- `roles` provided but `role` not in list → inline 403 view (no redirect).
+- `!isAuthenticated` → `<Navigate to="/auth/signin" replace />`.
+- `roles` provided but `role` not in list → `<Navigate to="/403" replace />`.
 - Otherwise → `<Outlet />`.
 
 ### Routing table
 
-| Path | Component | Guard |
+Routes are grouped by role prefix. Each role's subtree is wrapped in a `ProtectedRoute roles={[...]}` layout route inside the shared `AppShell` wrapper.
+
+#### Public / error
+
+| Path | Component | Notes |
 |------|-----------|-------|
-| `/` | `RootRedirect` | → `/dashboard` if authed, `/signin` otherwise |
-| `/signin` | `SignIn` | `AuthLayout` (redirects authed users away) |
-| `/signup` | `SignUp` | `AuthLayout` |
-| `/dashboard` | `AdminDashboard` | `ProtectedRoute` (any role) |
-| `/admin/centers` | `CentersList` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager is redirected to their own center |
-| `/admin/centers/:id` | `CenterDetail` | `ProtectedRoute roles={['super_admin','center_manager']}` — center_manager enforced to own center_id |
-| `/admin/org` | `OrgSettings` | `ProtectedRoute roles={['super_admin']}` |
-| `/admin/courses` | `CoursesList` | `ProtectedRoute` (any authenticated role) |
-| `/admin/courses/:id` | `CourseDetail` | `ProtectedRoute` (any authenticated role) |
-| `/classes` | `ClassesList` | `ProtectedRoute roles={['center_manager','teacher']}` — center_manager scoped to user.center_id |
-| `/classes/:id` | `ClassDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/enrollment` | `EnrollmentsList` | `ProtectedRoute roles={['center_manager']}` |
-| `/enrollment/new` | `EnrollmentForm` | `ProtectedRoute roles={['center_manager']}` |
-| `/attendance` | `MarkAttendance` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/attendance/sheet` | `AttendanceSheet` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/attendance/my` | `MyAttendance` | `ProtectedRoute roles={['student']}` |
-| `/progress` | `ProgressLogger` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/progress/class` | `ClassProgress` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/progress/my` | `MyProgress` | `ProtectedRoute roles={['student']}` |
-| `/assessments` | `AssessmentsList` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/assessments/:id` | `AssessmentDetail` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/assessments/my` | `MyAssessments` | `ProtectedRoute roles={['student']}` |
-| `/reports` | `OrgReport` | `ProtectedRoute roles={['super_admin']}` |
-| `/reports/center` | `CenterReport` | `ProtectedRoute roles={['super_admin','center_manager']}` |
-| `/reports/homework` | `HomeworkReport` | `ProtectedRoute roles={['center_manager','teacher']}` |
-| `/reports/students/:userId` | `StudentReport` | `ProtectedRoute roles={['center_manager','teacher','student','guardian']}` |
-| `/results` | redirect | → `/assessments/my` |
-| `/centers` | redirect | → `/admin/centers` (legacy redirect) |
-| `/courses` | redirect | → `/admin/courses` (legacy redirect) |
-| `/settings` | redirect | → `/admin/org` (legacy redirect) |
-| `/teachers`, `/students` | `Placeholder` | `ProtectedRoute` (any role) |
+| `/` | `RootRedirect` | → role dashboard if authed, `/auth/signin` otherwise |
+| `/auth/signin` | `SignIn` | `AuthLayout` (redirects authed users away) |
+| `/auth/signup` | `SignUp` | `AuthLayout` |
+| `/signin`, `/signup` | redirect | → `/auth/signin`, `/auth/signup` (legacy compat) |
+| `/403` | `Forbidden` | No auth wrapper — accessible always |
+| `*` | `NotFound` | No auth wrapper |
+
+#### Super admin (`roles={['super_admin']}`)
+
+| Path | Component |
+|------|-----------|
+| `/admin/dashboard` | `AdminDashboard` |
+| `/admin/centers` | `CentersList` |
+| `/admin/centers/:id` | `CenterDetail` |
+| `/admin/org` | `OrgSettings` |
+| `/admin/courses` | `CoursesList` |
+| `/admin/courses/:id` | `CourseDetail` |
+| `/admin/teachers` | `TeachersList` (stub) |
+| `/admin/students` | `StudentsList` (stub) |
+| `/admin/reports` | `OrgReport` |
+
+#### Center manager (`roles={['center_manager']}`)
+
+| Path | Component |
+|------|-----------|
+| `/manager/dashboard` | `ManagerDashboard` |
+| `/manager/classes` | `ClassesList` |
+| `/manager/classes/:id` | `ClassDetail` |
+| `/manager/enrollment` | `EnrollmentForm` |
+| `/manager/enrollments` | `EnrollmentsList` |
+| `/manager/attendance` | `AttendanceSheet` |
+| `/manager/reports` | `CenterReport` |
+
+#### Teacher (`roles={['teacher']}`)
+
+| Path | Component |
+|------|-----------|
+| `/teacher/dashboard` | `TeacherDashboard` |
+| `/teacher/attendance` | `MarkAttendance` |
+| `/teacher/attendance/sheet` | `AttendanceSheet` |
+| `/teacher/progress` | `ProgressLogger` |
+| `/teacher/progress/class` | `ClassProgress` |
+| `/teacher/assessments` | `AssessmentsList` |
+| `/teacher/assessments/:id` | `AssessmentDetail` |
+| `/teacher/reports/homework` | `HomeworkReport` |
+
+#### Student (`roles={['student']}`)
+
+| Path | Component |
+|------|-----------|
+| `/student/dashboard` | `MyProgress` (reused) |
+| `/student/attendance` | `MyAttendance` |
+| `/student/schedule` | `Schedule` (stub) |
+| `/student/results` | `MyAssessments` |
+
+#### Shared (any authenticated role)
+
+| Path | Component |
+|------|-----------|
+| `/reports/students/:userId` | `StudentReport` |
+
+### New pages added (includes RBAC)
+
+| File | Description |
+|------|-------------|
+| `src/pages/errors/NotFound.jsx` | 404 — "صفحہ نہیں ملا", back-to-dashboard link, no auth wrapper |
+| `src/pages/errors/Forbidden.jsx` | 403 — "آپ کو یہ صفحہ دیکھنے کی اجازت نہیں ہے", no auth wrapper |
+| `src/pages/manager/Dashboard.jsx` | Center manager home — live 4-metric overview via `useCenterReport(user.center_id, currentMonth())` |
+| `src/pages/teacher/Dashboard.jsx` | Teacher home — quick-access card grid linking to all teacher workflows |
+| `src/pages/admin/Teachers/TeachersList.jsx` | Stub (coming soon) |
+| `src/pages/admin/Students/StudentsList.jsx` | Stub (coming soon) |
+| `src/pages/student/Schedule.jsx` | Stub (coming soon) |
 
 ### Role-based sidebar nav
 
-`AppShell` reads `role` from `useAuth()` and selects from `NAV_CONFIG`:
+`AppShell` reads `role` from `useAuth()` and selects from `NAV_CONFIG`. All nav paths match the role-prefixed routing exactly:
 
-| Role | Nav sections |
+| Role | Sections & paths |
+|------|-----------------|
+| `super_admin` | **Overview**: Dashboard `/admin/dashboard`, Centers `/admin/centers` · **Academic**: Courses `/admin/courses`, Teachers `/admin/teachers`, Students `/admin/students` · **Reports & Settings**: Org Report `/admin/reports`, Settings `/admin/org` |
+| `center_manager` | **My Center**: Dashboard `/manager/dashboard`, My Center `/admin/centers/:id`, Classes `/manager/classes`, Enrollment `/manager/enrollments`, Attendance `/manager/attendance` · **Reports**: Center Report `/manager/reports` |
+| `teacher` | **My Classes**: Dashboard `/teacher/dashboard`, Attendance `/teacher/attendance`, Log Progress `/teacher/progress`, Class Overview `/teacher/progress/class`, Assessments `/teacher/assessments` · **Reports**: HW Report `/teacher/reports/homework` |
+| `student` | **My Learning**: My Progress `/student/dashboard`, Attendance `/student/attendance`, Schedule `/student/schedule`, Results `/student/results` |
+
+`pageTitle()` in `AppShell` derives the topbar title from the last non-UUID URL segment (UUID regex: `/^[0-9a-f]{8}-...-[0-9a-f]{12}$/i`), falling back to `'Dashboard'`.
+
+### RBAC Control Panel — `src/pages/admin/RBAC/`
+
+Route: `/admin/rbac` · Guard: `ProtectedRoute roles={['super_admin']}`
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/api/rbac.js` | All Axios helpers: roles CRUD, permission toggles, user overrides |
+| `src/hooks/usePermissions.js` | React Query wrappers: `useRoles`, `useRolePermissions`, `useCreateRole`, `useUpdateRole`, `useDeleteRole`, `useSetRolePermissions`, `useToggleRolePermission` |
+| `src/pages/admin/RBAC/RBACPage.jsx` | Main two-panel page: roles list (left) + permission matrix (right) |
+| `src/pages/admin/RBAC/CreateRoleModal.jsx` | Create role form with color picker + copy-permissions-from toggle |
+| `src/pages/admin/RBAC/EditRoleModal.jsx` | Edit role metadata; name is read-only for system roles |
+| `src/pages/admin/RBAC/DeleteRoleModal.jsx` | Type-to-confirm delete with user-count warning |
+
+#### Layout
+
+Two-panel grid (`300px left | 1fr right`):
+- **Left panel**: sticky role card list — colored border dot, user/permission count, 🔒 badge for system roles
+- **Right panel**: permission matrix for selected role
+
+#### Left panel — role cards
+
+Each card shows: colored dot (role.color), role name in bold, optional `label_ur` (Amiri RTL), user count, permission count, 🔒 if `is_system`. Click selects the role and loads the permission matrix.
+
+#### Right panel — permission matrix
+
+**Header**: role name + color swatch + user count + Edit button + Delete button (hidden for system roles).
+
+**Summary line**: `n permissions across m modules`.
+
+**Module sections** (all expanded by default, collapsible):
+- Module header: icon + label + `{granted}/{total}` chip (green/gold/neutral) + **Grant all** + **Revoke all** buttons
+- Permission rows: label | label_ur (RTL Amiri) | action chip | `Toggle`
+- `Toggle` is a CSS switch (40×22px, emerald when ON, sand-deep when OFF), shows `···` spinner when in-flight
+
+**Unsaved changes bar** (`position: sticky; bottom: 0`): appears when `pendingCount > 0`. Dark background with "N unsaved changes" + **Discard** + **Save all** buttons.
+
+#### Permission state management
+
+```
+localGranted:  Set<id>  – current UI state
+initGranted:   Set<id>  – last server-synced state
+inFlight:      Set<id>  – per-toggle PATCH in-progress
+pendingCount:  count of IDs where localGranted ≠ initGranted
+```
+
+- **Individual toggle** → optimistic update + `PATCH /rbac/roles/:id/permissions/:permId`; on success: `initGranted` updated (no longer pending); on failure: revert + error toast.
+- **Grant all / Revoke all** → updates `localGranted` only; counts as pending (no PATCH fired).
+- **Save all** → `PUT /rbac/roles/:id/permissions` with `[...localGranted]`; on success: `initGranted = localGranted`.
+- **Discard** → resets `localGranted = initGranted`.
+
+#### CreateRoleModal
+
+- Live `snake_case` validation: `/^[a-z][a-z0-9_]*$/`
+- Color picker: 8 preset swatches + hex text input with live preview
+- **Copy permissions from** checkbox → role selector → after create, calls `getRolePermissions(copyRoleId)` + `setRolePermissions(newRoleId, ids)` in one flow
+
+#### DeleteRoleModal
+
+- Shows user count with Urdu warning text if `user_count > 0`
+- Type-to-confirm pattern: Delete button disabled until typed name matches `role.name`
+- After deletion: clears `selectedRoleId` if deleted role was selected
+
+#### AppShell nav update
+
+`super_admin` "Reports & Settings" section includes `{ to: '/admin/rbac', label: 'Roles & Perms', icon: '⚙' }`.
+
+---
+
+### Permissions Management Page — `src/pages/admin/RBAC/PermissionsPage.jsx`
+
+Route: `/admin/rbac/permissions` · Guard: `ProtectedRoute roles={['super_admin']}`  
+Second tab in the RBAC section, accessible via `RBACTabs` navigation bar.
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/pages/admin/RBAC/RBACTabs.jsx` | Tab bar used by both RBACPage and PermissionsPage — links `/admin/rbac` and `/admin/rbac/permissions` |
+| `src/pages/admin/RBAC/PermissionsPage.jsx` | Filterable permission table grouped by module with status toggle and edit |
+| `src/pages/admin/RBAC/AddPermissionModal.jsx` | Create permission with live key preview + multi-role assignment |
+| `src/pages/admin/RBAC/EditPermissionModal.jsx` | Edit labels/description/status; key/module/action read-only |
+| `src/pages/admin/RBAC/RoleImpactPanel.jsx` | Slide-in panel showing which roles have a permission; revoke/grant from here |
+
+#### New hooks added to `usePermissions.js`
+
+| Hook | Description |
 |------|-------------|
-| `super_admin` | Overview (Dashboard, Centers), Academic (Courses, Teachers, Students), Reports (Org Report → `/reports`, Center Report → `/reports/center`, Settings → `/admin/org`) |
-| `center_manager` | My Center (Dashboard, My Center, Classes, Enrollment, Attendance), Reports (Center Report → `/reports/center`, HW Report → `/reports/homework`) |
-| `teacher` | My Classes (Dashboard, Attendance, Log Progress, Class Overview, Assessments), Reports (HW Report → `/reports/homework`) |
-| `student` | My Learning (My Progress, Attendance, Schedule, Results) |
+| `useAllPermissions(params)` | `GET /rbac/permissions` — cached 60s; returns grouped object |
+| `useCreatePermission()` | `POST /rbac/permissions`; invalidates `rbac-all-permissions` |
+| `useUpdatePermission()` | `PATCH /rbac/permissions/:id`; invalidates `rbac-all-permissions` |
+| `useToggleRolePermission` (updated) | Now also invalidates `rbac-roles` and `rbac-role-perms` on success |
+
+#### PermissionsPage — filter state
+
+| Filter | Control | Effect |
+|--------|---------|--------|
+| Module | `<select>` derived from data | Filters to one module group |
+| Action | `<select>` derived from data | Filters to one action type |
+| Status | Two-button toggle (Active only / All) | Default: active only |
+| Search | Text input | Filters by `key` or `label` (case-insensitive) |
+
+**Flat permissions** are derived from the grouped API response: `Object.entries(grouped).flatMap(([mod, perms]) => perms.map(p => ({...p, module: mod})))`.
+
+**Role counts** per permission are computed from `useRoles({ include: 'permissions' })` — no extra API call.
+
+#### PermissionsPage — table columns
+
+| Column | Notes |
+|--------|-------|
+| Key | Monospace, `{module}.{action}` |
+| Label | English label |
+| اردو | Amiri RTL, label_ur |
+| Action | Colored chip: view=blue, create=green, edit=gold, delete=red, export/others=sand |
+| Roles | `RolesChip` — shows count; hover tooltip lists role names; click opens `RoleImpactPanel` |
+| Status | `StatusDot` — click toggles `is_active` via `updatePermission`; optimistic via loading state |
+| Edit | ✎ icon — opens `EditPermissionModal` |
+
+#### AddPermissionModal
+
+- **Module select**: predefined list + `— New module… —` option that reveals a text input (snake_case)
+- **Action select**: predefined list + `— Custom… —` option
+- **Key preview**: live `{module}.{action}` with ✓ (unique) or ✕ (exists) indicator
+- **Assign to roles**: checkbox list of all roles; on save, fires `toggleRolePermission` for each checked role
+- Success toast format: `"Permission 'x.y' created and assigned to N roles"`
+
+#### EditPermissionModal
+
+- `key`, `module`, `action` shown as read-only monospace fields with immutability banner
+- Editable: `label`, `label_ur` (RTLInput), `description`, `is_active` checkbox
+
+#### RoleImpactPanel
+
+- Rendered via `createPortal` — fixed-position (380px wide, full height) with semi-transparent backdrop
+- **Slide-in animation**: `transform: translateX(100% → 0)` via CSS transition triggered 10ms after mount
+- **Roles list**: derived from `useRoles({ include: 'permissions' })` — no extra API call
+- **Revoke button**: fires `toggleRolePermission(roleId, permId, false)` with per-role loading state
+- **Add to role dropdown**: shows only roles that DON'T already have the permission; fires `toggleRolePermission(roleId, permId, true)` on confirm
+
+---
+
+### User Permission Overrides — `src/pages/admin/Users/`
+
+Route: `/admin/users/:userId/permissions` · Guard: `ProtectedRoute roles={['super_admin']}`  
+Accessed via a tab on the user's profile page at `/admin/users/:userId`.
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/pages/admin/Users/UserProfilePage.jsx` | Stub profile page; shows name, Urdu name, phone, preferred language; "coming soon" card body |
+| `src/pages/admin/Users/UserProfileTabs.jsx` | Tab bar with "Profile" and "Permissions" tabs; active tab detected by `pathname === to` (exact) or `pathname.startsWith(to)` |
+| `src/pages/admin/Users/UserPermissionsPage.jsx` | Main three-column override view (see layout below) |
+| `src/pages/admin/Users/AddOverrideModal.jsx` | Searchable permission select + Grant/Deny toggle; upserts override via `useSetUserPermissionOverride` |
+
+Both `UserProfilePage` and `UserPermissionsPage` render `<UserProfileTabs userId={userId} />` at the top before their content.
+
+#### Routes added to `router/index.jsx`
+
+```jsx
+// Inside ProtectedRoute roles={['super_admin']}
+<Route path="/admin/users/:userId"             element={<UserProfilePage />} />
+<Route path="/admin/users/:userId/permissions" element={<UserPermissionsPage />} />
+```
+
+#### UserPermissionsPage — three-column layout
+
+Grid: `1fr 1fr 1.1fr`, gap 20px. Data fetched from `GET /users/:userId/permissions` via `useUserPermissions(userId)`.
+
+The API response shape:
+```js
+{
+  role_permissions: [{ id, key, label, module, action }],   // all perms from assigned roles
+  overrides:        [{ id, permission_id, key, is_granted, granted_at, granted_by }],
+  resolved:         ['key1', 'key2', ...]                   // final effective set
+}
+```
+
+**Column 1 — "Inherited from roles"**  
+Read-only list of `role_permissions`, grouped by module with module header badges. Opacity 0.75. Shows `{count} permissions from assigned roles` at top.
+
+**Column 2 — "User overrides"**  
+Two sub-sections:
+- *Extra grants* — overrides with `is_granted = true`; each shows `[Override ✓]` source tag + Remove ✕ button
+- *Explicit denies* — overrides with `is_granted = false`; shown with `--red` accent + Remove ✕ button
+
+Remove fires `DELETE /users/:userId/permissions/:permissionId` via `useRemoveUserPermissionOverride`.  
+"+ Add override" button opens `AddOverrideModal`.
+
+**Column 3 — "Final permission set"**  
+Derived from `resolved` keys + explicit denies. Grouped by module. Each key shows a `SourceTag`:
+- `[Role]` — inherited from role permissions
+- `[Override ✓]` — granted via user override
+- `[Override ✗]` — denied via user override (shown with strikethrough + red tint)
+
+Derivation:
+```js
+const overrideGrantKeys = new Set(overrides.filter(o =>  o.is_granted).map(o => o.key));
+const explicitDenies    = overrides.filter(o => !o.is_granted);
+
+const resolvedView = [
+  ...resolved.map(key => ({
+    key,
+    source: overrideGrantKeys.has(key) ? 'override_grant' : 'role',
+    denied: false,
+  })),
+  ...explicitDenies.map(o => ({ ...o, source: 'override_deny', denied: true })),
+];
+```
+
+**Audit trail** (collapsible, bottom of page)  
+Triggered by "Show audit trail" toggle. Lists each override with date (`granted_at` formatted as `DD MMM YYYY`) and who granted it (`granted_by`). Sorted newest-first.
+
+#### AddOverrideModal
+
+- **Permission search**: text input filters `allPerms` by `key` or `label` (case-insensitive)
+- **Permission select**: grouped `<select size={8}>` with `<optgroup>` per module; monospace 12px; shows `key  (label)`
+- **Update notice**: if selected permission key already exists in `existingOverrideKeys`, shows amber "— will update existing override" warning
+- **Override type toggle**: two-button toggle row — Grant (emerald bg + ✓) / Deny (red bg + ✕); default Grant
+- Submits via `setUserPermissionOverride({ userId, permissionId, isGranted })` → `PUT /users/:userId/permissions/:permId`
+
+#### New hooks in `usePermissions.js`
+
+| Hook | API call | Cache key | Description |
+|------|----------|-----------|-------------|
+| `useUserPermissions(userId)` | `GET /users/:id/permissions` | `['user-permissions', userId]` | Returns `{ role_permissions, overrides, resolved }` |
+| `useSetUserPermissionOverride()` | `PUT /users/:id/permissions/:permId` | invalidates `user-permissions` | Upsert override (grant or deny) |
+| `useRemoveUserPermissionOverride()` | `DELETE /users/:id/permissions/:permId` | invalidates `user-permissions` | Remove override entirely |
+
+---
 
 ### Design tokens (key values)
 

@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission, requireAnyPermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/enrollments.controller');
 
@@ -28,37 +28,38 @@ const updateEnrollmentSchema = z.object({
   message: 'Request body must contain at least one field to update.',
 });
 
+// Enroll a NEW student — creates user + role + enrollment in one transaction.
+const enrollNewStudentSchema = z.object({
+  full_name:      z.string().min(1, 'full_name is required'),
+  full_name_ur:   z.string().optional(),
+  phone:          z.string().min(1, 'phone is required'),
+  whatsapp:       z.string().optional(),
+  date_of_birth:  z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
+  gender:         z.enum(['male', 'female', 'other']).optional(),
+  class_id:       z.string().uuid('class_id must be a UUID'),
+  enrolled_on:    z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
+  prior_level:    z.string().max(100).optional(),
+  notes_ur:       z.string().optional(),
+  amount_paid:    z.number().positive().optional(),
+  payment_method: z.string().optional(),
+});
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Enroll a student into a class.
+// Enroll an existing student into a class.
 router.post(
   '/enrollments',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('enrollments.create'),
   validate(createEnrollmentSchema),
   controller.createEnrollment,
 );
 
-// Enroll a NEW student — creates user + role + enrollment in one transaction.
-const enrollNewStudentSchema = z.object({
-  full_name:     z.string().min(1, 'full_name is required'),
-  full_name_ur:  z.string().optional(),
-  phone:         z.string().min(1, 'phone is required'),
-  whatsapp:      z.string().optional(),
-  date_of_birth: z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
-  gender:        z.enum(['male', 'female', 'other']).optional(),
-  class_id:      z.string().uuid('class_id must be a UUID'),
-  enrolled_on:   z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
-  prior_level:   z.string().max(100).optional(),
-  notes_ur:      z.string().optional(),
-  amount_paid:   z.number().positive().optional(),
-  payment_method: z.string().optional(),
-});
-
+// Enroll a brand-new student — register + enroll in one step.
 router.post(
   '/enrollments/enroll-student',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('enrollments.create'),
   validate(enrollNewStudentSchema),
   controller.enrollNewStudent,
 );
@@ -67,7 +68,7 @@ router.post(
 router.get(
   '/centers/:center_id/enrollments',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('enrollments.view'),
   controller.listEnrollmentsByCenter,
 );
 
@@ -75,22 +76,21 @@ router.get(
 router.get(
   '/classes/:class_id/enrollments',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('enrollments.view'),
   controller.listEnrollmentsByClass,
 );
 
-// List all enrollments for a student.
+// Any authenticated user can view a student's enrollment history
 router.get(
   '/students/:user_id/enrollments',
   requireAuth,
   controller.listEnrollmentsByStudent,
 );
 
-// Update an enrollment (e.g. withdraw a student).
 router.patch(
   '/enrollments/:enrollment_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requireAnyPermission('enrollments.withdraw', 'enrollments.transfer'),
   validate(updateEnrollmentSchema),
   controller.updateEnrollment,
 );

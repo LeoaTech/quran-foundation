@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
+import Can from '../../../components/Can';
 import { useToast } from '../../../hooks/useToast';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import MetricCard from '../../../components/MetricCard';
@@ -191,11 +192,11 @@ function ClassroomsTab({ centerId }) {
     <Card>
       <CardHeader>
         <span className="card-title">Classrooms</span>
-        {canEdit && (
+        <Can permission="centers.edit">
           <Button size="sm" variant="outline" onClick={() => setShowAdd((v) => !v)}>
             {showAdd ? 'Cancel' : '+ Add classroom'}
           </Button>
-        )}
+        </Can>
       </CardHeader>
       <CardBody style={{ padding: 0 }}>
         {isLoading ? (
@@ -361,11 +362,11 @@ function SettingsTab({ centerId, center }) {
             </div>
           )}
 
-          {canEdit && (
+          <Can permission="centers.edit">
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
               <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</Button>
             </div>
-          )}
+          </Can>
         </form>
       </CardBody>
     </Card>

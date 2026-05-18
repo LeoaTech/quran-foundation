@@ -1,5 +1,13 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { usePermissions } from '../hooks/usePermissions';
+
+// ── Nav config ────────────────────────────────────────────────────────────────
+// Each item may carry an optional `requires` field:
+//   string  → user must have that permission key
+//   string[] → user must have ANY of those keys
+// Items without `requires` are always shown.
+// When permissions are not yet loaded, all items are shown (no flash).
 
 const NAV_CONFIG = {
   super_admin: {
@@ -10,16 +18,16 @@ const NAV_CONFIG = {
       {
         title: 'Overview',
         items: [
-          { to: '/dashboard',    label: 'Dashboard', icon: '⊞' },
-          { to: '/admin/centers', label: 'Centers',   icon: '⊙' },
+          { to: '/admin/dashboard', label: 'Dashboard', icon: '⊞' },
+          { to: '/admin/centers',   label: 'Centers',   icon: '⊙', requires: 'centers.view' },
         ],
       },
       {
         title: 'Academic',
         items: [
-          { to: '/admin/courses', label: 'Courses', icon: '◈' },
-          { to: '/teachers', label: 'Staff', icon: '◉' },
-          { to: '/students', label: 'Students', icon: '○' },
+          { to: '/admin/courses',   label: 'Courses',   icon: '◈', requires: 'courses.view' },
+          { to: '/admin/teachers',  label: 'Teachers',  icon: '◉', requires: 'users.view' },
+          { to: '/admin/students',  label: 'Students',  icon: '○', requires: 'users.view' },
         ],
       },
       {
@@ -29,15 +37,16 @@ const NAV_CONFIG = {
         ],
       },
       {
-        title: 'Reports',
+        title: 'Reports & Settings',
         items: [
-          { to: '/reports',        label: 'Org Report',    icon: '▦' },
-          { to: '/reports/center', label: 'Center Report', icon: '◈' },
-          { to: '/admin/org',      label: 'Settings',      icon: '⚙' },
+          { to: '/admin/reports', label: 'Org Report',    icon: '▦', requires: 'reports.view_org' },
+          { to: '/admin/rbac',    label: 'Roles & Perms', icon: '⚙', requires: 'roles.view' },
+          { to: '/admin/org',     label: 'Settings',      icon: '⚙', requires: 'org.edit' },
         ],
       },
     ],
   },
+
   center_manager: {
     label: 'Center Manager',
     sub: 'My Center',
@@ -46,12 +55,12 @@ const NAV_CONFIG = {
       {
         title: 'My Center',
         items: [
-          { to: '/dashboard',  label: 'Dashboard',  icon: '⊞' },
-          { to: 'MY_CENTER',   label: 'My Center',  icon: '⊙' },
-          { to: '/classes',    label: 'Classes',    icon: '◈' },
+          { to: '/manager/dashboard',   label: 'Dashboard',  icon: '⊞' },
+          { to: 'MY_CENTER',            label: 'My Center',  icon: '⊙', requires: 'centers.view' },
+          { to: '/manager/classes',     label: 'Classes',    icon: '◈', requires: 'classes.view' },
           { to: '/teachers',   label: 'Teachers',   icon: '◉' },
-          { to: '/enrollment', label: 'Enrollment', icon: '○' },
-          { to: '/attendance', label: 'Attendance', icon: '☑' },
+          { to: '/manager/enrollments', label: 'Enrollment', icon: '○', requires: 'enrollments.view' },
+          { to: '/manager/attendance',  label: 'Attendance', icon: '☑', requires: 'attendance.view' },
         ],
       },
       {
@@ -63,12 +72,12 @@ const NAV_CONFIG = {
       {
         title: 'Reports',
         items: [
-          { to: '/reports/center',  label: 'Center Report', icon: '▦' },
-          { to: '/reports/homework', label: 'HW Report',    icon: '◈' },
+          { to: '/manager/reports', label: 'Center Report', icon: '▦', requires: 'reports.view_center' },
         ],
       },
     ],
   },
+
   teacher: {
     label: 'Teacher',
     sub: 'My Classes',
@@ -77,21 +86,22 @@ const NAV_CONFIG = {
       {
         title: 'My Classes',
         items: [
-          { to: '/dashboard',       label: 'Dashboard',     icon: '⊞' },
-          { to: '/attendance',      label: 'Attendance',    icon: '☑' },
-          { to: '/progress',        label: 'Log Progress',  icon: '◈' },
-          { to: '/progress/class',  label: 'Class Overview', icon: '◉' },
-          { to: '/assessments',     label: 'Assessments',   icon: '▦' },
+          { to: '/teacher/dashboard',      label: 'Dashboard',      icon: '⊞' },
+          { to: '/teacher/attendance',     label: 'Attendance',     icon: '☑', requires: 'attendance.mark' },
+          { to: '/teacher/progress',       label: 'Log Progress',   icon: '◈', requires: 'progress.create' },
+          { to: '/teacher/progress/class', label: 'Class Overview', icon: '◉', requires: 'progress.view' },
+          { to: '/teacher/assessments',    label: 'Assessments',    icon: '▦', requires: 'assessments.view' },
         ],
       },
       {
         title: 'Reports',
         items: [
-          { to: '/reports/homework', label: 'HW Report', icon: '▦' },
+          { to: '/teacher/reports/homework', label: 'HW Report', icon: '▦', requires: 'reports.view_student' },
         ],
       },
     ],
   },
+
   student: {
     label: 'Student',
     sub: 'My Learning',
@@ -100,15 +110,17 @@ const NAV_CONFIG = {
       {
         title: 'My Learning',
         items: [
-          { to: '/progress/my',     label: 'My Progress', icon: '⊞' },
-          { to: '/attendance/my',   label: 'Attendance',  icon: '☑' },
-          { to: '/schedule',           label: 'Schedule',    icon: '◉' },
-          { to: '/assessments/my',  label: 'Results',     icon: '▦' },
+          { to: '/student/dashboard',  label: 'My Progress', icon: '⊞' },
+          { to: '/student/attendance', label: 'Attendance',  icon: '☑', requires: 'attendance.view' },
+          { to: '/student/schedule',   label: 'Schedule',    icon: '◉' },
+          { to: '/student/results',    label: 'Results',     icon: '▦', requires: 'assessments.view' },
         ],
       },
     ],
   },
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function initials(name = '') {
   return name
@@ -120,16 +132,22 @@ function initials(name = '') {
 }
 
 function pageTitle(pathname) {
-  const segment = pathname.split('/').filter(Boolean)[0] ?? 'dashboard';
-  return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
+  const parts   = pathname.split('/').filter(Boolean);
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const label   = [...parts].reverse().find((p) => !UUID_RE.test(p)) ?? parts[0] ?? 'Dashboard';
+  return label.charAt(0).toUpperCase() + label.slice(1).replace(/-/g, ' ');
 }
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AppShell() {
   const { user, role, logout } = useAuth();
-  const location = useLocation();
+  const { can, loaded }        = usePermissions();
+  const location               = useLocation();
 
-  // For center_manager, replace the static center link with their own center URL
   const rawConfig = NAV_CONFIG[role ?? 'student'] ?? NAV_CONFIG.student;
+
+  // For center_manager, swap the MY_CENTER placeholder with their actual center URL.
   const config = role === 'center_manager' && user?.center_id
     ? {
         ...rawConfig,
@@ -143,6 +161,15 @@ export default function AppShell() {
         })),
       }
     : rawConfig;
+
+  // Returns true if this nav item should be shown.
+  // When permissions are not loaded, all items are shown (prevents layout flash).
+  function canSeeItem(item) {
+    if (!item.requires) return true;
+    if (!loaded)        return true; // not loaded yet — show everything
+    const keys = [].concat(item.requires);
+    return keys.some((k) => can(k));
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -161,21 +188,25 @@ export default function AppShell() {
         </div>
 
         <nav className="sidebar-nav">
-          {config.sections.map((section) => (
-            <div key={section.title}>
-              <div className="nav-section-title">{section.title}</div>
-              {section.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          ))}
+          {config.sections.map((section) => {
+            const visibleItems = section.items.filter(canSeeItem);
+            if (visibleItems.length === 0) return null; // hide empty sections
+            return (
+              <div key={section.title}>
+                <div className="nav-section-title">{section.title}</div>
+                {visibleItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">

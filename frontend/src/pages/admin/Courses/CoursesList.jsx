@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import AddCourseModal from './AddCourseModal';
@@ -55,13 +56,15 @@ function CourseCard({ course, onEdit }) {
           >
             Manage topics
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(course)}
-          >
-            Edit
-          </Button>
+          <Can permission="courses.edit">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEdit(course)}
+            >
+              Edit
+            </Button>
+          </Can>
         </div>
       </CardBody>
     </Card>
@@ -105,9 +108,11 @@ export default function CoursesList() {
             {courses.length} course{courses.length !== 1 ? 's' : ''} in the curriculum
           </p>
         </div>
-        <Button variant="primary" onClick={() => setAddOpen(true)}>
-          + New course
-        </Button>
+        <Can permission="courses.create">
+          <Button variant="primary" onClick={() => setAddOpen(true)}>
+            + New course
+          </Button>
+        </Can>
       </div>
 
       {courses.length === 0 ? (
@@ -115,7 +120,11 @@ export default function CoursesList() {
           icon="◈"
           title="No courses yet"
           description="Create the first course to get started with the curriculum."
-          action={<Button variant="primary" onClick={() => setAddOpen(true)}>+ New course</Button>}
+          action={
+            <Can permission="courses.create">
+              <Button variant="primary" onClick={() => setAddOpen(true)}>+ New course</Button>
+            </Can>
+          }
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>

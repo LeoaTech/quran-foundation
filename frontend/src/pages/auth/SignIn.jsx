@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { ROLE_DASHBOARDS } from '../../router';
 
 const DEMO_ROLES = [
   {
@@ -38,8 +39,9 @@ export default function SignIn() {
     setError('');
     setBusy(true);
     try {
-      await login(credentials);
-      navigate('/');
+      const loggedInUser = await login(credentials);
+      const userRole = loggedInUser?.roles?.[0];
+      navigate(ROLE_DASHBOARDS[userRole] ?? '/', { replace: true });
     } catch (err) {
       setError(err.response?.data?.error?.message ?? 'Sign in failed. Check your credentials.');
     } finally {
@@ -82,7 +84,7 @@ export default function SignIn() {
           {/* Tab row (Sign in active) */}
           <div className="auth-tabs">
             <button className="auth-tab active">Sign in</button>
-            <Link to="/signup" style={{ flex: 1, textDecoration: 'none' }}>
+            <Link to="/auth/signup" style={{ flex: 1, textDecoration: 'none' }}>
               <button className="auth-tab" style={{ width: '100%' }}>Sign up</button>
             </Link>
           </div>

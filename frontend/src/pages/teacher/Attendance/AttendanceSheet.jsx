@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
+import { usePermissions } from '../../../hooks/usePermissions';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import { useCorrectRecord } from '../../../hooks/useAttendance';
@@ -45,7 +47,7 @@ const STATUS_CHIP = {
   late:     { cls: 'chip chip-gold',  short: 'L' },
 };
 
-function StatusCell({ record, sessionId, classId, onCorrected }) {
+function StatusCell({ record, sessionId, classId, onCorrected, editable = true }) {
   const toast   = useToast();
   const correct = useCorrectRecord();
   const [editing, setEditing] = useState(false);
@@ -90,9 +92,9 @@ function StatusCell({ record, sessionId, classId, onCorrected }) {
 
   return (
     <td
-      style={{ padding: '8px 10px', textAlign: 'center', cursor: 'pointer' }}
-      onClick={() => setEditing(true)}
-      title="Click to correct"
+      style={{ padding: '8px 10px', textAlign: 'center', cursor: editable ? 'pointer' : 'default' }}
+      onClick={() => { if (editable) setEditing(true); }}
+      title={editable ? 'Click to correct' : undefined}
     >
       <span className={chip.cls} style={{ fontSize: 10, padding: '2px 7px' }}>{chip.short}</span>
     </td>
@@ -129,6 +131,7 @@ function exportCSV(students, dates, sessionMap) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AttendanceSheet() {
   const { user }   = useAuth();
+  const { can }    = usePermissions();
   const centerId   = user?.center_id;
 
   const [selectedClass, setSelectedClass] = useState('');
@@ -256,9 +259,11 @@ export default function AttendanceSheet() {
         </div>
 
         {selectedClass && students.length > 0 && (
-          <Button size="sm" variant="outline" onClick={() => exportCSV(students, dates, sessionMap)}>
-            Export CSV
-          </Button>
+          <Can permission="attendance.export">
+            <Button size="sm" variant="outline" onClick={() => exportCSV(students, dates, sessionMap)}>
+              Export CSV
+            </Button>
+          </Can>
         )}
       </div>
 
@@ -311,6 +316,7 @@ export default function AttendanceSheet() {
                           sessionId={sess?.session_id ?? sess?.id}
                           classId={selectedClass}
                           onCorrected={refetch}
+                          editable={can('attendance.correct')}
                         />
                       );
                     })}

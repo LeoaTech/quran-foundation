@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/courses.controller');
 
@@ -94,48 +94,32 @@ const updateSubtopicSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// ── Courses ───────────────────────────────────────────────────────────────────
-
-router.get(
-  '/courses',
-  requireAuth,
-  controller.listCourses,
-);
+// Courses — any authenticated user can browse the catalogue
+router.get('/courses',             requireAuth, controller.listCourses);
+router.get('/courses/:course_id',  requireAuth, controller.getCourse);
 
 router.post(
   '/courses',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('courses.create'),
   validate(createCourseSchema),
   controller.createCourse,
-);
-
-router.get(
-  '/courses/:course_id',
-  requireAuth,
-  controller.getCourse,
 );
 
 router.patch(
   '/courses/:course_id',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('courses.edit'),
   validate(updateCourseSchema),
   controller.updateCourse,
 );
 
 // ── Course Levels ──────────────────────────────────────────────────────────────
 
-router.get(
-  '/courses/:course_id/levels',
-  requireAuth,
-  controller.getLevels,
-);
-
 router.post(
   '/courses/:course_id/levels',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('courses.create'),
   validate(createLevelSchema),
   controller.createLevel,
 );
@@ -143,7 +127,7 @@ router.post(
 router.patch(
   '/courses/:course_id/levels/:level_id',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('courses.edit'),
   validate(updateLevelSchema),
   controller.updateLevel,
 );
@@ -159,7 +143,7 @@ router.get(
 router.put(
   '/courses/:course_id/levels/:level_id/fee',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('courses.edit'),
   validate(upsertFeeSchema),
   controller.upsertCourseLevelFee,
 );
@@ -167,22 +151,17 @@ router.put(
 router.delete(
   '/courses/:course_id/levels/:level_id/fee',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('courses.edit'),
   controller.deleteCourseLevelFee,
 );
 
-// ── Topics ────────────────────────────────────────────────────────────────────
-
-router.get(
-  '/courses/:course_id/topics',
-  requireAuth,
-  controller.getTopics,
-);
+// Topics — any authenticated user can read
+router.get('/courses/:course_id/topics', requireAuth, controller.getTopics);
 
 router.post(
   '/courses/:course_id/topics',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('topics.create'),
   validate(createTopicSchema),
   controller.createTopic,
 );
@@ -190,7 +169,7 @@ router.post(
 router.patch(
   '/courses/:course_id/topics/:topic_id',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('topics.edit'),
   validate(updateTopicSchema),
   controller.updateTopic,
 );
@@ -198,16 +177,15 @@ router.patch(
 router.delete(
   '/courses/:course_id/topics/:topic_id',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('topics.delete'),
   controller.deleteTopic,
 );
 
-// ── Subtopics ─────────────────────────────────────────────────────────────────
-
+// Subtopics
 router.post(
   '/courses/:course_id/topics/:topic_id/subtopics',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('topics.create'),
   validate(createSubtopicSchema),
   controller.createSubtopic,
 );
@@ -215,7 +193,7 @@ router.post(
 router.patch(
   '/courses/:course_id/topics/:topic_id/subtopics/:subtopic_id',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('topics.edit'),
   validate(updateSubtopicSchema),
   controller.updateSubtopic,
 );
@@ -223,7 +201,7 @@ router.patch(
 router.delete(
   '/courses/:course_id/topics/:topic_id/subtopics/:subtopic_id',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('topics.delete'),
   controller.deleteSubtopic,
 );
 

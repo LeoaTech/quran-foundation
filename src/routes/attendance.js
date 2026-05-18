@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/attendance.controller');
 
@@ -29,33 +29,30 @@ const correctRecordSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Create a session and bulk-mark attendance for all students.
 router.post(
   '/classes/:class_id/attendance',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('attendance.mark'),
   validate(createSessionSchema),
   controller.createAttendanceSession,
 );
 
-// List attendance sessions for a class with optional date-range filter.
 router.get(
   '/classes/:class_id/attendance',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('attendance.view'),
   controller.listSessionsByClass,
 );
 
-// Correct a single attendance record (logs corrected_by + corrected_at).
 router.patch(
   '/attendance/sessions/:session_id/records/:record_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('attendance.correct'),
   validate(correctRecordSchema),
   controller.correctRecord,
 );
 
-// Get a student's full attendance history with summary stats.
+// Any authenticated user can view a student's own attendance history
 router.get(
   '/students/:user_id/attendance',
   requireAuth,

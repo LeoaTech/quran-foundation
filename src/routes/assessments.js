@@ -1,7 +1,7 @@
 const { Router } = require('express');
-const { z }        = require('zod');
+const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/assessments.controller');
 
@@ -18,9 +18,6 @@ const createAssessmentSchema = z.object({
   instructions_ur: z.string().optional(),
 });
 
-// Each result must carry exactly one of score (written/topic_test) or
-// oral_grade (oral) — enforced here at the Zod layer and re-checked in
-// the service once the assessment type is known.
 const resultItemSchema = z.object({
   student_user_id:    z.string().uuid('student_user_id must be a valid UUID'),
   examiner_user_id:   z.string().uuid('examiner_user_id must be a valid UUID').optional(),
@@ -52,60 +49,52 @@ const updateResultSchema = z.object({
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Create an assessment for a class.
 router.post(
   '/classes/:class_id/assessments',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('assessments.create'),
   validate(createAssessmentSchema),
   controller.createAssessment,
 );
 
-// List all assessments for a class.
-// ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
 router.get(
   '/classes/:class_id/assessments',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('assessments.view'),
   controller.listAssessmentsByClass,
 );
 
-// Get a single assessment by ID.
 router.get(
   '/assessments/:assessment_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('assessments.view'),
   controller.getAssessment,
 );
 
-// Bulk-insert results for an assessment (single transaction).
 router.post(
   '/assessments/:assessment_id/results',
   requireAuth,
-  requireRoles('teacher', 'center_manager'),
+  requirePermission('assessments.record_results'),
   validate(createResultsSchema),
   controller.createResults,
 );
 
-// List all results for an assessment.
 router.get(
   '/assessments/:assessment_id/results',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('assessments.view'),
   controller.listResults,
 );
 
-// Update a single result (correct score, oral_grade, remarks, etc.).
 router.patch(
   '/assessments/:assessment_id/results/:result_id',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requirePermission('assessments.record_results'),
   validate(updateResultSchema),
   controller.updateResult,
 );
 
-// Get a student's full assessment history.
-// ?class_id=uuid  ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
+// Any authenticated user can view a student's assessment history
 router.get(
   '/students/:user_id/assessments',
   requireAuth,

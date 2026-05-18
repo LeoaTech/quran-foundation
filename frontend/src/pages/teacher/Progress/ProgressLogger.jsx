@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import RTLInput from '../../../components/RTLInput';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import { useToast } from '../../../hooks/useToast';
@@ -540,14 +541,16 @@ export default function ProgressLogger({ prefillEnrollmentId } = {}) {
               {' · '}{selectedClass?.name ?? ''}
               {' · '}<span style={{ color: 'var(--ink-pale)' }}>{today()}</span>
             </span>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={createSession.isPending || !classwork.grade}
-              style={{ padding: '10px 28px', fontSize: 14 }}
-            >
-              {createSession.isPending ? 'Saving…' : 'Save progress log'}
-            </Button>
+            <Can permission="progress.create">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={createSession.isPending || !classwork.grade}
+                style={{ padding: '10px 28px', fontSize: 14 }}
+              >
+                {createSession.isPending ? 'Saving…' : 'Save progress log'}
+              </Button>
+            </Can>
           </div>
         </form>
       )}

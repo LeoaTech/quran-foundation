@@ -1,27 +1,49 @@
-const { AppError } = require('../utils/errors');
+const { AppError }           = require('../utils/errors');
+const { getCachedPermissions } = require('../repositories/permissions');
 
-// Factory — declare required roles on a route:
-//   router.get('/...', requireAuth, requireRoles('teacher', 'center_manager'), controller)
-//
-// super_admin always passes regardless of listed roles.
-function requireRoles(...allowed) {
-  return (req, _res, next) => {
-    if (!req.user) {
-      return next(new AppError('UNAUTHORIZED', 'Authentication required.', 'تصدیق ضروری ہے۔', 401));
+// requirePermission('centers.create')
+// Passes if the user's resolved permission set includes the given key.
+// The set is fetched from Redis (TTL 5 min) or computed from DB on cache miss.
+// super_admin short-circuit: all permissions are included via seed data.
+function requirePermission(permissionKey) {
+  return async (req, _res, next) => {
+    try {
+      const perms = await req.userPermissions;
+      if (!perms.has(permissionKey)) {
+        return next(new AppError(
+          'FORBIDDEN',
+          `Permission '${permissionKey}' is required.`,
+          'آپ کو یہ کارروائی کرنے کی اجازت نہیں ہے۔',
+          403,
+        ));
+      }
+      next();
+    } catch (err) {
+      next(err);
     }
-    if (req.user.roles.includes('super_admin')) return next();
-
-    const hasRole = req.user.roles.some((r) => allowed.includes(r));
-    if (!hasRole) {
-      return next(new AppError(
-        'FORBIDDEN',
-        'You do not have permission to perform this action.',
-        'آپ کو یہ کارروائی کرنے کی اجازت نہیں ہے۔',
-        403,
-      ));
-    }
-    next();
   };
 }
 
-module.exports = requireRoles;
+// requireAnyPermission('enrollments.withdraw', 'enrollments.transfer')
+// Passes if the user has at least ONE of the listed permission keys.
+function requireAnyPermission(...permissionKeys) {
+  return async (req, _res, next) => {
+    try {
+      const perms = await req.userPermissions;
+      const granted = permissionKeys.some((key) => perms.has(key));
+      if (!granted) {
+        return next(new AppError(
+          'FORBIDDEN',
+          `One of [${permissionKeys.join(', ')}] is required.`,
+          'آپ کو یہ کارروائی کرنے کی اجازت نہیں ہے۔',
+          403,
+        ));
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+module.exports = { requirePermission, requireAnyPermission };

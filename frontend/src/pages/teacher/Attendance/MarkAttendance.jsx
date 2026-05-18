@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import RTLInput from '../../../components/RTLInput';
@@ -297,13 +298,15 @@ export default function MarkAttendance() {
             {'  '}Late: <strong style={{ color: 'var(--amber)' }}>{counts.late}</strong>
             {'  '}Total: <strong>{counts.total}</strong>
           </span>
-          <Button
-            variant="primary"
-            disabled={markMutation.isPending}
-            onClick={handleSave}
-          >
-            {markMutation.isPending ? 'Saving…' : 'Save attendance'}
-          </Button>
+          <Can permission="attendance.mark">
+            <Button
+              variant="primary"
+              disabled={markMutation.isPending}
+              onClick={handleSave}
+            >
+              {markMutation.isPending ? 'Saving…' : 'Save attendance'}
+            </Button>
+          </Can>
         </div>
       )}
     </div>

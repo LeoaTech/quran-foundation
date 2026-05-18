@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardBody } from '../../../components/Card';
+import Can from '../../../components/Can';
 import MetricCard from '../../../components/MetricCard';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Button from '../../../components/Button';
@@ -107,8 +108,10 @@ export default function HomeworkReport() {
             onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
             style={{ width: 150 }}
           />
-          {classId && <Button variant="outline" onClick={exportCSV}>Export CSV</Button>}
-          <Button variant="outline" onClick={() => window.print()}>Print</Button>
+          <Can permission="reports.export">
+            {classId && <Button variant="outline" onClick={exportCSV}>Export CSV</Button>}
+            <Button variant="outline" onClick={() => window.print()}>Print</Button>
+          </Can>
         </div>
       </div>
 

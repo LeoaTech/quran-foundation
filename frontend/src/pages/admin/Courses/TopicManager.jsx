@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import RTLInput from '../../../components/RTLInput';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
@@ -120,8 +121,12 @@ function SubtopicRow({ courseId, topicId, sub, onMutated }) {
       {sub.title_ur && (
         <span style={{ fontSize: 12, fontFamily: 'var(--font-display)', direction: 'rtl', color: 'var(--ink-soft)' }}>{sub.title_ur}</span>
       )}
-      <button onClick={() => setEditing(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 12, padding: '2px 6px' }} title="Edit">✎</button>
-      <button onClick={() => setDeleting(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: 12, padding: '2px 6px' }} title="Delete">✕</button>
+      <Can permission="topics.edit">
+        <button onClick={() => setEditing(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 12, padding: '2px 6px' }} title="Edit">✎</button>
+      </Can>
+      <Can permission="topics.delete">
+        <button onClick={() => setDeleting(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: 12, padding: '2px 6px' }} title="Delete">✕</button>
+      </Can>
     </div>
   );
 }
@@ -217,7 +222,9 @@ function TopicPanel({ courseId, topic, onMutated }) {
           )}
         </div>
         {!editing && (
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Edit topic</Button>
+          <Can permission="topics.edit">
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Edit topic</Button>
+          </Can>
         )}
       </div>
 
@@ -250,7 +257,9 @@ function TopicPanel({ courseId, topic, onMutated }) {
             Subtopics ({subtopics.length})
           </span>
           {!addingSub && (
-            <Button size="sm" variant="ghost" onClick={() => setAddingSub(true)}>+ Add subtopic</Button>
+            <Can permission="topics.create">
+              <Button size="sm" variant="ghost" onClick={() => setAddingSub(true)}>+ Add subtopic</Button>
+            </Can>
           )}
         </div>
 
@@ -383,7 +392,9 @@ export default function TopicManager({ courseId }) {
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sand-mid)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Topics ({topics.length})</span>
           {!addingTopic && (
-            <Button size="sm" variant="ghost" onClick={() => setAddingTopic(true)}>+ Add</Button>
+            <Can permission="topics.create">
+              <Button size="sm" variant="ghost" onClick={() => setAddingTopic(true)}>+ Add</Button>
+            </Can>
           )}
         </div>
 
@@ -438,13 +449,15 @@ export default function TopicManager({ courseId }) {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(topic); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 12, padding: '2px 4px', flexShrink: 0 }}
-                  title="Delete topic"
-                >
-                  ✕
-                </button>
+                <Can permission="topics.delete">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmDelete(topic); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 12, padding: '2px 4px', flexShrink: 0 }}
+                    title="Delete topic"
+                  >
+                    ✕
+                  </button>
+                </Can>
               </div>
 
               {confirmDelete?.id === topic.id && (

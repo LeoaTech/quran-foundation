@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
+import Can from '../../../components/Can';
 import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
@@ -84,7 +85,9 @@ export default function EnrollmentsList() {
             {search ? ' matching search' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/enrollment/new')}>+ Enroll student</Button>
+        <Can permission="enrollments.create">
+          <Button variant="primary" onClick={() => navigate('/manager/enrollment')}>+ Enroll student</Button>
+        </Can>
       </div>
 
       {/* Filter bar */}
@@ -143,7 +146,7 @@ export default function EnrollmentsList() {
           icon="○"
           title="No classes found"
           description="Create a class first before enrolling students."
-          action={<Button variant="outline" onClick={() => navigate('/classes')}>Go to Classes</Button>}
+          action={<Button variant="outline" onClick={() => navigate('/manager/classes')}>Go to Classes</Button>}
         />
       ) : isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
@@ -154,7 +157,7 @@ export default function EnrollmentsList() {
           icon="○"
           title="No enrollments found"
           description={search ? 'No students match your search.' : statusFilter === 'active' ? 'No active enrollments in this class.' : 'No records found.'}
-          action={<Button variant="primary" onClick={() => navigate('/enrollment/new')}>+ Enroll student</Button>}
+          action={<Button variant="primary" onClick={() => navigate('/manager/enrollment')}>+ Enroll student</Button>}
         />
       ) : (
         <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
@@ -197,14 +200,16 @@ export default function EnrollmentsList() {
                     <td style={tdStyle(!isLast)}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                            onClick={() => setWithdrawTarget(en)}
-                          >
-                            Withdraw
-                          </Button>
+                          <Can permission="enrollments.edit">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                              onClick={() => setWithdrawTarget(en)}
+                            >
+                              Withdraw
+                            </Button>
+                          </Can>
                         )}
                         <Button
                           size="sm"

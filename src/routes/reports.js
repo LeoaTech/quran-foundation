@@ -1,47 +1,41 @@
 const { Router } = require('express');
 const requireAuth  = require('../middleware/auth');
-const requireRoles = require('../middleware/rbac');
+const { requirePermission, requireAnyPermission } = require('../middleware/rbac');
 const controller   = require('../controllers/reports.controller');
 
 const router = Router();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Org-wide summary dashboard — super_admin only.
-// Cache: 5 min, key = 'report:org:overview'
+// Org-wide summary — super_admin only (reports.view_org seed)
 router.get(
   '/reports/org/overview',
   requireAuth,
-  requireRoles('super_admin'),
+  requirePermission('reports.view_org'),
   controller.getOrgOverview,
 );
 
-// Center-level summary.
-// ?month=YYYY-MM  — scopes attendance + progress counts to that month
-// Cache: 3 min, key = 'report:center:{id}:{month}'
+// Center-level summary — managers and super_admin
 router.get(
   '/reports/centers/:center_id/overview',
   requireAuth,
-  requireRoles('super_admin', 'center_manager'),
+  requirePermission('reports.view_center'),
   controller.getCenterOverview,
 );
 
-// Full student report card — any authenticated user (own/guardian scoping
-// is a product decision deferred to the frontend; the endpoint is open).
-// Cache: 2 min, key = 'report:student:{user_id}'
+// Full student report card — any authenticated user (own/guardian scoping in controller)
 router.get(
   '/reports/students/:user_id/summary',
   requireAuth,
   controller.getStudentSummary,
 );
 
-// Per-criterion homework performance breakdown for a class.
-// ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
-// Not cached (analytical, low traffic, short aggregation window).
+// Per-criterion homework breakdown — teachers use reports.view_student;
+// managers use reports.view_center
 router.get(
   '/reports/classes/:class_id/homework-performance',
   requireAuth,
-  requireRoles('super_admin', 'center_manager', 'teacher'),
+  requireAnyPermission('reports.view_center', 'reports.view_student'),
   controller.getHomeworkPerformance,
 );
 
