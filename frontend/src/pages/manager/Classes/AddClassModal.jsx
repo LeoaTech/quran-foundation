@@ -86,7 +86,7 @@ export default function AddClassModal({ open, centerId, onClose }) {
       await qc.invalidateQueries({ queryKey: ['classes', centerId] });
       toast.success('Class created.');
       handleClose();
-      navigate(`/classes/${newClass.id ?? newClass.data?.id}`);
+      navigate(`/manager/classes/${newClass.id ?? newClass.data?.id}`);
     } catch (err) {
       toast.error(err.response?.data?.error?.message ?? 'Failed to create class.');
     } finally {

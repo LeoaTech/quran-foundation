@@ -182,7 +182,7 @@ export default function ClassesList() {
                 return (
                   <tr
                     key={cls.id}
-                    onClick={() => navigate(`/classes/${cls.id}`)}
+                    onClick={() => navigate(`/manager/classes/${cls.id}`)}
                     style={{ cursor: 'pointer' }}
                     onMouseEnter={(e) => e.currentTarget.querySelectorAll('td').forEach((td) => (td.style.background = 'var(--sand)'))}
                     onMouseLeave={(e) => e.currentTarget.querySelectorAll('td').forEach((td) => (td.style.background = ''))}
@@ -233,7 +233,7 @@ export default function ClassesList() {
                       </Badge>
                     </td>
                     <td style={tdStyle(!isLast)} onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/classes/${cls.id}`)}>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/manager/classes/${cls.id}`)}>
                         View →
                       </Button>
                     </td>
