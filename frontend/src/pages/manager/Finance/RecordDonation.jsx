@@ -15,11 +15,10 @@ const DONOR_TYPES = [
 ];
 
 export default function RecordDonation() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
-  const centerId = user?.center_id;
 
   const [donorType, setDonorType] = useState('visitor');
   const [donorUserId, setDonorUserId] = useState('');
@@ -29,16 +28,17 @@ export default function RecordDonation() {
   const [dateReceived, setDateReceived] = useState(new Date().toISOString().split('T')[0]);
   const [purpose, setPurpose] = useState('General (Sadaqah)');
   const [notes, setNotes] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
-  // Fetch registered users if needed
+  // Fetch registered users when donor type is student or teacher
   const { data: usersData, isLoading: usersLoading } = useQuery({
-    queryKey: ['users', donorType, centerId],
+    queryKey: ['users', donorType],
     queryFn: () => {
-      if (donorType === 'student') return getStudents({ center_id: centerId, perPage: 200 });
-      if (donorType === 'teacher') return getUsers({ role: 'teacher', center_id: centerId, per_page: 200 });
+      if (donorType === 'student') return getStudents({ perPage: 200 });
+      if (donorType === 'teacher') return getUsers({ role: 'teacher', per_page: 200 });
       return null;
     },
-    enabled: !!centerId && (donorType === 'student' || donorType === 'teacher'),
+    enabled: donorType === 'student' || donorType === 'teacher',
   });
 
   const registeredUsers = usersData?.data ?? [];
@@ -74,28 +74,29 @@ export default function RecordDonation() {
       return;
     }
 
-    if (!donorName.trim()) {
-      setErrorMsg('Please enter a donor name or "Anonymous".');
+    if (!isAnonymous && !donorName.trim()) {
+      setErrorMsg('Please enter a donor name or mark the donation as anonymous.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await recordDonation(centerId, {
+      await recordDonation({
         donor_type: donorType,
         donor_user_id: donorUserId || undefined,
-        donor_name: donorName,
+        donor_name: isAnonymous ? 'Anonymous' : donorName,
         donor_phone: donorPhone || undefined,
         amount: Number(amount),
         date_received: dateReceived,
         purpose,
         notes: notes || undefined,
+        is_anonymous: isAnonymous,
       });
 
       toast.success('Donation recorded successfully!');
       qc.invalidateQueries({ queryKey: ['donations'] });
-      navigate('/donations');
+      navigate(`${role === 'super_admin' ? '/admin' : role === 'finance_manager' ? '/finance' : '/manager'}/donations`);
     } catch (err) {
       setErrorMsg(err.response?.data?.error?.message || 'Failed to record donation.');
       setIsSubmitting(false);
@@ -109,7 +110,7 @@ export default function RecordDonation() {
           Record New Donation
         </h2>
         <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-          Record cash received from a donor to the center.
+          Log a donation received from any donor for the organization.
         </p>
       </div>
 
@@ -154,7 +155,7 @@ export default function RecordDonation() {
                 value={donorUserId}
                 onChange={e => handleUserSelect(e.target.value)}
                 disabled={usersLoading}
-                required
+                required={!isAnonymous}
               >
                 <option value="">-- Select {donorType} --</option>
                 {registeredUsers.map(u => (
@@ -166,13 +167,15 @@ export default function RecordDonation() {
             </div>
           ) : (
             <div className="field">
-              <label>Donor Name <span style={{ color: 'var(--red)' }}>*</span></label>
+              <label>Donor Name {!isAnonymous && <span style={{ color: 'var(--red)' }}>*</span>}</label>
               <input
                 type="text"
-                placeholder="Name or 'Anonymous'"
-                value={donorName}
+                placeholder={isAnonymous ? 'Anonymous' : "Enter donor name"}
+                value={isAnonymous ? '' : donorName}
                 onChange={e => setDonorName(e.target.value)}
-                required
+                required={!isAnonymous}
+                disabled={isAnonymous}
+                style={isAnonymous ? { background: 'var(--sand-light)', cursor: 'not-allowed' } : {}}
               />
             </div>
           )}
@@ -190,7 +193,21 @@ export default function RecordDonation() {
           </div>
         </div>
 
-        {(donorType === 'student' || donorType === 'teacher') && donorUserId && (
+        {/* Anonymous Donation Checkbox */}
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            id="is_anonymous"
+            checked={isAnonymous}
+            onChange={e => setIsAnonymous(e.target.checked)}
+            style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--emerald)' }}
+          />
+          <label htmlFor="is_anonymous" style={{ fontSize: 14, color: 'var(--ink-mid)', cursor: 'pointer', userSelect: 'none' }}>
+            Donor wishes to remain <strong>anonymous</strong> — their name will be hidden in donation records
+          </label>
+        </div>
+
+        {(donorType === 'student' || donorType === 'teacher') && donorUserId && !isAnonymous && (
           <div style={{ marginBottom: 24, padding: '12px 16px', background: 'var(--sand-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--sand-mid)', fontSize: 13, color: 'var(--ink-mid)' }}>
             Selected: <strong>{donorName}</strong> {donorPhone && `(${donorPhone})`}
           </div>
@@ -229,8 +246,6 @@ export default function RecordDonation() {
           <select value={purpose} onChange={e => setPurpose(e.target.value)} required>
             <option value="General (Sadaqah)">General (Sadaqah)</option>
             <option value="Zakat">Zakat</option>
-            <option value="Construction">Construction</option>
-            <option value="Student Sponsorship">Student Sponsorship</option>
             <option value="Other">Other</option>
           </select>
         </div>
@@ -247,7 +262,7 @@ export default function RecordDonation() {
 
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <Button type="button" variant="outline" onClick={() => navigate('/donations')}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => navigate(`${role === 'super_admin' ? '/admin' : role === 'finance_manager' ? '/finance' : '/manager'}/donations`)}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={isSubmitting} style={{ background: 'var(--emerald)', borderColor: 'var(--emerald)' }}>
             {isSubmitting ? 'Recording...' : 'Record Donation'}
           </Button>

@@ -16,17 +16,15 @@ function tdStyle(hasBorder = true) {
 }
 
 export default function DonationsList() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
-  const centerId = user?.center_id;
 
   const [donorTypeFilter, setDonorTypeFilter] = useState('');
   const [page, setPage] = useState(1);
 
   const { data: donationsRaw, isLoading, error } = useQuery({
-    queryKey: ['donations', centerId, donorTypeFilter, page],
-    queryFn: () => getDonations(centerId, { donor_type: donorTypeFilter, page }),
-    enabled: !!centerId,
+    queryKey: ['donations', donorTypeFilter, page],
+    queryFn: () => getDonations({ donor_type: donorTypeFilter, page }),
     staleTime: 30_000,
   });
 
@@ -49,10 +47,12 @@ export default function DonationsList() {
             Donations
           </h2>
           <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-            {meta?.total ?? 0} record{meta?.total !== 1 ? 's' : ''}
+            Organization donations • {meta?.total ?? 0} record{meta?.total !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/donations/new')}>+ Record Donation</Button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Button variant="primary" onClick={() => navigate(`${role === 'super_admin' ? '/admin' : role === 'finance_manager' ? '/finance' : '/manager'}/donations/new`)}>+ Record Donation</Button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
@@ -79,7 +79,7 @@ export default function DonationsList() {
           icon="💸"
           title="No donations found"
           description={donorTypeFilter ? 'No donations match this filter.' : 'Record your first donation.'}
-          action={<Button variant="primary" onClick={() => navigate('/donations/new')}>+ Record Donation</Button>}
+          action={<Button variant="primary" onClick={() => navigate(`${role === 'super_admin' ? '/admin' : role === 'finance_manager' ? '/finance' : '/manager'}/donations/new`)}>+ Record Donation</Button>}
         />
       ) : (
         <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
@@ -97,14 +97,24 @@ export default function DonationsList() {
             <tbody>
               {donations.map((d, i) => {
                 const isLast = i === donations.length - 1;
+                const showAnonymous = d.is_anonymous;
                 return (
                   <tr key={d.id}>
                     <td style={tdStyle(!isLast)}>
                       {new Date(d.date_received).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td style={tdStyle(!isLast)}>
-                      <div style={{ fontWeight: 500, color: 'var(--ink)' }}>{d.donor_name}</div>
-                      {d.donor_phone && <div style={{ fontSize: 11, color: 'var(--ink-pale)' }}>{d.donor_phone}</div>}
+                      {showAnonymous ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {/* <span style={{ fontSize: 14 }}>🔒</span> */}
+                          <span style={{ fontWeight: 500, color: 'var(--ink-pale)', fontStyle: 'italic' }}>Anonymous Donor</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontWeight: 500, color: 'var(--ink)' }}>{d.donor_name}</div>
+                          {d.donor_phone && <div style={{ fontSize: 11, color: 'var(--ink-pale)' }}>{d.donor_phone}</div>}
+                        </>
+                      )}
                     </td>
                     <td style={tdStyle(!isLast)}>
                       <span style={{ textTransform: 'capitalize' }}>{d.donor_type}</span>
@@ -113,7 +123,18 @@ export default function DonationsList() {
                       <span style={{ fontWeight: 600, color: 'var(--emerald)' }}>{Number(d.amount).toLocaleString()}</span>
                     </td>
                     <td style={tdStyle(!isLast)}>{d.purpose}</td>
-                    <td style={tdStyle(!isLast)}>{d.recorded_by_name ?? '—'}</td>
+                    <td style={tdStyle(!isLast)}>
+                      {d.recorded_by_name ? (
+                        <>
+                          <div>{d.recorded_by_name}</div>
+                          {d.recorded_by_role && (
+                            <span style={{ fontSize: 11, color: 'var(--ink-pale)', textTransform: 'capitalize' }}>
+                              {d.recorded_by_role.replace('_', ' ')}
+                            </span>
+                          )}
+                        </>
+                      ) : '—'}
+                    </td>
                   </tr>
                 );
               })}
