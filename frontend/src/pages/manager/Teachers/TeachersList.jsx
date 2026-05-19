@@ -15,15 +15,15 @@ export default function TeachersList() {
   const { user, role } = useAuth();
   const isGlobal = role === 'super_admin' || role === 'finance_manager';
   const centerId = user?.center_id;
-  
+
   const [selectedCenter, setSelectedCenter] = useState(centerId || 'all');
   const qc = useQueryClient();
   const toast = useToast();
 
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ 
-    full_name: '', 
-    phone: '', 
+  const [form, setForm] = useState({
+    full_name: '',
+    phone: '',
     role: 'teacher',
     base_salary: '',
     joining_date: new Date().toISOString().split('T')[0],
@@ -32,7 +32,7 @@ export default function TeachersList() {
     account_number: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [editId, setEditId] = useState(null);
   const [editCenterId, setEditCenterId] = useState(null);
 
@@ -78,13 +78,13 @@ export default function TeachersList() {
         });
         toast.success('Teacher added successfully');
       }
-      
+
       setShowAdd(false);
       setEditId(null);
       setEditCenterId(null);
-      setForm({ 
-        full_name: '', 
-        phone: '', 
+      setForm({
+        full_name: '',
+        phone: '',
         role: 'teacher',
         center_id: '',
         base_salary: '',
@@ -123,9 +123,9 @@ export default function TeachersList() {
     setShowAdd(false);
     setEditId(null);
     setEditCenterId(null);
-    setForm({ 
-      full_name: '', 
-      phone: '', 
+    setForm({
+      full_name: '',
+      phone: '',
       role: 'teacher',
       center_id: '',
       base_salary: '',
@@ -161,10 +161,10 @@ export default function TeachersList() {
         <PageHeader title={role === 'super_admin' ? "Staff Management" : "Teachers & Staff"} subtitle={selectedCenter === 'all' ? 'Manage staff across all centers' : 'Manage teachers and staff salaries'} />
         <div style={{ display: 'flex', gap: 12 }}>
           {isGlobal && (
-            <select 
-              className="f-input" 
-              style={{ width: 200 }} 
-              value={selectedCenter} 
+            <select
+              className="f-input"
+              style={{ width: 200 }}
+              value={selectedCenter}
               onChange={e => setSelectedCenter(e.target.value)}
             >
               <option value="all">All Centers</option>
@@ -188,11 +188,11 @@ export default function TeachersList() {
             {selectedCenter === 'all' && (
               <div className="f-group" style={{ marginBottom: 8 }}>
                 <label className="f-label">Select Center <span style={{ color: 'var(--red)' }}>*</span></label>
-                <select 
-                  required 
-                  className="f-input" 
-                  value={form.center_id || ''} 
-                  onChange={e => setForm({...form, center_id: e.target.value})}
+                <select
+                  required
+                  className="f-input"
+                  value={form.center_id || ''}
+                  onChange={e => setForm({ ...form, center_id: e.target.value })}
                 >
                   <option value="">-- Choose Center --</option>
                   {centers.map(c => (
@@ -204,24 +204,24 @@ export default function TeachersList() {
             <div style={{ display: 'flex', gap: 16, width: '100%', flexWrap: 'wrap' }}>
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Full Name</label>
-                <input required className="f-input" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} />
+                <input required className="f-input" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
               </div>
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Phone</label>
-                <input required className="f-input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+                <input required className="f-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Joining Date</label>
-                <input type="date" required className="f-input" value={form.joining_date} onChange={e => setForm({...form, joining_date: e.target.value})} />
+                <input type="date" required className="f-input" value={form.joining_date} onChange={e => setForm({ ...form, joining_date: e.target.value })} />
               </div>
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Base Salary (PKR)</label>
-                <input type="number" required min="0" className="f-input" value={form.base_salary} onChange={e => setForm({...form, base_salary: e.target.value})} />
+                <input type="number" required min="0" className="f-input" value={form.base_salary} onChange={e => setForm({ ...form, base_salary: e.target.value })} />
               </div>
               {role === 'super_admin' && (
                 <div className="f-group" style={{ flex: '1 1 200px' }}>
                   <label className="f-label">Role</label>
-                  <select className="f-input" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                  <select className="f-input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
                     <option value="teacher">Teacher</option>
                     <option value="center_manager">Center Manager</option>
                     <option value="finance_manager">Finance Manager</option>
@@ -234,18 +234,19 @@ export default function TeachersList() {
             <div style={{ display: 'flex', gap: 16, width: '100%', flexWrap: 'wrap', marginTop: 12 }}>
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Payment Method</label>
-                <select className="f-input" value={form.payment_method} onChange={e => setForm({...form, payment_method: e.target.value})}>
-                  <option value="cash">Cash (Phase 1)</option>
-                  <option value="bank">Bank Transfer (Phase 2 - inactive)</option>
+                <select className="f-input" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })}>
+                  <option value="cash">Cash </option>
+                  <option value="bank">Bank Transfer </option>
                 </select>
               </div>
+
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Bank Name</label>
-                <input className="f-input" value={form.bank_name} onChange={e => setForm({...form, bank_name: e.target.value})} disabled={form.payment_method === 'cash'} placeholder={form.payment_method === 'cash' ? 'N/A' : 'e.g. HBL'} />
+                <input disabled={form.payment_method !== 'bank'} className="f-input" value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} placeholder={form.payment_method === 'cash' ? 'N/A' : 'e.g. HBL'} />
               </div>
               <div className="f-group" style={{ flex: '1 1 200px' }}>
                 <label className="f-label">Account Number</label>
-                <input className="f-input" value={form.account_number} onChange={e => setForm({...form, account_number: e.target.value})} disabled={form.payment_method === 'cash'} placeholder={form.payment_method === 'cash' ? 'N/A' : 'IBAN or account no.'} />
+                <input disabled={form.payment_method !== 'bank'} className="f-input" value={form.account_number} onChange={e => setForm({ ...form, account_number: e.target.value })} placeholder={form.payment_method === 'cash' ? 'N/A' : 'IBAN or account no.'} />
               </div>
             </div>
 
@@ -303,12 +304,20 @@ export default function TeachersList() {
                     )}
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => handleEditClick(s)} style={{ color: 'var(--blue)', background: 'none', border: 'none', fontWeight: 500, cursor: 'pointer' }}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          style={{ color: 'var(--blue)', borderColor: 'var(--blue)' }}
+                          onClick={() => handleEditClick(s)}                                                    >
                           Edit Profile
-                        </button>
-                        <button onClick={() => handleRemove(s.user_id, s.center_id, s.full_name)} style={{ color: 'var(--red)', background: 'none', border: 'none', fontWeight: 500, cursor: 'pointer' }}>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          style={{ color: 'var(--red)', border: 'none' }}
+                          onClick={() => handleRemove(s.user_id, s.center_id, s.full_name)} >
                           Remove
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
