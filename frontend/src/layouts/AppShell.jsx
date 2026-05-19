@@ -19,29 +19,29 @@ const NAV_CONFIG = {
         title: 'Overview',
         items: [
           { to: '/admin/dashboard', label: 'Dashboard', icon: '⊞' },
-          { to: '/admin/centers',   label: 'Centers',   icon: '⊙', requires: 'centers.view' },
+          { to: '/admin/centers', label: 'Centers', icon: '⊙', requires: 'centers.view' },
         ],
       },
       {
         title: 'Academic',
         items: [
-          { to: '/admin/courses',   label: 'Courses',   icon: '◈', requires: 'courses.view' },
-          { to: '/admin/teachers',  label: 'Teachers',  icon: '◉', requires: 'users.view' },
-          { to: '/admin/students',  label: 'Students',  icon: '○', requires: 'users.view' },
+          { to: '/admin/courses', label: 'Courses', icon: '◈', requires: 'courses.view' },
+          { to: '/admin/teachers', label: 'Teachers', icon: '◉', requires: 'users.view' },
+          { to: '/admin/students', label: 'Students', icon: '○', requires: 'users.view' },
         ],
       },
       {
         title: 'Finance',
         items: [
-          { to: '/donations', label: 'Donations', icon: '◈' },
+          { to: '/admin/donations', label: 'Donations', icon: '◈' },
         ],
       },
       {
         title: 'Reports & Settings',
         items: [
-          { to: '/admin/reports', label: 'Org Report',    icon: '▦', requires: 'reports.view_org' },
-          { to: '/admin/rbac',    label: 'Roles & Perms', icon: '⚙', requires: 'roles.view' },
-          { to: '/admin/org',     label: 'Settings',      icon: '⚙', requires: 'org.edit' },
+          { to: '/admin/reports', label: 'Org Report', icon: '▦', requires: 'reports.view_org' },
+          { to: '/admin/rbac', label: 'Roles & Perms', icon: '⚙', requires: 'roles.view' },
+          { to: '/admin/org', label: 'Settings', icon: '⚙', requires: 'org.edit' },
         ],
       },
     ],
@@ -55,18 +55,18 @@ const NAV_CONFIG = {
       {
         title: 'My Center',
         items: [
-          { to: '/manager/dashboard',   label: 'Dashboard',  icon: '⊞' },
-          { to: 'MY_CENTER',            label: 'My Center',  icon: '⊙', requires: 'centers.view' },
-          { to: '/manager/classes',     label: 'Classes',    icon: '◈', requires: 'classes.view' },
-          { to: '/teachers',   label: 'Teachers',   icon: '◉' },
+          { to: '/manager/dashboard', label: 'Dashboard', icon: '⊞' },
+          { to: '/manager/centers', label: 'My Center', icon: '⊙', requires: 'centers.view' },
+          { to: '/manager/classes', label: 'Classes', icon: '◈', requires: 'classes.view' },
+          { to: '/manager/teachers', label: 'Teachers', icon: '◉' },
           { to: '/manager/enrollments', label: 'Enrollment', icon: '○', requires: 'enrollments.view' },
-          { to: '/manager/attendance',  label: 'Attendance', icon: '☑', requires: 'attendance.view' },
+          { to: '/manager/attendance', label: 'Attendance', icon: '☑', requires: 'attendance.view' },
         ],
       },
       {
         title: 'Finance',
         items: [
-          { to: '/donations', label: 'Donations', icon: '◈' },
+          { to: '/manager/donations', label: 'Donations', icon: '◈' },
         ],
       },
       {
@@ -86,11 +86,11 @@ const NAV_CONFIG = {
       {
         title: 'My Classes',
         items: [
-          { to: '/teacher/dashboard',      label: 'Dashboard',      icon: '⊞' },
-          { to: '/teacher/attendance',     label: 'Attendance',     icon: '☑', requires: 'attendance.mark' },
-          { to: '/teacher/progress',       label: 'Log Progress',   icon: '◈', requires: 'progress.create' },
+          { to: '/teacher/dashboard', label: 'Dashboard', icon: '⊞' },
+          { to: '/teacher/attendance', label: 'Attendance', icon: '☑', requires: 'attendance.mark' },
+          { to: '/teacher/progress', label: 'Log Progress', icon: '◈', requires: 'progress.create' },
           { to: '/teacher/progress/class', label: 'Class Overview', icon: '◉', requires: 'progress.view' },
-          { to: '/teacher/assessments',    label: 'Assessments',    icon: '▦', requires: 'assessments.view' },
+          { to: '/teacher/assessments', label: 'Assessments', icon: '▦', requires: 'assessments.view' },
         ],
       },
       {
@@ -110,10 +110,10 @@ const NAV_CONFIG = {
       {
         title: 'My Learning',
         items: [
-          { to: '/student/dashboard',  label: 'My Progress', icon: '⊞' },
-          { to: '/student/attendance', label: 'Attendance',  icon: '☑', requires: 'attendance.view' },
-          { to: '/student/schedule',   label: 'Schedule',    icon: '◉' },
-          { to: '/student/results',    label: 'Results',     icon: '▦', requires: 'assessments.view' },
+          { to: '/student/dashboard', label: 'My Progress', icon: '⊞' },
+          { to: '/student/attendance', label: 'Attendance', icon: '☑', requires: 'attendance.view' },
+          { to: '/student/schedule', label: 'Schedule', icon: '◉' },
+          { to: '/student/results', label: 'Results', icon: '▦', requires: 'assessments.view' },
         ],
       },
     ],
@@ -132,9 +132,9 @@ function initials(name = '') {
 }
 
 function pageTitle(pathname) {
-  const parts   = pathname.split('/').filter(Boolean);
+  const parts = pathname.split('/').filter(Boolean);
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const label   = [...parts].reverse().find((p) => !UUID_RE.test(p)) ?? parts[0] ?? 'Dashboard';
+  const label = [...parts].reverse().find((p) => !UUID_RE.test(p)) ?? parts[0] ?? 'Dashboard';
   return label.charAt(0).toUpperCase() + label.slice(1).replace(/-/g, ' ');
 }
 
@@ -142,31 +142,31 @@ function pageTitle(pathname) {
 
 export default function AppShell() {
   const { user, role, logout } = useAuth();
-  const { can, loaded }        = usePermissions();
-  const location               = useLocation();
+  const { can, loaded } = usePermissions();
+  const location = useLocation();
 
   const rawConfig = NAV_CONFIG[role ?? 'student'] ?? NAV_CONFIG.student;
 
   // For center_manager, swap the MY_CENTER placeholder with their actual center URL.
   const config = role === 'center_manager' && user?.center_id
     ? {
-        ...rawConfig,
-        sections: rawConfig.sections.map((section) => ({
-          ...section,
-          items: section.items.map((item) =>
-            item.label === 'My Center'
-              ? { ...item, to: `/admin/centers/${user.center_id}` }
-              : item,
-          ),
-        })),
-      }
+      ...rawConfig,
+      sections: rawConfig.sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.label === 'My Center'
+            ? { ...item, to: `/manager/centers/${user.center_id}` }
+            : item,
+        ),
+      })),
+    }
     : rawConfig;
 
   // Returns true if this nav item should be shown.
   // When permissions are not loaded, all items are shown (prevents layout flash).
   function canSeeItem(item) {
     if (!item.requires) return true;
-    if (!loaded)        return true; // not loaded yet — show everything
+    if (!loaded) return true; // not loaded yet — show everything
     const keys = [].concat(item.requires);
     return keys.some((k) => can(k));
   }
