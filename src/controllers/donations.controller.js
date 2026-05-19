@@ -11,16 +11,15 @@ const recordSchema = z.object({
   date_received: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
   purpose: z.string().min(1, "Purpose is required"),
   notes: z.string().optional().nullable(),
+  is_anonymous: z.boolean().optional().default(false),
 });
 
 async function recordDonation(req, res, next) {
   try {
-    const { centerId } = req.params;
     const body = recordSchema.parse(req.body);
     
     const donation = await service.recordDonation({
       user: req.user,
-      centerId,
       body,
     });
     
@@ -36,10 +35,8 @@ async function recordDonation(req, res, next) {
 
 async function listDonations(req, res, next) {
   try {
-    const { centerId } = req.params;
     const result = await service.listDonations({
       user: req.user,
-      centerId,
       query: req.query,
     });
     

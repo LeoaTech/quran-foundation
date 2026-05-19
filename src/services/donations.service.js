@@ -3,25 +3,7 @@ const activityLog = require('./activityLog.service');
 const { AppError } = require('../utils/errors');
 const db = require('../db/knex');
 
-function forbidden() {
-  return new AppError(
-    'FORBIDDEN',
-    'You do not have access to perform this action.',
-    'آپ کو یہ عمل کرنے کی اجازت نہیں ہے۔',
-    403
-  );
-}
-
-function assertCenterAccess(user, targetCenterId) {
-  if (user.roles.includes('super_admin')) return;
-  if (user.center_id !== targetCenterId) {
-    throw forbidden();
-  }
-}
-
-async function recordDonation({ user: actor, centerId, body }) {
-  assertCenterAccess(actor, centerId);
-
+async function recordDonation({ user: actor, body }) {
   const {
     donor_type,
     donor_user_id,
@@ -31,6 +13,7 @@ async function recordDonation({ user: actor, centerId, body }) {
     date_received,
     purpose,
     notes,
+    is_anonymous,
   } = body;
 
   if (!donor_type || !amount || !date_received || !purpose) {
@@ -38,7 +21,6 @@ async function recordDonation({ user: actor, centerId, body }) {
   }
 
   const donationData = {
-    center_id: centerId,
     donor_type,
     donor_user_id: donor_user_id || null,
     donor_name: donor_name || 'Anonymous',
@@ -47,6 +29,7 @@ async function recordDonation({ user: actor, centerId, body }) {
     date_received,
     purpose,
     notes: notes || null,
+    is_anonymous: is_anonymous || false,
     recorded_by: actor.id,
   };
 
@@ -58,12 +41,12 @@ async function recordDonation({ user: actor, centerId, body }) {
       action: 'donation.collect',
       entity_type: 'donation',
       entity_id: created.id,
-      center_id: centerId,
-      summary_en: `Recorded donation of ${amount} PKR from ${created.donor_name}`,
+      center_id: null,
+      summary_en: `Recorded donation of ${amount} PKR from ${is_anonymous ? 'Anonymous Donor' : created.donor_name}`,
       metadata: {
         amount,
         donor_type,
-        donor_name: created.donor_name,
+        donor_name: is_anonymous ? 'Anonymous' : created.donor_name,
         purpose,
       },
     }, trx).catch(() => {}); // Catch safely
@@ -74,16 +57,14 @@ async function recordDonation({ user: actor, centerId, body }) {
   return donation;
 }
 
-async function listDonations({ user: actor, centerId, query }) {
-  assertCenterAccess(actor, centerId);
-
+async function listDonations({ user: actor, query }) {
   const page = Math.max(1, parseInt(query.page || '1', 10));
   const perPage = Math.min(100, parseInt(query.per_page || '20', 10));
   const donorType = query.donor_type;
 
   const [rows, meta] = await Promise.all([
-    repo.listDonations(centerId, { donorType, page, perPage }),
-    repo.countDonations(centerId, { donorType }),
+    repo.listDonations({ donorType, page, perPage }),
+    repo.countDonations({ donorType }),
   ]);
 
   const total = parseInt(meta.total, 10);
