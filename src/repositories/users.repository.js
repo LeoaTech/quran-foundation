@@ -117,6 +117,8 @@ async function createUser({ userData, roleData, staffData }, trx) {
 }
 
 async function updateStaffProfile(userId, oldCenterId, { userData, roleData, staffData }) {
+  const isOldCenterOrgWide = !oldCenterId || oldCenterId === 'org_wide' || oldCenterId === '00000000-0000-0000-0000-000000000000';
+
   return db.transaction(async (trx) => {
     // 1. Update user
     if (Object.keys(userData).length > 0) {
@@ -128,18 +130,26 @@ async function updateStaffProfile(userId, oldCenterId, { userData, roleData, sta
       const roleRow = await trx('roles').where({ name: roleData.role }).first();
       if (!roleRow) throw new Error(`Role '${roleData.role}' not found`);
 
-      await trx('user_roles')
-        .where({ user_id: userId, center_id: oldCenterId || null })
-        .update({ role_id: roleRow.id, center_id: roleData.center_id || null });
+      const roleQuery = trx('user_roles').where({ user_id: userId });
+      if (isOldCenterOrgWide) {
+        roleQuery.whereNull('center_id');
+      } else {
+        roleQuery.where({ center_id: oldCenterId });
+      }
+
+      await roleQuery.update({ role_id: roleRow.id, center_id: roleData.center_id || null });
     }
 
     // 3. Update staff details
     if (Object.keys(staffData).length > 0 || (roleData && roleData.center_id !== oldCenterId)) {
-      const newCenterId = roleData.center_id !== undefined ? roleData.center_id : oldCenterId;
+      const newCenterId = roleData.center_id !== undefined ? roleData.center_id : (isOldCenterOrgWide ? null : oldCenterId);
       
-      const existing = await trx('staff_details')
-        .where({ user_id: userId, center_id: oldCenterId })
-        .first();
+      let existing = null;
+      if (!isOldCenterOrgWide) {
+        existing = await trx('staff_details')
+          .where({ user_id: userId, center_id: oldCenterId })
+          .first();
+      }
 
       if (existing) {
         // Update existing (including changing center_id if needed)
