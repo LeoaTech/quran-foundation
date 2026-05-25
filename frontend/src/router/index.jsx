@@ -38,6 +38,8 @@ import EnrollmentsList from '../pages/manager/Enrollments/EnrollmentsList';
 import CenterReport from '../pages/admin/Reports/CenterReport';
 import DonationsList from '../pages/manager/Finance/DonationsList';
 import RecordDonation from '../pages/manager/Finance/RecordDonation';
+import SalariesTab      from '../pages/manager/Finance/SalariesTab';
+import FinanceDashboard from '../pages/finance/Dashboard';
 
 // Teacher
 import TeacherDashboard from '../pages/teacher/Dashboard';
@@ -59,10 +61,11 @@ import MyAssessments from '../pages/student/Assessments/MyAssessments';
 import StudentReport from '../pages/shared/Reports/StudentReport';
 
 export const ROLE_DASHBOARDS = {
-  super_admin: '/admin/dashboard',
-  center_manager: '/manager/dashboard',
-  teacher: '/teacher/dashboard',
-  student: '/student/dashboard',
+  super_admin:     '/admin/dashboard',
+  center_manager:  '/manager/dashboard',
+  finance_manager: '/finance/dashboard',
+  teacher:         '/teacher/dashboard',
+  student:         '/student/dashboard',
 };
 
 function RootRedirect() {
@@ -103,6 +106,7 @@ export default function AppRoutes() {
             <Route path="/admin/students" element={<StudentsList />} />
             <Route path="/admin/donations" element={<DonationsList />} />
             <Route path="/admin/donations/new" element={<RecordDonation />} />
+            <Route path="/admin/salaries" element={<SalariesTab />} />
             <Route path="/admin/reports" element={<OrgReport />} />
             <Route path="/admin/rbac" element={<RBACPage />} />
             <Route path="/admin/rbac/permissions" element={<PermissionsPage />} />
@@ -121,6 +125,7 @@ export default function AppRoutes() {
             <Route path="/manager/teachers" element={<TeachersList />} />
             <Route path="/manager/donations" element={<DonationsList />} />
             <Route path="/manager/donations/new" element={<RecordDonation />} />
+            <Route path="/manager/salaries" element={<SalariesTab />} />
             <Route path="/manager/attendance" element={<AttendanceSheet />} />
             <Route path="/manager/reports" element={<CenterReport />} />
           </Route>
