@@ -50,14 +50,15 @@ async function updateBaseSalary({ user: caller, centerId, staffUserId, baseSalar
 async function recordPayment({ user: caller, centerId, body }) {
   assertCenterScope(caller, centerId);
 
-  const { staff_user_id, amount_paid, payment_method, notes } = body;
+  const { staff_user_id, amount_paid, payment_method, payment_date, notes } = body;
   const staffUser = await usersRepo.getUserById(staff_user_id);
 
   const paymentData = {
     staff_user_id,
     center_id: centerId,
     amount_paid,
-    payment_method,
+    payment_method: payment_method || 'cash',
+    payment_date: payment_date || undefined,
     notes,
     paid_by_user_id: caller.id,
   };
@@ -81,10 +82,11 @@ async function listPayments({ user: caller, centerId, query = {} }) {
   assertCenterScope(caller, centerId);
   
   const page = Math.max(1, parseInt(query.page || '1', 10));
-  const limit = Math.min(100, parseInt(query.per_page || '20', 10));
+  const limit = Math.min(200, parseInt(query.per_page || '200', 10));
   const offset = (page - 1) * limit;
+  const { month, year } = query;
 
-  const { data, total } = await repo.listPayments(centerId, { limit, offset });
+  const { data, total } = await repo.listPayments(centerId, { limit, offset, month, year });
   const totalPages = Math.ceil(total / limit);
 
   return {

@@ -59,13 +59,15 @@ async function recordPayment(paymentData, trx) {
   return row;
 }
 
-async function listPayments(centerId, { limit = 50, offset = 0 } = {}) {
+async function listPayments(centerId, { limit = 50, offset = 0, month, year } = {}) {
   const query = db('salary_payments as sp')
     .join('users as staff', 'staff.id', 'sp.staff_user_id')
     .join('users as admin', 'admin.id', 'sp.paid_by_user_id')
     .where('sp.center_id', centerId)
     .select(
       'sp.id',
+      'sp.staff_user_id',
+      'sp.center_id',
       'sp.amount_paid',
       'sp.payment_date',
       'sp.payment_method',
@@ -76,9 +78,20 @@ async function listPayments(centerId, { limit = 50, offset = 0 } = {}) {
     .orderBy('sp.payment_date', 'desc')
     .limit(limit)
     .offset(offset);
-  
-  const countQuery = db('salary_payments').where('center_id', centerId).count('id as total').first();
 
+  const countBase = db('salary_payments').where('center_id', centerId);
+
+  // Filter by month and year when provided
+  if (month) {
+    query.whereRaw('EXTRACT(MONTH FROM sp.payment_date) = ?', [parseInt(month, 10)]);
+    countBase.whereRaw('EXTRACT(MONTH FROM payment_date) = ?', [parseInt(month, 10)]);
+  }
+  if (year) {
+    query.whereRaw('EXTRACT(YEAR FROM sp.payment_date) = ?', [parseInt(year, 10)]);
+    countBase.whereRaw('EXTRACT(YEAR FROM payment_date) = ?', [parseInt(year, 10)]);
+  }
+
+  const countQuery = countBase.count('id as total').first();
   const [data, { total }] = await Promise.all([query, countQuery]);
   return { data, total: parseInt(total, 10) };
 }

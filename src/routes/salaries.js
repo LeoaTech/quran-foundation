@@ -15,6 +15,7 @@ const recordPaymentSchema = z.object({
   staff_user_id:  z.string().uuid('staff_user_id must be a UUID'),
   amount_paid:    z.number().min(1, 'amount_paid must be greater than 0'),
   payment_method: z.string().optional(),
+  payment_date:   z.string().date('payment_date must be YYYY-MM-DD').optional(),
   notes:          z.string().optional(),
 });
 
