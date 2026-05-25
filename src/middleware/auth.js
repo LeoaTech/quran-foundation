@@ -15,8 +15,9 @@ function requireAuth(req, _res, next) {
       throw new Error('wrong token type');
     }
     req.user = {
-      id:        payload.sub,
-      roles:     payload.roles || [],
+      id: payload.sub,
+      full_name: payload.full_name || 'Unknown',
+      roles: payload.roles || [],
       center_id: payload.center_id || null,
     };
 

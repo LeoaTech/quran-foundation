@@ -15,9 +15,9 @@ const invalidCredentials = () => new AppError(
   401,
 );
 
-function signAccess(sub, roles, center_id) {
+function signAccess(sub, roles, center_id, full_name) {
   return jwt.sign(
-    { sub, type: 'access', roles, center_id },
+    { sub, type: 'access', roles, center_id, full_name },
     process.env.JWT_ACCESS_SECRET,
     { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' },
   );
@@ -34,10 +34,10 @@ function signRefresh(sub, jti, center_id) {
 // Derive { roles, scopedCenterId } from the user's role rows.
 // center_id from request body scopes the session; if omitted, first available center is used.
 function resolveScope(allRoles, requestedCenterId) {
-  // super_admin has a role entry with center_id = null
-  const isSuperAdmin = allRoles.some((r) => r.role === 'super_admin' && r.center_id === null);
-  if (isSuperAdmin) {
-    return { roles: ['super_admin'], scopedCenterId: requestedCenterId || null };
+  // Global roles have center_id = null
+  const globalRoles = allRoles.filter(r => r.center_id === null).map(r => r.role);
+  if (globalRoles.includes('super_admin') || globalRoles.includes('finance_manager')) {
+    return { roles: globalRoles, scopedCenterId: requestedCenterId || null };
   }
 
   const target = requestedCenterId || allRoles[0]?.center_id;
@@ -67,7 +67,7 @@ async function login({ phone, password, center_id }) {
   const { roles, scopedCenterId } = resolveScope(allRoles, center_id);
 
   const jti = uuidv4();
-  const access_token = signAccess(user.id, roles, scopedCenterId);
+  const access_token = signAccess(user.id, roles, scopedCenterId, user.full_name);
   const refresh_token = signRefresh(user.id, jti, scopedCenterId);
 
   await authRepo.updateLastLogin(user.id);
@@ -110,10 +110,11 @@ async function refresh({ refresh_token }) {
 
   // Reload roles so any permission changes take effect on the new access token
   const allRoles = await authRepo.getUserRoles(user.id);
-  const isSuperAdmin = allRoles.some((r) => r.role === 'super_admin' && r.center_id === null);
+  const globalRoles = allRoles.filter(r => r.center_id === null).map(r => r.role);
+  const isGlobal = globalRoles.includes('super_admin') || globalRoles.includes('finance_manager');
   let roles;
-  if (isSuperAdmin) {
-    roles = ['super_admin'];
+  if (isGlobal) {
+    roles = globalRoles;
   } else {
     const scoped = payload.center_id
       ? allRoles.filter((r) => r.center_id === payload.center_id)
@@ -121,7 +122,7 @@ async function refresh({ refresh_token }) {
     roles = [...new Set(scoped.map((r) => r.role))];
   }
 
-  return { access_token: signAccess(user.id, roles, payload.center_id) };
+  return { access_token: signAccess(user.id, roles, payload.center_id, user.full_name) };
 }
 
 async function logout({ refresh_token }) {
@@ -205,7 +206,7 @@ async function signup({ full_name, full_name_ur, phone, password, center_id }) {
   // 5. Auto-login: issue tokens so the student can start using the app immediately
   const roles = ['student'];
   const jti = uuidv4();
-  const access_token = signAccess(newUser.id, roles, center_id);
+  const access_token = signAccess(newUser.id, roles, center_id, newUser.full_name);
   const refresh_token = signRefresh(newUser.id, jti, center_id);
 
   return {
