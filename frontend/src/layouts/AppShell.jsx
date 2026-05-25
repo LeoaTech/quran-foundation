@@ -79,7 +79,23 @@ const NAV_CONFIG = {
       },
     ],
   },
-
+  finance_manager: {
+    label: 'Finance',
+    sub: 'Accounts',
+    badgeClass: 'badge-manager',
+    sections: [
+      {
+        title: 'Finance Hub',
+        items: [
+          { to: '/finance/dashboard', label: 'Dashboard', icon: '⊞' },
+          { to: '/finance/donations', label: 'Donations', icon: '◈' },
+          { to: '/finance/salaries', label: 'Salaries', icon: '⚹' },
+          { to: '/finance/teachers', label: 'Staff', icon: '◉' },
+          { to: '/finance/enrollments', label: 'Enrollments', icon: '○' },
+        ],
+      },
+    ],
+  },
   teacher: {
     label: 'Teacher',
     sub: 'My Classes',

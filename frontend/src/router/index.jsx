@@ -150,6 +150,16 @@ export default function AppRoutes() {
             <Route path="/student/results" element={<MyAssessments />} />
           </Route>
 
+          {/* ── Finance Manager ── */}
+          <Route element={<ProtectedRoute roles={['finance_manager']} />}>
+            <Route path="/finance/dashboard"    element={<FinanceDashboard />} />
+            <Route path="/finance/donations"    element={<DonationsList />} />
+            <Route path="/finance/donations/new" element={<RecordDonation />} />
+            <Route path="/finance/salaries"     element={<SalariesTab />} />
+            <Route path="/finance/teachers"     element={<TeachersList />} />
+            <Route path="/finance/enrollments"  element={<EnrollmentsList />} />
+          </Route>
+
           {/* ── Shared (any authenticated role) ── */}
           <Route path="/reports/students/:userId" element={<StudentReport />} />
 
