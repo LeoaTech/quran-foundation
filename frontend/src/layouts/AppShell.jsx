@@ -33,7 +33,8 @@ const NAV_CONFIG = {
       {
         title: 'Finance',
         items: [
-          { to: '/admin/donations', label: 'Donations', icon: '◈' },
+          { to: '/admin/donations', label: 'Donations', icon: '◈', requires: 'donations.view' },
+          { to: '/admin/salaries', label: 'Salaries', icon: '⚹', requires: 'salaries.view' },
         ],
       },
       {
@@ -67,6 +68,7 @@ const NAV_CONFIG = {
         title: 'Finance',
         items: [
           { to: '/manager/donations', label: 'Donations', icon: '◈' },
+          { to: '/manager/salaries', label: 'Salaries', icon: '⚹', requires: 'salaries.view' },
         ],
       },
       {
