@@ -10,6 +10,7 @@ import Badge from '../../../components/Badge';
 import { getStaffDetails } from '../../../api/salaries';
 import { createUser, removeUserFromCenter, updateStaffProfile } from '../../../api/users';
 import { getCenters } from '../../../api/centers';
+import { getRoles } from '../../../api/rbac';
 
 export default function TeachersList() {
   const { user, role } = useAuth();
@@ -20,17 +21,20 @@ export default function TeachersList() {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({
+  const getInitialForm = () => ({
     full_name: '',
     phone: '',
     role: 'teacher',
+    center_id: selectedCenter === 'all' ? 'org_wide' : selectedCenter,
     base_salary: '',
     joining_date: new Date().toISOString().split('T')[0],
     payment_method: 'cash',
     bank_name: '',
     account_number: ''
   });
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState(getInitialForm());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [editId, setEditId] = useState(null);
@@ -43,6 +47,14 @@ export default function TeachersList() {
   });
   const centers = centersData?.data ?? [];
 
+  const { data: rolesData } = useQuery({
+    queryKey: ['rbac-roles'],
+    queryFn: () => getRoles(),
+    enabled: isGlobal,
+    staleTime: 5 * 60_000,
+  });
+  const dbRoles = rolesData?.data ?? rolesData ?? [];
+
   const { data: staffData, isLoading, error } = useQuery({
     queryKey: ['staff', selectedCenter],
     queryFn: () => getStaffDetails(selectedCenter),
@@ -53,49 +65,36 @@ export default function TeachersList() {
 
   async function handleAdd(e) {
     e.preventDefault();
-    const targetCenter = selectedCenter === 'all' ? form.center_id : selectedCenter;
-    if (!targetCenter) {
-      toast.error('Please select a center first');
-      setIsSubmitting(false);
-      return;
+    setIsSubmitting(true);
+
+    let targetCenter = isGlobal ? (form.center_id || 'org_wide') : centerId;
+    if (targetCenter === 'org_wide' || !targetCenter) {
+      targetCenter = undefined;
     }
 
     try {
+      const payload = {
+        ...form,
+        role: isGlobal ? form.role : 'teacher',
+        center_id: targetCenter,
+        base_salary: form.base_salary ? Number(form.base_salary) : 0,
+      };
+
       if (editId) {
-        await updateStaffProfile(editId, editCenterId, {
-          ...form,
-          role: role === 'super_admin' ? form.role : 'teacher',
-          center_id: targetCenter,
-          base_salary: form.base_salary ? Number(form.base_salary) : 0,
-        });
+        await updateStaffProfile(editId, editCenterId || '00000000-0000-0000-0000-000000000000', payload);
         toast.success('Staff profile updated successfully');
       } else {
-        await createUser({
-          ...form,
-          role: role === 'super_admin' ? form.role : 'teacher',
-          center_id: targetCenter,
-          base_salary: form.base_salary ? Number(form.base_salary) : 0,
-        });
-        toast.success('Teacher added successfully');
+        await createUser(payload);
+        toast.success('Staff added successfully');
       }
 
       setShowAdd(false);
       setEditId(null);
       setEditCenterId(null);
-      setForm({
-        full_name: '',
-        phone: '',
-        role: 'teacher',
-        center_id: '',
-        base_salary: '',
-        joining_date: new Date().toISOString().split('T')[0],
-        payment_method: 'cash',
-        bank_name: '',
-        account_number: ''
-      });
+      setForm(getInitialForm());
       qc.invalidateQueries(['staff', selectedCenter]);
     } catch (err) {
-      toast.error(err?.response?.data?.error?.message || 'Failed to add teacher');
+      toast.error(err?.response?.data?.error?.message || 'Failed to save staff member');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +107,7 @@ export default function TeachersList() {
       full_name: s.full_name || '',
       phone: s.phone || '',
       role: s.role || 'teacher',
-      center_id: s.center_id || '',
+      center_id: s.center_id || 'org_wide',
       base_salary: s.base_salary ?? '',
       joining_date: s.joining_date ? new Date(s.joining_date).toISOString().split('T')[0] : '',
       payment_method: s.payment_method || 'cash',
@@ -123,17 +122,7 @@ export default function TeachersList() {
     setShowAdd(false);
     setEditId(null);
     setEditCenterId(null);
-    setForm({
-      full_name: '',
-      phone: '',
-      role: 'teacher',
-      center_id: '',
-      base_salary: '',
-      joining_date: new Date().toISOString().split('T')[0],
-      payment_method: 'cash',
-      bank_name: '',
-      account_number: ''
-    });
+    setForm(getInitialForm());
   }
 
   async function handleRemove(staffUserId, staffCenterId, name) {
@@ -158,7 +147,7 @@ export default function TeachersList() {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
-        <PageHeader title={role === 'super_admin' ? "Staff Management" : "Teachers & Staff"} subtitle={selectedCenter === 'all' ? 'Manage staff across all centers' : 'Manage teachers and staff salaries'} />
+        <PageHeader title={isGlobal ? "Staff Management" : "Teachers & Staff"} subtitle={selectedCenter === 'all' ? 'Manage staff across all centers' : 'Manage teachers and staff salaries'} />
         <div style={{ display: 'flex', gap: 12 }}>
           {isGlobal && (
             <select
@@ -173,8 +162,8 @@ export default function TeachersList() {
               ))}
             </select>
           )}
-          <Button variant="primary" onClick={showAdd ? handleCancelAdd : () => setShowAdd(true)}>
-            {showAdd ? 'Cancel' : (role === 'super_admin' ? '+ Add Staff' : '+ Add Teacher')}
+          <Button disabled={!isGlobal && role !== 'center_manager'} variant="primary" onClick={showAdd ? handleCancelAdd : () => setShowAdd(true)}>
+            {showAdd ? 'Cancel' : (isGlobal ? '+ Add Staff' : '+ Add Teacher')}
           </Button>
         </div>
       </div>
@@ -182,19 +171,18 @@ export default function TeachersList() {
       {showAdd && (
         <div style={{ background: 'var(--white)', padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--emerald)', marginBottom: 24 }}>
           <h3 style={{ fontSize: 16, marginBottom: 16, fontFamily: 'var(--font-display)' }}>
-            {editId ? 'Edit Staff Profile' : (role === 'super_admin' ? 'Add New Staff Member' : 'Add New Teacher')}
+            {editId ? 'Edit Staff Profile' : (isGlobal ? 'Add New Staff Member' : 'Add New Teacher')}
           </h3>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {selectedCenter === 'all' && (
+            {isGlobal && (
               <div className="f-group" style={{ marginBottom: 8 }}>
-                <label className="f-label">Select Center <span style={{ color: 'var(--red)' }}>*</span></label>
+                <label className="f-label">Select Center</label>
                 <select
-                  required
                   className="f-input"
-                  value={form.center_id || ''}
+                  value={form.center_id || 'org_wide'}
                   onChange={e => setForm({ ...form, center_id: e.target.value })}
                 >
-                  <option value="">-- Choose Center --</option>
+                  <option value="org_wide">For Organization </option>
                   {centers.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -218,14 +206,24 @@ export default function TeachersList() {
                 <label className="f-label">Base Salary (PKR)</label>
                 <input type="number" required min="0" className="f-input" value={form.base_salary} onChange={e => setForm({ ...form, base_salary: e.target.value })} />
               </div>
-              {role === 'super_admin' && (
+              {isGlobal && (
                 <div className="f-group" style={{ flex: '1 1 200px' }}>
                   <label className="f-label">Role</label>
                   <select className="f-input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
-                    <option value="teacher">Teacher</option>
-                    <option value="center_manager">Center Manager</option>
-                    <option value="finance_manager">Finance Manager</option>
-                    <option value="area_manager">Area Manager</option>
+                    {Array.isArray(dbRoles) && dbRoles.length > 0
+                      ? dbRoles
+                        .filter(r => r.name !== 'student')
+                        .map(r => (
+                          <option key={r.id} value={r.name}>
+                            {r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </option>
+                        ))
+                      : <>
+                        <option value="teacher">Teacher</option>
+                        <option value="center_manager">Center Manager</option>
+                        <option value="super_admin">Super Admin</option>
+                      </>
+                    }
                   </select>
                 </div>
               )}
@@ -252,7 +250,7 @@ export default function TeachersList() {
 
             <div style={{ marginTop: 16, textAlign: 'right' }}>
               <Button type="submit" variant="primary" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : (role === 'super_admin' ? 'Save Staff & Salary Profile' : 'Save Teacher & Salary Profile')}
+                {isSubmitting ? 'Saving...' : (isGlobal ? 'Save Staff & Salary Profile' : 'Save Teacher & Salary Profile')}
               </Button>
             </div>
           </form>
@@ -267,7 +265,7 @@ export default function TeachersList() {
 
       <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
         {staff.length === 0 && !isLoading ? (
-          <EmptyState icon="◉" title="No staff yet" description={role === 'super_admin' ? "Select a center to add staff members." : "Add teachers to your center to manage their salaries."} />
+          <EmptyState icon="◉" title="No staff yet" description={isGlobal ? "Select a center to add staff members." : "Add teachers to your center to manage their salaries."} />
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
