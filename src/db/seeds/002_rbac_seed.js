@@ -127,7 +127,7 @@ const ROLE_PERMISSION_KEYS = {
   finance_manager: [
     'salaries.view', 'salaries.pay',
     'donations.view', 'donations.create',
-    'users.view',
+    'users.view', 'users.create', 'users.edit',
     'reports.view_org', 'reports.view_center', 'reports.export',
     'activity.view'
   ],
