@@ -5,6 +5,12 @@ const db = require('./db/knex');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+// In single-container free tier environments, run the background worker inline
+if (process.env.RUN_WORKER_INLINE === 'true') {
+  console.log('[Startup] RUN_WORKER_INLINE is true. Starting background worker inline...');
+  require('./workers/whatsappWorker');
+}
+
 async function start() {
   try {
     await db.raw('SELECT 1');
@@ -20,3 +26,4 @@ async function start() {
 }
 
 start();
+
