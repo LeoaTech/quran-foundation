@@ -6,13 +6,17 @@ export async function login({ phone, password }) {
 }
 
 export async function refresh() {
-  // refresh_token is in an httpOnly cookie — sent automatically via withCredentials.
-  const { data } = await client.post('/auth/refresh', {});
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) throw new Error('No refresh token available');
+  const { data } = await client.post('/auth/refresh', { refresh_token: refreshToken });
   return data; // { access_token }
 }
 
 export async function logout() {
-  await client.post('/auth/logout', {});
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (refreshToken) {
+    await client.post('/auth/logout', { refresh_token: refreshToken });
+  }
 }
 
 export async function getMe() {

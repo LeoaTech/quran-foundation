@@ -26,7 +26,15 @@ app.use(
 
 // CORS
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowed = (process.env.CORS_ORIGIN || 'http://localhost:3001').split(',').map(s => s.trim());
+    if (allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
 }));
 

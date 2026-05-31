@@ -51,6 +51,7 @@ export default function SignUp() {
       // Auto-login: store the access token and set user in auth context
       if (data.access_token) {
         setAccessToken(data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
       }
 
       setSuccess(true);

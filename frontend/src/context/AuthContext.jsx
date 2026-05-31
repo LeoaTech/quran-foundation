@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     function handleAuthLogout() {
       clearAccessToken();
+      localStorage.removeItem('refresh_token');
       setUser(null);
       setPermissions(null);
     }
@@ -53,6 +54,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(async ({ phone, password }) => {
     const data = await apiLogin({ phone, password });
     setAccessToken(data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
     const u = data.user;
     setUser(u);
     // Fire-and-forget: permissions will appear shortly after navigation completes.
@@ -64,6 +66,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try { await apiLogout(); } catch { /* ignore network errors on logout */ }
     clearAccessToken();
+    localStorage.removeItem('refresh_token');
     setUser(null);
     setPermissions(null);
   }, []);

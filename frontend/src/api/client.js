@@ -48,8 +48,9 @@ client.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      // Use a plain axios call to avoid the interceptor re-triggering on the refresh itself.
-      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) throw new Error('No refresh token');
+      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refreshToken }, { withCredentials: true });
       accessToken = data.access_token;
       processQueue(null);
       original.headers.Authorization = `Bearer ${accessToken}`;
