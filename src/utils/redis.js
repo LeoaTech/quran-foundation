@@ -1,9 +1,13 @@
 const { createClient } = require('redis');
 
+const isTLS = process.env.REDIS_TLS === 'true';
+
 const client = createClient({
+  password: process.env.REDIS_PASSWORD || undefined,
   socket: {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    tls: isTLS,
   },
 });
 
