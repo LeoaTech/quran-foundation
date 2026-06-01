@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+require('dns').setDefaultResultOrder('ipv4first');
+
 module.exports = {
   development: {
     client: "postgresql",
@@ -22,14 +24,16 @@ module.exports = {
 
   production: {
     client: "postgresql",
-    connection: {
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || "5432", 10),
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false }
-    },
+   connection: process.env.DATABASE_URL
+      ? { connectionString: process.env.DATABASE_URL }
+      : {
+          host: process.env.DB_HOST,
+          port: parseInt(process.env.DB_PORT || "5432", 10),
+          database: process.env.DB_NAME,
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+          ssl: { rejectUnauthorized: false }
+        },
     migrations: {
       directory: "./src/db/migrations",
       tableName: "knex_migrations"
@@ -37,6 +41,6 @@ module.exports = {
     seeds: {
       directory: "./src/db/seeds"
     },
-    pool: { min: 2, max: 20 }
+    pool: { min: 0, max: 10 }
   }
 };
