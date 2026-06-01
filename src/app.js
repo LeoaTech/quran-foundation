@@ -20,6 +20,7 @@ app.use(
         "font-src": ["'self'", "https://fonts.gstatic.com"],
       },
     },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 
@@ -29,7 +30,11 @@ app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     const allowed = (process.env.CORS_ORIGIN || 'http://localhost:3001').split(',').map(s => s.trim());
-    if (allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+    const isAllowed = allowed.includes(origin) || origin.endsWith('.vercel.app');
+    
+    console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       callback(null, false);
