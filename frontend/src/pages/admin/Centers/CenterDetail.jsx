@@ -16,6 +16,9 @@ import {
   getCenterOverview, getCenterClasses,
   getClassrooms, createClassroom, updateClassroom,
 } from '../../../api/centers';
+import { getUsers } from '../../../api/users';
+import { getCourses, getTopics } from '../../../api/courses';
+import { getCenterTeacherTopics, assignTeacherTopic, removeTeacherTopic } from '../../../api/teacherTopics';
 import ActivityLogTab from './ActivityLogTab';
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
