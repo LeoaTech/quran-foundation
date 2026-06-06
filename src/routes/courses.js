@@ -12,22 +12,28 @@ const router = Router();
 const COURSE_TYPES = ['hifz', 'nazra', 'tajweed', 'arabic'];
 
 const createCourseSchema = z.object({
-  name:           z.string().min(1, 'name is required'),
-  name_ur:        z.string().optional(),
-  name_ar:        z.string().optional(),
-  type:           z.enum(COURSE_TYPES, {
+  name:             z.string().min(1, 'name is required'),
+  name_ur:          z.string().optional(),
+  name_ar:          z.string().optional(),
+  type:             z.enum(COURSE_TYPES, {
     errorMap: () => ({ message: `type must be one of: ${COURSE_TYPES.join(', ')}` }),
   }).optional(),
-  description_ur: z.string().optional(),
+  description_ur:   z.string().optional(),
+  difficulty_level: z.enum(['beginner', 'intermediate', 'advance']).optional(),
+  fee:              z.number().nonnegative().optional(),
+  duration_months:  z.number().int().positive().optional(),
 });
 
 const updateCourseSchema = z.object({
-  name:           z.string().min(1).optional(),
-  name_ur:        z.string().optional(),
-  name_ar:        z.string().optional(),
-  type:           z.enum(COURSE_TYPES).optional(),
-  description_ur: z.string().optional(),
-  is_active:      z.boolean().optional(),
+  name:             z.string().min(1).optional(),
+  name_ur:          z.string().optional(),
+  name_ar:          z.string().optional(),
+  type:             z.enum(COURSE_TYPES).optional(),
+  description_ur:   z.string().optional(),
+  difficulty_level: z.enum(['beginner', 'intermediate', 'advance']).optional(),
+  fee:              z.number().nonnegative().optional(),
+  duration_months:  z.number().int().positive().nullable().optional(),
+  is_active:        z.boolean().optional(),
 }).refine((b) => Object.keys(b).length > 0, {
   message: 'Request body must contain at least one field to update.',
 });
@@ -61,6 +67,7 @@ const createTopicSchema = z.object({
   title_ur:       z.string().optional(),
   title_ar:       z.string().optional(),
   description_ur: z.string().optional(),
+  description:    z.string().optional(),
   display_order:  z.number().int().min(0).optional(),
 });
 
@@ -69,6 +76,7 @@ const updateTopicSchema = z.object({
   title_ur:       z.string().optional(),
   title_ar:       z.string().optional(),
   description_ur: z.string().optional(),
+  description:    z.string().optional(),
   display_order:  z.number().int().min(0).optional(),
   is_active:      z.boolean().optional(),
 }).refine((b) => Object.keys(b).length > 0, {
