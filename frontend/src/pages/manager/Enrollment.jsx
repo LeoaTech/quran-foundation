@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import PageHeader from '../../components/PageHeader';
 import { useToast } from '../../hooks/useToast';
 import { getStudents } from '../../api/users';
-import { getCourses, getCourseLevels, getCourseFees } from '../../api/courses';
+import { getCourses, getCourseFees } from '../../api/courses';
 import { getClasses } from '../../api/classes';
 import { enrollNewStudent, enrollExistingStudent } from '../../api/enrollments';
+import { formatClassroomWithSchedules } from '../../utils/classSessions';
 
 export default function Enrollment() {
   const { user } = useAuth();
@@ -67,15 +68,6 @@ export default function Enrollment() {
   const filteredClasses = courseId
     ? centerClasses.filter((c) => c.course_id === courseId && c.is_active)
     : centerClasses.filter((c) => c.is_active);
-
-  const { data: levelsData, isLoading: isLoadingLevels } = useQuery({
-    queryKey: ['levels', courseId],
-    queryFn: () => getCourseLevels(courseId),
-    enabled: !!courseId,
-    staleTime: 60_000,
-  });
-  const levels = levelsData ?? [];
-
   const { data: feesData } = useQuery({
     queryKey: ['fees', courseId],
     queryFn: () => getCourseFees(courseId),
@@ -85,20 +77,25 @@ export default function Enrollment() {
   const courseFees = feesData ?? [];
 
   const selectedClass = filteredClasses.find(c => c.id === classId);
-  const selectedCourseLevel = levels.find(l => l.id === selectedClass?.course_level_id);
-  const selectedFee = courseFees.find(f => f.course_level_id === selectedClass?.course_level_id);
+  const selectedFee = coursesData.find(f => f.id === selectedClass?.course_id);
+  // Auto-select course when arriving with only class_id preset
+  useEffect(() => {
+    if (!presetClassId || courseId) return;
+    const preset = centerClasses.find((c) => c.id === presetClassId);
+    if (preset?.course_id) setCourseId(preset.course_id);
+  }, [presetClassId, courseId, centerClasses]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
     if (!classId) {
-      setErrorMsg('Please select a class.');
+      setErrorMsg('Please select a classroom.');
       return;
     }
 
-    if (selectedFee && Number(cashReceived) !== Number(selectedFee.full_fee)) {
-      setErrorMsg(`Full course level fee (PKR ${selectedFee.full_fee}) must be received in cash before enrollment is confirmed.`);
+    if (selectedFee && Number(cashReceived) !== Number(selectedFee.fee)) {
+      setErrorMsg(`Full course level fee (PKR ${selectedFee.fee}) must be received in cash before enrollment is confirmed.`);
       return;
     }
 
@@ -129,6 +126,9 @@ export default function Enrollment() {
         setClassId('');
         setCourseId('');
         setCashReceived('');
+        if (presetClassId && courseId) {
+          navigate(-1)
+        }
 
       } else {
         if (!fullName || !phone) {
@@ -161,12 +161,11 @@ export default function Enrollment() {
         setWhatsapp('');
         setDob('');
         setGender('');
-        setClassId(presetClassId);  // keep preset class if came from ClassDetail
+        setClassId(presetClassId);
         setCourseId(presetCourseId);
         setCashReceived('');
       }
     } catch (err) {
-      // Handle the 409 duplicate phone error gracefully
       if (err.response?.status === 409 && err.response?.data?.error?.code === 'USER_EXISTS') {
         setErrorMsg('A user with this phone number already exists. Please enroll them using the "Enroll Existing Student" tab.');
       } else {
@@ -194,7 +193,7 @@ export default function Enrollment() {
             ← Back to class
           </button>
           <div style={{ marginTop: 8, background: 'var(--emerald-pale)', border: '1px solid var(--emerald-light)', borderRadius: 'var(--radius-sm)', padding: '8px 14px', fontSize: 13, color: 'var(--emerald)' }}>
-            Class pre-selected — choose a student below and submit.
+            Course and classroom pre-selected — choose a student below and submit.
           </div>
         </div>
       )}
@@ -285,20 +284,21 @@ export default function Enrollment() {
             </div>
 
             <div style={{ marginBottom: 24, paddingTop: 24, borderTop: '1px solid var(--sand)' }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginBottom: 16 }}>Course & Class</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginBottom: 16 }}>Course & Classroom</h3>
 
               <div style={{ display: 'grid', gap: 16, gridTemplateColumns: '1fr 1fr' }}>
                 <div className="field">
                   <label>Course <span style={{ color: 'var(--red)' }}>*</span></label>
-                  <select 
-                    value={courseId} 
+                  <select
+                    value={courseId}
                     onChange={(e) => {
                       setCourseId(e.target.value);
                       setClassId('');
                       setPriorLevel('');
                       setCashReceived('');
-                    }} 
+                    }}
                     required
+                    disabled={!!presetClassId}
                   >
                     <option value="">— Select course —</option>
                     {courses.map(c => (
@@ -308,24 +308,23 @@ export default function Enrollment() {
                 </div>
 
                 <div className="field">
-                  <label>Class <span style={{ color: 'var(--red)' }}>*</span></label>
-                  <select value={classId} onChange={(e) => setClassId(e.target.value)} required disabled={!courseId || isLoadingClasses}>
-                    <option value="">{!courseId ? '— Select a course first —' : isLoadingClasses ? 'Loading...' : '— Select class —'}</option>
+                  <label>Classroom <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <select
+                    value={classId}
+                    onChange={(e) => setClassId(e.target.value)}
+                    required
+                    disabled={!courseId || !!presetClassId || isLoadingClasses}
+                  >
+                    <option value="">{!courseId ? '— Select a course first —' : isLoadingClasses ? 'Loading...' : '— Select classroom —'}</option>
                     {filteredClasses.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} {c.max_capacity ? `(cap: ${c.max_capacity})` : ''}</option>
+                      <option key={c.id} value={c.id}>{formatClassroomWithSchedules(c)}</option>
                     ))}
                   </select>
-                </div>
-
-                <div className="field">
-                  <label>Class Level (Auto)</label>
-                  <input 
-                    type="text" 
-                    value={selectedCourseLevel ? `${selectedCourseLevel.title}${selectedCourseLevel.title_ur ? ` — ${selectedCourseLevel.title_ur}` : ''}` : '—'} 
-                    readOnly 
-                    disabled 
-                    style={{ background: 'transparent', border: '1.5px solid var(--rule)', outline: 'none', color: 'var(--ink-muted)' }} 
-                  />
+                  {selectedClass?.schedules?.length > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4 }}>
+                      Student will attend all scheduled time slots for this classroom.
+                    </div>
+                  )}
                 </div>
 
                 <div className="field">
@@ -341,11 +340,11 @@ export default function Enrollment() {
               <div style={{ display: 'grid', gap: 16, gridTemplateColumns: '1fr 1fr' }}>
                 <div className="field">
                   <label>Level</label>
-                  <select value={priorLevel} onChange={(e) => setPriorLevel(e.target.value)} disabled={!courseId || isLoadingLevels}>
-                    <option value="">{!courseId ? '— Select a course first —' : isLoadingLevels ? 'Loading...' : '— Select level —'}</option>
-                    {levels.map(l => (
-                      <option key={l.title} value={l.title}>{l.title} {l.title_ur ? `— ${l.title_ur}` : ''}</option>
-                    ))}
+                  <select value={priorLevel} onChange={(e) => setPriorLevel(e.target.value)}>
+                    <option value="">— Select level —</option>
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
                   </select>
                 </div>
                 <div className="field">
@@ -366,7 +365,7 @@ export default function Enrollment() {
                   <label>Course Level Fee (Auto)</label>
                   <div style={{ display: 'flex', border: '1.5px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--rule2)', overflow: 'hidden' }}>
                     <div style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)', borderRight: '1.5px solid var(--rule)' }}>PKR</div>
-                    <input type="text" value={selectedFee ? selectedFee.full_fee : '0'} readOnly style={{ border: 'none', background: 'transparent', flex: 1, padding: '8px 11px', color: 'var(--ink-muted)' }} />
+                    <input type="text" value={selectedFee ? selectedFee.fee : '0'} readOnly style={{ border: 'none', background: 'transparent', flex: 1, padding: '8px 11px', color: 'var(--ink-muted)' }} />
                   </div>
                 </div>
 
@@ -391,7 +390,7 @@ export default function Enrollment() {
                       style={{ border: 'none', background: 'transparent', flex: 1, padding: '8px 11px', outline: 'none' }}
                     />
                   </div>
-                  {selectedFee && <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4 }}>Must match fee exactly (PKR {selectedFee.full_fee}).</div>}
+                  {selectedFee && <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4 }}>Must match fee exactly (PKR {selectedFee.fee}).</div>}
                 </div>
               </div>
             </div>
