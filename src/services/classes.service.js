@@ -3,6 +3,21 @@ const centerRepo = require('../repositories/centers.repository');
 const activityLog = require('./activityLog.service');
 const { AppError } = require('../utils/errors');
 
+const DAY_ALIASES = {
+  sun: 'Sunday', sunday: 'Sunday',
+  mon: 'Monday', monday: 'Monday',
+  tue: 'Tuesday', tuesday: 'Tuesday',
+  wed: 'Wednesday', wednesday: 'Wednesday',
+  thu: 'Thursday', thursday: 'Thursday',
+  fri: 'Friday', friday: 'Friday',
+  sat: 'Saturday', saturday: 'Saturday',
+};
+
+function normalizeDayInput(day) {
+  const key = day.trim().toLowerCase();
+  return DAY_ALIASES[key] || (day.charAt(0).toUpperCase() + day.slice(1).toLowerCase());
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function notFound(entity = 'Class') {
@@ -90,7 +105,40 @@ async function createClass({ user, centerId, body }) {
     throw new AppError('NOT_FOUND', 'Center not found or inactive.', 'مرکز نہیں ملا یا غیر فعال ہے۔', 404);
   }
 
-  const cls = await repo.createClass({ ...body, center_id: centerId });
+  const cls = await repo.createClass({
+    center_id: centerId,
+    course_id: body.course_id,
+    course_level_id: body.course_level_id || null,
+    name: body.name,
+    name_ur: body.name_ur || null,
+    max_capacity: body.max_capacity,
+    schedule_days: body.schedule_days || '',
+    start_time: body.start_time || null,
+    start_date: body.start_date || null,
+  });
+
+  // Automatically populate class_schedules
+  if (body.schedule_days && body.start_time) {
+    const days = body.schedule_days.split(',').map(d => d.trim()).filter(Boolean);
+    for (const day of days) {
+      const capitalizedDay = normalizeDayInput(day);
+      let endTime = null;
+      try {
+        const [hours, minutes] = body.start_time.split(':');
+        const startHrs = parseInt(hours, 10);
+        const endHrs = (startHrs + 3) % 24;
+        endTime = `${String(endHrs).padStart(2, '0')}:${minutes || '00'}:00`;
+      } catch (e) {}
+
+      await repo.createSchedule({
+        class_id: cls.id,
+        day_of_week: capitalizedDay,
+        start_time: body.start_time,
+        end_time: endTime,
+      });
+    }
+  }
+
   activityLog.log({
     actor:       user,
     action:      'class.create',
@@ -226,6 +274,57 @@ async function deleteCriteria({ user, classId, criteriaId }) {
   return repo.deactivateCriteria(criteriaId);
 }
 
+// ── Class Schedules ───────────────────────────────────────────────────────────
+
+async function listSchedules({ user, classId }) {
+  const cls = await requireClass(classId);
+  await assertClassAccess(user, cls);
+  return repo.listSchedules(classId);
+}
+
+async function createSchedule({ user, classId, body }) {
+  const cls = await requireClass(classId);
+  if (!user.roles.includes('super_admin') && !user.roles.includes('center_manager')) {
+    throw forbidden();
+  }
+  assertCenterAccess(user, cls.center_id);
+  return repo.createSchedule({
+    class_id: classId,
+    day_of_week: body.day_of_week,
+    start_time: body.start_time,
+    end_time: body.end_time || null,
+    is_active: true,
+  });
+}
+
+async function deleteSchedule({ user, classId, scheduleId }) {
+  const cls = await requireClass(classId);
+  if (!user.roles.includes('super_admin') && !user.roles.includes('center_manager')) {
+    throw forbidden();
+  }
+  assertCenterAccess(user, cls.center_id);
+  const schedule = await repo.getScheduleById(scheduleId);
+  if (!schedule || schedule.class_id !== classId) throw notFound('Schedule slot');
+  return repo.deactivateSchedule(scheduleId);
+}
+
+// ── Class Session Plans ───────────────────────────────────────────────────────
+
+async function listSessionPlans({ user, classId }) {
+  const cls = await requireClass(classId);
+  await assertClassAccess(user, cls);
+  return repo.listSessionPlans(classId);
+}
+
+async function upsertSessionPlan({ user, classId, body }) {
+  const cls = await requireClass(classId);
+  if (!user.roles.includes('super_admin') && !user.roles.includes('center_manager') && !user.roles.includes('teacher')) {
+    throw forbidden();
+  }
+  assertCenterAccess(user, cls.center_id);
+  return repo.upsertSessionPlan(classId, body);
+}
+
 module.exports = {
   listClasses,
   getClass,
@@ -238,4 +337,9 @@ module.exports = {
   createCriteria,
   updateCriteria,
   deleteCriteria,
+  listSchedules,
+  createSchedule,
+  deleteSchedule,
+  listSessionPlans,
+  upsertSessionPlan,
 };

@@ -241,6 +241,55 @@ async function deactivateSchedule(scheduleId) {
   return row;
 }
 
+// ── Class Session Plans (topic per projected class) ───────────────────────────
+
+function listSessionPlans(classId) {
+  return db('class_session_plans as p')
+    .leftJoin('topics as t', 't.id', 'p.topic_id')
+    .where({ 'p.class_id': classId, 'p.is_active': true })
+    .select(
+      'p.*',
+      't.title as syllabus_topic_title',
+      't.title_ur as syllabus_topic_title_ur',
+    )
+    .orderBy('p.session_date', 'asc');
+}
+
+async function upsertSessionPlan(classId, data) {
+  const existing = await db('class_session_plans')
+    .where({
+      class_id: classId,
+      session_date: data.session_date,
+      schedule_id: data.schedule_id ?? null,
+    })
+    .first();
+
+  const payload = {
+    topic_id: data.topic_id ?? null,
+    topic_title: data.topic_title ?? null,
+    topic_title_ur: data.topic_title_ur ?? null,
+    is_active: true,
+    updated_at: db.fn.now(),
+  };
+
+  if (existing) {
+    const [row] = await db('class_session_plans')
+      .where({ id: existing.id })
+      .update(payload)
+      .returning('*');
+    return row;
+  }
+
+  const [row] = await db('class_session_plans')
+    .insert({
+      class_id: classId,
+      session_date: data.session_date,
+      schedule_id: data.schedule_id ?? null,
+      ...payload,
+    })
+    .returning('*');
+  return row;
+}
 
 module.exports = {
   listClasses,
@@ -261,5 +310,7 @@ module.exports = {
   listSchedules,
   getScheduleById,
   createSchedule,
-  deactivateSchedule
+  deactivateSchedule,
+  listSessionPlans,
+  upsertSessionPlan,
 };

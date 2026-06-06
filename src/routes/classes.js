@@ -176,5 +176,27 @@ router.delete(
   controller.deleteSchedule,
 );
 
+const sessionPlanSchema = z.object({
+  session_date:    z.string().date('session_date must be YYYY-MM-DD'),
+  schedule_id:     z.string().uuid().optional().nullable(),
+  topic_id:        z.string().uuid().optional().nullable(),
+  topic_title:     z.string().max(255).optional().nullable(),
+  topic_title_ur:  z.string().optional().nullable(),
+});
+
+router.get(
+  '/classes/:class_id/session-plans',
+  requireAuth,
+  requirePermission('classes.view'),
+  controller.listSessionPlans,
+);
+
+router.put(
+  '/classes/:class_id/session-plans',
+  requireAuth,
+  requirePermission('classes.edit'),
+  validate(sessionPlanSchema),
+  controller.upsertSessionPlan,
+);
 
 module.exports = router;

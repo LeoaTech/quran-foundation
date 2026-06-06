@@ -114,6 +114,21 @@ async function deleteSchedule(req, res, next) {
   }
 }
 
+async function listSessionPlans(req, res, next) {
+  try {
+    res.json(await service.listSessionPlans({ user: req.user, classId: req.params.class_id }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function upsertSessionPlan(req, res, next) {
+  try {
+    res.json(await service.upsertSessionPlan({ user: req.user, classId: req.params.class_id, body: req.body }));
+  } catch (err) {
+    next(err);
+  }
+}
 
 module.exports = {
   listClasses,
@@ -129,5 +144,7 @@ module.exports = {
   deleteCriteria,
   listSchedules,
   createSchedule,
-  deleteSchedule
+  deleteSchedule,
+  listSessionPlans,
+  upsertSessionPlan,
 };
