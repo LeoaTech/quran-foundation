@@ -21,15 +21,32 @@ import {
   updateCriterion,
   deactivateCriterion,
   getClassEnrollments,
+  getClassSchedules,
+  getClassSessionPlans,
 } from '../../../api/classes';
+import { getClassAttendance } from '../../../api/attendance';
 import { getTopics } from '../../../api/courses';
 import { getUsers } from '../../../api/users';
+import { getCenterTeacherTopics, assignTeacherTopic, removeTeacherTopic, updateTeacherTopic } from '../../../api/teacherTopics';
+import SessionAttendanceModal from '../../../components/SessionAttendanceModal';
+import ClassSessionModal from '../../../components/ClassSessionModal';
+import {
+  resolveSchedules,
+  projectClassSessions,
+  countExpectedSessionsPerSlot,
+  getScheduledSessionOptions,
+  getSessionStatus,
+  buildScheduleSummary,
+  getDurationMonths,
+  formatTimeShort,
+  sessionPlanKey,
+} from '../../../utils/classSessions';
 
 const TYPE_CHIP = {
-  hifz:    { label: 'Hifz',    cls: 'chip chip-green' },
-  nazra:   { label: 'Nazra',   cls: 'chip chip-blue'  },
-  tajweed: { label: 'Tajweed', cls: 'chip chip-gold'  },
-  arabic:  { label: 'Arabic',  cls: 'chip chip-sand'  },
+  hifz: { label: 'Hifz', cls: 'chip chip-green' },
+  nazra: { label: 'Nazra', cls: 'chip chip-blue' },
+  tajweed: { label: 'Tajweed', cls: 'chip chip-gold' },
+  arabic: { label: 'Arabic', cls: 'chip chip-sand' },
 };
 
 function formatTime(timeStr) {
@@ -81,13 +98,36 @@ function Field({ label, children }) {
 // ── Students tab ──────────────────────────────────────────────────────────────
 function StudentsTab({ classId, cls }) {
   const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ['class-enrollments', classId],
-    queryFn:  () => getClassEnrollments(classId, { status: 'active' }),
+    queryFn: () => getClassEnrollments(classId),
     staleTime: 60_000,
   });
 
   const rows = enrollments?.data ?? enrollments ?? [];
+
+  const getInitials = (name) => {
+    if (!name) return 'S';
+    return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+  };
+
+  const filteredRows = rows.filter((row) => {
+    const name = (row.full_name ?? row.student?.full_name ?? '').toLowerCase();
+    const nameUr = (row.full_name_ur ?? row.student?.full_name_ur ?? '').toLowerCase();
+    const matchesSearch = name.includes(search.toLowerCase()) || nameUr.includes(search.toLowerCase());
+
+    const statusVal = (row.status ?? 'active').toLowerCase();
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = statusVal === 'active';
+    } else if (statusFilter === 'dropped_withdrawn') {
+      matchesStatus = statusVal === 'withdrawn' || statusVal === 'dropped';
+    }
+    return matchesSearch && matchesStatus;
+  });
 
   if (isLoading) {
     return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><LoadingSpinner size={28} /></div>;
@@ -95,51 +135,108 @@ function StudentsTab({ classId, cls }) {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="f-input"
+            placeholder="Search student…"
+            style={{ width: 200, padding: '6px 10px', fontSize: 12 }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="f-select"
+            style={{ width: 150, padding: '6px 8px', fontSize: 12 }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="dropped_withdrawn">Dropped/Withdrawn</option>
+          </select>
+        </div>
         <Button
           size="sm"
           variant="primary"
           onClick={() => {
             const params = new URLSearchParams({ class_id: classId });
             if (cls?.course_id) params.set('course_id', cls.course_id);
-            navigate(`/enrollment?${params.toString()}`);
+            navigate(`/manager/enrollment?${params.toString()}`);
           }}
         >
-          + Enroll student
+          + Enroll Student
         </Button>
       </div>
-      {rows.length === 0 ? (
-        <EmptyState icon="○" title="No enrolled students" description="Enroll students into this class to get started." />
+
+      {filteredRows.length === 0 ? (
+        <EmptyState icon="○" title="No enrolled students" description="No students matching criteria." />
       ) : (
-        <div style={{ border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+        <div style={{ border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--white)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr>
-                {['Student', 'Urdu name', 'Enrolled on', 'Prior level', 'Status'].map((h) => (
-                  <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>{h}</th>
-                ))}
+              <tr style={{ background: 'var(--sand-light)' }}>
+                <th style={{ width: 45, padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}></th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Student</th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Urdu Name</th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Enrolled On</th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Prior Level</th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Fee Status</th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Attendance</th>
+                <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}>Status</th>
+                <th style={{ width: 80, padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' }}></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((en, i) => (
-                <tr key={en.id}>
-                  <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 500, color: 'var(--ink)', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    {en.full_name ?? en.student?.full_name ?? '—'}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)', direction: 'rtl', textAlign: 'right', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    {en.full_name_ur ?? en.student?.full_name_ur ?? ''}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    {en.enrolled_on ? new Date(en.enrolled_on).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    {en.prior_level ?? '—'}
-                  </td>
-                  <td style={{ padding: '10px 14px', borderBottom: i < rows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    <Badge variant={en.status === 'active' ? 'green' : 'sand'}>{en.status ?? 'active'}</Badge>
-                  </td>
-                </tr>
-              ))}
+              {filteredRows.map((en, i) => {
+                const isPaid = !en.course_fee || Number(en.total_paid) >= Number(en.course_fee);
+                const attendancePercent = en.attendance_total > 0 ? Math.round((en.attendance_present / en.attendance_total) * 100) : null;
+                const initials = getInitials(en.full_name);
+
+                return (
+                  <tr key={en.id} style={{ borderBottom: i < filteredRows.length - 1 ? '1px solid var(--sand)' : 'none' }}>
+                    <td style={{ padding: '10px 14px', verticalAlign: 'middle' }}>
+                      <div className="student-avatar" style={{
+                        width: 28, height: 28, fontSize: 10, borderRadius: '50%',
+                        background: 'var(--emerald-light)', color: 'var(--emerald)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600
+                      }}>
+                        {initials}
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                      {en.full_name ?? en.student?.full_name ?? '—'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)', direction: 'rtl', textAlign: 'right' }}>
+                      {en.full_name_ur ?? en.student?.full_name_ur ?? ''}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)' }}>
+                      {en.enrolled_on ? new Date(en.enrolled_on).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)' }}>
+                      {en.prior_level ?? '—'}
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <Badge variant={isPaid ? 'green' : 'yellow'}>{isPaid ? 'Paid' : 'Pending'}</Badge>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{
+                        fontWeight: 600,
+                        color: attendancePercent >= 80 ? 'var(--emerald)' : attendancePercent != null ? 'var(--red)' : 'var(--ink-pale)'
+                      }}>
+                        {attendancePercent != null ? `${attendancePercent}%` : '—'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <Badge variant={en.status === 'active' ? 'green' : 'sand'}>{en.status ?? 'active'}</Badge>
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/reports/students/${en.student_user_id}`)}>
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -149,63 +246,33 @@ function StudentsTab({ classId, cls }) {
 }
 
 // ── Teachers tab ──────────────────────────────────────────────────────────────
-function TeachersTab({ classId, centerId }) {
-  const qc    = useQueryClient();
-  const toast = useToast();
-
-  const [assigning, setAssigning] = useState(false);
-  const [search, setSearch]       = useState('');
-  const [confirmRemove, setConfirmRemove] = useState(null);
-  const [busy, setBusy]           = useState(false);
-
-  const { data: teachers = [], isLoading } = useQuery({
-    queryKey: ['class-teachers', classId],
-    queryFn:  () => getClassTeachers(classId),
-    staleTime: 2 * 60_000,
+function TeachersTab({ classId, centerId, courseId }) {
+  const { data: assignments = [], isLoading } = useQuery({
+    queryKey: ['teacher-topics', centerId],
+    queryFn: () => getCenterTeacherTopics(centerId),
+    enabled: !!centerId,
+    staleTime: 60_000,
   });
 
-  const { data: usersData } = useQuery({
-    queryKey:  ['users-teachers', centerId, search],
-    queryFn:   () => getUsers({ center_id: centerId, role: 'teacher', search, per_page: 10 }),
-    staleTime: 30_000,
-    enabled:   assigning,
-  });
+  const topicTeachersFiltered = assignments.filter((a) => a.course_id === courseId);
 
-  const teacherList = teachers?.data ?? teachers ?? [];
-  const searchResults = usersData?.data ?? usersData ?? [];
-
-  async function handleAssign(teacherUser) {
-    setBusy(true);
-    try {
-      await assignTeacher(classId, {
-        teacher_user_id: teacherUser.id,
-        is_primary: teacherList.length === 0,
-        assigned_from: new Date().toISOString().slice(0, 10),
+  // Group assignments by teacher id
+  const mergedTeachersMap = new Map();
+  topicTeachersFiltered.forEach((at) => {
+    const tid = at.teacher_user_id;
+    if (!mergedTeachersMap.has(tid)) {
+      mergedTeachersMap.set(tid, {
+        id: tid,
+        teacher_user_id: tid,
+        full_name: at.teacher_name,
+        full_name_ur: at.teacher_name_ur,
+        topics: [],
       });
-      await qc.invalidateQueries({ queryKey: ['class-teachers', classId] });
-      toast.success(`${teacherUser.full_name} assigned.`);
-      setAssigning(false);
-      setSearch('');
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message ?? 'Failed to assign teacher.');
-    } finally {
-      setBusy(false);
     }
-  }
+    mergedTeachersMap.get(tid).topics.push(at);
+  });
 
-  async function handleRemove(teacher) {
-    setBusy(true);
-    try {
-      await removeTeacher(classId, teacher.teacher_user_id ?? teacher.id);
-      await qc.invalidateQueries({ queryKey: ['class-teachers', classId] });
-      toast.success('Teacher removed.');
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message ?? 'Failed to remove teacher.');
-    } finally {
-      setBusy(false);
-      setConfirmRemove(null);
-    }
-  }
+  const teacherList = Array.from(mergedTeachersMap.values());
 
   if (isLoading) {
     return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><LoadingSpinner size={28} /></div>;
@@ -213,88 +280,42 @@ function TeachersTab({ classId, centerId }) {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        {!assigning && (
-          <Can permission="classes.edit">
-            <Button size="sm" variant="primary" onClick={() => setAssigning(true)}>+ Assign teacher</Button>
-          </Can>
-        )}
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>Assigned Teachers</h3>
+        <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+          Teachers teaching topics for this cohort's course syllabus.
+        </p>
       </div>
 
-      {assigning && (
-        <Card style={{ marginBottom: 20 }}>
-          <CardHeader><span className="card-title">Search teachers</span></CardHeader>
-          <CardBody>
-            <input
-              className="f-input"
-              placeholder="Search by name…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-              style={{ marginBottom: 12 }}
-            />
-            {searchResults.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--ink-pale)', textAlign: 'center', padding: '12px 0' }}>
-                {search ? 'No teachers found.' : 'Type to search teachers at this center.'}
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {searchResults.map((u) => (
-                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--sand-light)', border: '1px solid var(--sand-mid)' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{u.full_name}</div>
-                      {u.full_name_ur && <div style={{ fontSize: 11, color: 'var(--ink-soft)', direction: 'rtl' }}>{u.full_name_ur}</div>}
-                    </div>
-                    <Button size="sm" variant="primary" onClick={() => handleAssign(u)} disabled={busy}>Assign</Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ marginTop: 12, textAlign: 'right' }}>
-              <Button size="sm" variant="outline" onClick={() => { setAssigning(false); setSearch(''); }}>Cancel</Button>
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {teacherList.length === 0 && !assigning ? (
-        <EmptyState icon="◉" title="No teachers assigned" description="Assign a teacher to activate this class." />
+      {teacherList.length === 0 ? (
+        <EmptyState icon="◉" title="No teachers assigned" description="Go to the Topic Assignment tab to assign teachers to topics." />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {teacherList.map((t) => (
-            <div key={t.id ?? t.teacher_user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--white)', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)' }}>
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--white)', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--emerald-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: 'var(--emerald)' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--blue-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: 'var(--blue)' }}>
                   {(t.full_name ?? '?').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{t.full_name ?? '—'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-pale)' }}>
-                    {t.is_primary ? 'Primary teacher' : 'Secondary teacher'}
-                    {t.assigned_from ? ` · since ${t.assigned_from}` : ''}
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+                    {t.full_name ?? '—'}
+                    {t.full_name_ur && <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)', direction: 'rtl' }}>({t.full_name_ur})</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 2 }}>
+                    Assigned Topics:
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                    {t.topics.map((at) => (
+                      <span key={at.id} className="chip chip-green" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
+                        {at.topic_title}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {t.is_primary && <Badge variant="green">Primary</Badge>}
-                <Can permission="classes.edit">
-                  <Button size="sm" variant="outline" onClick={() => setConfirmRemove(t)}>Remove</Button>
-                </Can>
-              </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {confirmRemove && (
-        <div style={{ marginTop: 12, background: 'var(--red-light)', border: '1px solid var(--red)', borderRadius: 'var(--radius-md)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, color: 'var(--red)' }}>Remove {confirmRemove.full_name} from this class?</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button size="sm" variant="outline" onClick={() => setConfirmRemove(null)} disabled={busy}>Cancel</Button>
-            <Button size="sm" variant="primary" style={{ background: 'var(--red)', boxShadow: 'none' }} onClick={() => handleRemove(confirmRemove)} disabled={busy}>
-              {busy ? 'Removing…' : 'Remove'}
-            </Button>
-          </div>
         </div>
       )}
     </>
@@ -303,26 +324,26 @@ function TeachersTab({ classId, centerId }) {
 
 // ── Homework Criteria tab ─────────────────────────────────────────────────────
 function HomeworkCriteriaTab({ classId, courseId }) {
-  const qc    = useQueryClient();
+  const qc = useQueryClient();
   const toast = useToast();
-  const [addOpen, setAddOpen]   = useState(false);
-  const [editing, setEditing]   = useState(null);
-  const [busy, setBusy]         = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const EMPTY_FORM = { label: '', label_ur: '', topic_id: '', subtopic_id: '', max_marks: '', display_order: '' };
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { data: criteria = [], isLoading } = useQuery({
     queryKey: ['homework-criteria', classId],
-    queryFn:  () => getHomeworkCriteria(classId),
+    queryFn: () => getHomeworkCriteria(classId),
     staleTime: 2 * 60_000,
   });
 
   const { data: topics = [] } = useQuery({
-    queryKey:  ['topics', courseId],
-    queryFn:   () => getTopics(courseId),
+    queryKey: ['topics', courseId],
+    queryFn: () => getTopics(courseId),
     staleTime: 5 * 60_000,
-    enabled:   !!courseId,
+    enabled: !!courseId,
   });
 
   const rows = criteria?.data ?? criteria ?? [];
@@ -331,7 +352,7 @@ function HomeworkCriteriaTab({ classId, courseId }) {
   const totalMarks = activeCriteria.reduce((sum, c) => sum + (c.max_marks ?? 0), 0);
 
   const selectedTopic = topicList.find((t) => t.id === form.topic_id);
-  const subtopics     = selectedTopic?.subtopics ?? [];
+  const subtopics = selectedTopic?.subtopics ?? [];
 
   function setF(field) {
     return (e) => {
@@ -352,11 +373,11 @@ function HomeworkCriteriaTab({ classId, courseId }) {
 
   function openEdit(c) {
     setForm({
-      label:        c.label        ?? '',
-      label_ur:     c.label_ur     ?? '',
-      topic_id:     c.topic_id     ?? '',
-      subtopic_id:  c.subtopic_id  ?? '',
-      max_marks:    c.max_marks    ?? '',
+      label: c.label ?? '',
+      label_ur: c.label_ur ?? '',
+      topic_id: c.topic_id ?? '',
+      subtopic_id: c.subtopic_id ?? '',
+      max_marks: c.max_marks ?? '',
       display_order: c.display_order ?? '',
     });
     setEditing(c);
@@ -369,10 +390,10 @@ function HomeworkCriteriaTab({ classId, courseId }) {
     try {
       const payload = {
         ...form,
-        max_marks:     Number(form.max_marks),
+        max_marks: Number(form.max_marks),
         display_order: Number(form.display_order),
-        topic_id:      form.topic_id    || undefined,
-        subtopic_id:   form.subtopic_id || undefined,
+        topic_id: form.topic_id || undefined,
+        subtopic_id: form.subtopic_id || undefined,
       };
       if (editing) {
         await updateCriterion(classId, editing.id, payload);
@@ -558,11 +579,242 @@ function HomeworkCriteriaTab({ classId, courseId }) {
   );
 }
 
+// ── Topic Assignment tab ─────────────────────────────────────────────────────
+function TopicAssignmentTab({ cls }) {
+  const centerId = cls.center_id;
+  const courseId = cls.course_id;
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { role } = useAuth();
+  const canEdit = role === 'super_admin' || role === 'center_manager';
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ teacher_user_id: '', topic_id: '' });
+  const [busy, setBusy] = useState(false);
+
+  // Fetch assignments
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
+    queryKey: ['teacher-topics', centerId],
+    queryFn: () => getCenterTeacherTopics(centerId),
+    enabled: !!centerId,
+  });
+
+  // Filter assignments for this course
+  const classAssignments = assignments.filter((a) => a.course_id === courseId);
+
+  // Fetch teachers
+  const { data: teachersData, isLoading: teachersLoading } = useQuery({
+    queryKey: ['center-teachers', centerId],
+    queryFn: () => getUsers({ center_id: centerId, role: 'teacher', per_page: 200 }),
+    enabled: !!centerId,
+  });
+  const teachers = teachersData?.data ?? [];
+
+  // Fetch topics
+  const { data: topicsData, isLoading: topicsLoading } = useQuery({
+    queryKey: ['topics', courseId],
+    queryFn: () => getTopics(courseId),
+    enabled: !!courseId,
+  });
+  const topics = topicsData?.data ?? topicsData ?? [];
+
+  function handleEdit(as) {
+    setEditingId(as.id);
+    setForm({
+      teacher_user_id: as.teacher_user_id,
+      topic_id: as.topic_id,
+    });
+    setShowAdd(true);
+  }
+
+  async function handleAssign(e) {
+    e.preventDefault();
+    if (!form.teacher_user_id || !form.topic_id) {
+      toast.error('Please select both a topic and a teacher.');
+      return;
+    }
+    setBusy(true);
+    try {
+      if (editingId) {
+        await updateTeacherTopic(centerId, editingId, {
+          teacher_user_id: form.teacher_user_id,
+          topic_id: form.topic_id,
+        });
+        toast.success('Topic assignment updated successfully.');
+      } else {
+        await assignTeacherTopic(centerId, {
+          teacher_user_id: form.teacher_user_id,
+          topic_id: form.topic_id,
+        });
+        toast.success('Topic assigned successfully.');
+      }
+      await qc.invalidateQueries({ queryKey: ['teacher-topics', centerId] });
+      setForm({ teacher_user_id: '', topic_id: '' });
+      setEditingId(null);
+      setShowAdd(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to save topic assignment.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(assignmentId) {
+    if (!window.confirm('Are you sure you want to remove this topic assignment?')) return;
+    try {
+      await removeTeacherTopic(centerId, assignmentId);
+      await qc.invalidateQueries({ queryKey: ['teacher-topics', centerId] });
+      toast.success('Assignment removed.');
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to remove assignment.');
+    }
+  }
+
+  if (assignmentsLoading || teachersLoading || topicsLoading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><LoadingSpinner size={28} /></div>;
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        {canEdit && !showAdd && (
+          <Button size="sm" variant="primary" onClick={() => { setEditingId(null); setForm({ teacher_user_id: '', topic_id: '' }); setShowAdd(true); }}>
+            + Assign topic
+          </Button>
+        )}
+      </div>
+
+      {showAdd && (
+        <Card style={{ marginBottom: 20 }}>
+          <CardHeader>
+            <span className="card-title">{editingId ? 'Edit Topic Assignment' : 'Assign Topic to Teacher'}</span>
+          </CardHeader>
+          <CardBody>
+            <form onSubmit={handleAssign}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px', marginBottom: 16 }}>
+                <div className="f-group">
+                  <label className="f-label">Select Topic</label>
+                  <select
+                    className="f-select"
+                    value={form.topic_id}
+                    onChange={(e) => setForm((f) => ({ ...f, topic_id: e.target.value }))}
+                    required
+                  >
+                    <option value="">-- Select Topic --</option>
+                    {topics.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.display_order}. {t.title} {t.title_ur ? `(${t.title_ur})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="f-group">
+                  <label className="f-label">Select Teacher</label>
+                  <select
+                    className="f-select"
+                    value={form.teacher_user_id}
+                    onChange={(e) => setForm((f) => ({ ...f, teacher_user_id: e.target.value }))}
+                    required
+                  >
+                    <option value="">-- Select Teacher --</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.full_name} {t.full_name_ur ? `(${t.full_name_ur})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setShowAdd(false); setEditingId(null); setForm({ teacher_user_id: '', topic_id: '' }); }} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" variant="primary" disabled={busy || !form.teacher_user_id || !form.topic_id}>
+                  {busy ? 'Saving...' : (editingId ? 'Save Changes' : 'Assign Topic')}
+                </Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      )}
+
+      {classAssignments.length === 0 ? (
+        <EmptyState
+          icon="📖"
+          title="No topic assignments"
+          description="Assign topics of this course to teachers in this center class."
+        />
+      ) : (
+        <div style={{ border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Topic', 'Assigned Teacher', 'Assigned On', ''].map((h, index) => (
+                  <th key={h} style={{
+                    textAlign: 'left',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: 'var(--ink-pale)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '10px 14px 8px',
+                    borderBottom: '1px solid var(--sand-mid)',
+                    ...(index === 3 ? { width: 140 } : {})
+                  }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {classAssignments.map((as, i) => (
+                <tr key={as.id}>
+                  <td style={{ padding: '10px 14px', fontSize: 13, borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none' }}>
+                    <b>{as.topic_title}</b>
+                    {as.topic_title_ur && (
+                      <span style={{ fontSize: 11, color: 'var(--ink-soft)', marginLeft: 8, fontFamily: 'var(--font-display)' }}>
+                        ({as.topic_title_ur})
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 13, borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none' }}>
+                    <div>{as.teacher_name}</div>
+                    {as.teacher_name_ur && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-pale)' }}>{as.teacher_name_ur}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)', borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none' }}>
+                    {new Date(as.created_at).toLocaleDateString()}
+                  </td>
+                  <td style={{ padding: '10px 14px', borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none', whiteSpace: 'nowrap' }}>
+                    {canEdit && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(as)}>
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleRemove(as.id)} style={{ color: 'var(--red)' }}>
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
 // ── Settings tab (replaces read-only ScheduleTab) ────────────────────────────
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function SettingsTab({ cls, classId }) {
-  const qc    = useQueryClient();
+  const qc = useQueryClient();
   const toast = useToast();
   const { role } = useAuth();
   const canEdit = role === 'super_admin' || role === 'center_manager';
@@ -572,13 +824,14 @@ function SettingsTab({ cls, classId }) {
     : [];
 
   const [form, setForm] = useState({
-    name:          cls?.name          ?? '',
-    name_ur:       cls?.name_ur       ?? '',
+    name: cls?.name ?? '',
+    name_ur: cls?.name_ur ?? '',
     schedule_days: parsedDays,
-    start_time:    cls?.start_time    ?? '',
-    max_capacity:  cls?.max_capacity  ?? '',
-    notes:         cls?.notes         ?? '',
-    is_active:     cls?.is_active     ?? true,
+    start_time: cls?.start_time ?? '',
+    start_date: cls?.start_date ? cls.start_date.split('T')[0] : '',
+    max_capacity: cls?.max_capacity ?? '',
+    notes: cls?.notes ?? '',
+    is_active: cls?.is_active ?? true,
   });
   const [busy, setBusy] = useState(false);
 
@@ -599,12 +852,13 @@ function SettingsTab({ cls, classId }) {
       // Build only the fields the schema accepts — omit empty/null values
       // so Zod's `.optional()` is satisfied (absent ≠ null for number fields).
       const payload = {
-        name:     form.name,
+        name: form.name,
         is_active: form.is_active,
       };
-      if (form.name_ur !== '')       payload.name_ur       = form.name_ur;
+      if (form.name_ur !== '') payload.name_ur = form.name_ur;
       if (form.schedule_days.length) payload.schedule_days = form.schedule_days.join(',');
-      if (form.start_time)           payload.start_time    = form.start_time;
+      if (form.start_time) payload.start_time = form.start_time;
+      if (form.start_date) payload.start_date = form.start_date;
       if (form.max_capacity !== '' && form.max_capacity !== null) {
         payload.max_capacity = parseInt(form.max_capacity, 10);
       }
@@ -615,6 +869,22 @@ function SettingsTab({ cls, classId }) {
       toast.success('Class settings saved.');
     } catch (err) {
       toast.error(err.response?.data?.error?.message ?? 'Failed to save settings.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleActive() {
+    const action = cls.is_active ? 'deactivate/archive' : 'reactivate';
+    if (!window.confirm(`Are you sure you want to ${action} this class?`)) return;
+    setBusy(true);
+    try {
+      await updateClass(classId, { is_active: !cls.is_active });
+      await qc.invalidateQueries({ queryKey: ['class', classId] });
+      await qc.invalidateQueries({ queryKey: ['classes'] });
+      toast.success(`Class successfully ${cls.is_active ? 'deactivated/archived' : 'reactivated'}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to update class status.');
     } finally {
       setBusy(false);
     }
@@ -684,7 +954,7 @@ function SettingsTab({ cls, classId }) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 20px' }}>
 
               <div className="f-group" style={{ marginBottom: 16 }}>
                 <label className="f-label">Start time</label>
@@ -694,6 +964,18 @@ function SettingsTab({ cls, classId }) {
                   value={form.start_time}
                   onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
                   disabled={!canEdit}
+                />
+              </div>
+
+              <div className="f-group" style={{ marginBottom: 16 }}>
+                <label className="f-label">Start date</label>
+                <input
+                  className="f-input"
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+                  disabled={!canEdit}
+                  required
                 />
               </div>
 
@@ -723,19 +1005,7 @@ function SettingsTab({ cls, classId }) {
               />
             </div>
 
-            {canEdit && (
-              <div className="f-group" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  id="class-is-active"
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
-                />
-                <label htmlFor="class-is-active" style={{ fontSize: 13, color: 'var(--ink-mid)', cursor: 'pointer' }}>
-                  Active class
-                </label>
-              </div>
-            )}
+
 
             {canEdit && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
@@ -753,11 +1023,12 @@ function SettingsTab({ cls, classId }) {
         <CardHeader><span className="card-title">Class details</span></CardHeader>
         <CardBody>
           {[
-            ['Course',        cls?.course_name   ?? cls?.course?.name ?? '—'],
-            ['Level',         cls?.course_level_title ?? '—'],
+            ['Course', cls?.course_name ?? cls?.course?.name ?? '—'],
+            ['Difficulty', cls?.course_difficulty_level ? (cls.course_difficulty_level.charAt(0).toUpperCase() + cls.course_difficulty_level.slice(1)) : '—'],
+            ['Start date', cls?.start_date ? new Date(cls.start_date).toLocaleDateString() : '—'],
             ['Days per week', form.schedule_days.length],
-            ['Max capacity',  cls?.max_capacity ?? 'No limit'],
-            ['Status',        cls?.is_active ? 'Active' : 'Inactive'],
+            ['Max capacity', cls?.max_capacity ?? 'No limit'],
+            ['Status', cls?.is_active ? 'Active' : 'Inactive'],
           ].map(([label, value]) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--sand)', fontSize: 13 }}>
               <span style={{ color: 'var(--ink-soft)' }}>{label}</span>
@@ -767,16 +1038,49 @@ function SettingsTab({ cls, classId }) {
         </CardBody>
       </Card>
 
+      {/* ── Danger Zone ── */}
+      {canEdit && (
+        <Card style={{ borderColor: 'var(--red-light)' }}>
+          <CardHeader><span className="card-title" style={{ color: 'var(--red)' }}>Danger Zone</span></CardHeader>
+          <CardBody>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)' }}>
+                  {cls.is_active ? 'Deactivate / Archive Class' : 'Reactivate Class'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-pale)' }}>
+                  {cls.is_active
+                    ? 'This will make the class inactive and hide it from the active classes view.'
+                    : 'This will make the class active and visible again in active classes.'}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant={cls.is_active ? 'outline' : 'primary'}
+                onClick={handleToggleActive}
+                style={cls.is_active ? { color: 'var(--red)', borderColor: 'var(--red)' } : {}}
+                disabled={busy}
+              >
+                {cls.is_active ? 'Deactivate / Archive' : 'Reactivate'}
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
     </div>
   );
 }
 
+
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'students',  label: 'Students'          },
-  { id: 'teachers',  label: 'Teachers'          },
-  { id: 'criteria',  label: 'Homework Criteria' },
-  { id: 'settings',  label: 'Settings'          },
+  { id: 'students', label: 'Students' },
+  { id: 'teachers', label: 'Teachers' },
+  { id: 'topic-assignment', label: 'Topic Assignment' },
+  { id: 'criteria', label: 'Homework Criteria' },
+  { id: 'settings', label: 'Edit Classroom' },
 ];
 
 export default function ClassDetail() {
@@ -786,7 +1090,7 @@ export default function ClassDetail() {
 
   const { data: cls, isLoading, error } = useQuery({
     queryKey: ['class', classId],
-    queryFn:  () => getClass(classId),
+    queryFn: () => getClass(classId),
     staleTime: 2 * 60_000,
   });
 
@@ -817,7 +1121,7 @@ export default function ClassDetail() {
           onClick={() => navigate('/manager/classes')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 13, padding: 0, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}
         >
-          ← Classes
+          ← Classrooms
         </button>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
@@ -833,10 +1137,16 @@ export default function ClassDetail() {
                 {cls.name_ur}
               </div>
             )}
-            <div style={{ fontSize: 12, color: 'var(--ink-pale)', display: 'flex', gap: 12 }}>
-              {cls.schedule_days && (
+            <div style={{ fontSize: 12, color: 'var(--ink-pale)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {Array.isArray(cls.schedules) && cls.schedules.length > 0 ? (
+                cls.schedules.map((s, idx) => (
+                  <span key={s.id || idx} style={{ background: 'var(--sand-mid)', padding: '2px 8px', borderRadius: 'var(--radius-sm)', fontSize: 11 }}>
+                    {s.day_of_week} · {formatTime(s.start_time)}{s.end_time ? `–${formatTime(s.end_time)}` : ''}
+                  </span>
+                ))
+              ) : cls.schedule_days ? (
                 <span>{cls.schedule_days} · {formatTime(cls.start_time) || ''}</span>
-              )}
+              ) : null}
               {(cls.center_name ?? cls.center?.name) && (
                 <span>{cls.center_name ?? cls.center?.name}</span>
               )}
@@ -848,7 +1158,8 @@ export default function ClassDetail() {
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === 'students' && <StudentsTab classId={classId} cls={cls} />}
-      {tab === 'teachers' && <TeachersTab classId={classId} centerId={cls.center_id} />}
+      {tab === 'teachers' && <TeachersTab classId={classId} centerId={cls.center_id} courseId={cls.course_id} />}
+      {tab === 'topic-assignment' && <TopicAssignmentTab cls={cls} />}
       {tab === 'criteria' && <HomeworkCriteriaTab classId={classId} courseId={cls.course_id} />}
       {tab === 'settings' && <SettingsTab cls={cls} classId={classId} />}
     </>
