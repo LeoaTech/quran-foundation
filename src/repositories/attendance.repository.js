@@ -24,10 +24,43 @@ function bulkCreateAttendanceRecords(trx, rows) {
 }
 
 // Returns all sessions for a class between from/to dates (inclusive), each
-// joined with the teacher who marked it.
+// joined with the teacher who marked it + attendance summary counts + topic.
 function listSessionsByClass(classId, { from, to } = {}) {
   const query = db('attendance_sessions as s')
     .join('users as u', 'u.id', 's.marked_by')
+    .leftJoin(
+      db('attendance_records as ar2')
+        .where('ar2.is_active', true)
+        .select(
+          'ar2.session_id',
+          db.raw("COUNT(CASE WHEN ar2.status = 'present' THEN 1 END)::int AS cnt_present"),
+          db.raw("COUNT(CASE WHEN ar2.status = 'absent'  THEN 1 END)::int AS cnt_absent"),
+          db.raw("COUNT(CASE WHEN ar2.status = 'late'    THEN 1 END)::int AS cnt_late"),
+          db.raw('COUNT(ar2.id)::int AS cnt_total'),
+        )
+        .groupBy('ar2.session_id')
+        .as('agg'),
+      'agg.session_id',
+      's.id',
+    )
+    .leftJoin(
+      // Pull the first cw_topic_id/title recorded for any student on this session date + class
+      db('progress_sessions as ps')
+        .join('topics as tp', 'tp.id', 'ps.cw_topic_id')
+        .select(
+          'ps.class_id',
+          'ps.session_date as ps_date',
+          db.raw("MIN(tp.title) AS topic_title"),
+          db.raw("MIN(tp.title_ar) AS topic_title_ar"),
+        )
+        .whereNotNull('ps.cw_topic_id')
+        .groupBy('ps.class_id', 'ps.session_date')
+        .as('ptopic'),
+      function () {
+        this.on('ptopic.class_id', '=', 's.class_id')
+            .andOn('ptopic.ps_date', '=', 's.session_date');
+      },
+    )
     .where('s.class_id', classId)
     .where('s.is_active', true)
     .select(
@@ -36,6 +69,12 @@ function listSessionsByClass(classId, { from, to } = {}) {
       's.marked_at',
       'u.id as marked_by_id',
       'u.full_name as marked_by_name',
+      db.raw('COALESCE(agg.cnt_present, 0) AS cnt_present'),
+      db.raw('COALESCE(agg.cnt_absent,  0) AS cnt_absent'),
+      db.raw('COALESCE(agg.cnt_late,    0) AS cnt_late'),
+      db.raw('COALESCE(agg.cnt_total,   0) AS cnt_total'),
+      db.raw('ptopic.topic_title'),
+      db.raw('ptopic.topic_title_ar'),
     )
     .orderBy('s.session_date', 'desc');
 
