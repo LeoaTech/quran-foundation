@@ -31,6 +31,7 @@ function listEnrollmentsByClass(classId, { status } = {}) {
     .join('classes as c', 'c.id', 'e.class_id')
     .join('courses as cr', 'cr.id', 'c.course_id')
     .leftJoin('course_levels as cl', 'cl.id', 'c.course_level_id')
+    .leftJoin('class_schedules as cs', 'cs.id', 'e.class_schedule_id')
     .where('e.class_id', classId)
     .where('e.is_active', true)
     .select(
@@ -42,6 +43,7 @@ function listEnrollmentsByClass(classId, { status } = {}) {
       'e.notes_ur',
       'e.created_at',
       'e.updated_at',
+      'e.class_schedule_id',
       'u.id as student_user_id',
       'u.full_name',
       'u.full_name_ur',
@@ -49,7 +51,14 @@ function listEnrollmentsByClass(classId, { status } = {}) {
       'c.id as class_id',
       'c.name as class_name',
       'cr.name as course_name',
-      'cl.title as course_level_title'
+      'cr.fee as course_fee',
+      'cl.title as course_level_title',
+      'cs.day_of_week as preferred_day',
+      'cs.start_time as preferred_start_time',
+      'cs.end_time as preferred_end_time',
+      db.raw(`(SELECT COALESCE(SUM(fp.amount_paid), 0)::float FROM fee_payments fp WHERE fp.enrollment_id = e.id AND fp.is_active = true) as total_paid`),
+      db.raw(`(SELECT COUNT(*)::int FROM attendance_records ar JOIN attendance_sessions as2 ON as2.id = ar.session_id WHERE ar.student_user_id = e.student_user_id AND as2.class_id = e.class_id AND ar.is_active = true AND as2.is_active = true) as attendance_total`),
+      db.raw(`(SELECT COUNT(*)::int FROM attendance_records ar JOIN attendance_sessions as2 ON as2.id = ar.session_id WHERE ar.student_user_id = e.student_user_id AND as2.class_id = e.class_id AND ar.is_active = true AND as2.is_active = true AND ar.status IN ('present', 'late')) as attendance_present`)
     )
     .orderBy('e.enrolled_on', 'desc')
     .orderBy('u.full_name', 'asc');

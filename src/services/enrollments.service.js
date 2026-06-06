@@ -2,6 +2,7 @@ const repo      = require('../repositories/enrollments.repository');
 const classRepo = require('../repositories/classes.repository');
 const financeRepo = require('../repositories/finance.repository');
 const activityLog = require('./activityLog.service');
+const reportCache = require('../utils/reportCache');
 const db        = require('../db/knex');
 const { AppError } = require('../utils/errors');
 
@@ -46,7 +47,7 @@ async function requireEnrollment(enrollmentId) {
 // ── Service functions ─────────────────────────────────────────────────────────
 
 async function createEnrollment({ user, body }) {
-  const { student_user_id, class_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method } = body;
+  const { student_user_id, class_id, class_schedule_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method } = body;
 
   const cls = await requireClass(class_id);
 
@@ -87,6 +88,7 @@ async function createEnrollment({ user, body }) {
     const enrollment = await repo.createEnrollment({
       student_user_id,
       class_id,
+      class_schedule_id: class_schedule_id || null,
       center_id:   cls.center_id,
       status:      'active',
       enrolled_on: enrolled_on || today,
@@ -134,6 +136,8 @@ async function createEnrollment({ user, body }) {
     }).catch(() => {});
   }
 
+  await reportCache.invalidateCenterReports(cls.center_id).catch(() => {});
+
   return result;
 }
 
@@ -145,7 +149,7 @@ async function createEnrollment({ user, body }) {
 async function enrollNewStudent({ user, body }) {
   const {
     full_name, full_name_ur, phone, whatsapp, date_of_birth, gender,
-    class_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method
+    class_id, class_schedule_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method
   } = body;
 
   // ── Pre-flight checks (outside transaction — read-only) ─────────────────
@@ -213,6 +217,7 @@ async function enrollNewStudent({ user, body }) {
     const [enrollment] = await trx('enrollments').insert({
       student_user_id: newUser.id,
       class_id,
+      class_schedule_id: class_schedule_id || null,
       center_id:   cls.center_id,
       status:      'active',
       enrolled_on: enrolled_on || today,
@@ -267,6 +272,8 @@ async function enrollNewStudent({ user, body }) {
     }).catch(() => {});
   }
 
+  await reportCache.invalidateCenterReports(result.enrollment.center_id).catch(() => {});
+
   return responseData;
 }
 
@@ -320,6 +327,9 @@ async function updateEnrollment({ user, enrollmentId, body }) {
     summary_en:  `Updated enrollment status for ${student?.full_name || 'Student'} to "${updates.status || enrollment.status}"`,
     metadata:    { enrollment_id: enrollmentId, status: updates.status || enrollment.status },
   }).catch(() => {});
+
+  await reportCache.invalidateCenterReports(enrollment.center_id).catch(() => {});
+
   return updated;
 }
 

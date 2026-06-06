@@ -10,13 +10,14 @@ const router = Router();
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const createEnrollmentSchema = z.object({
-  student_user_id: z.string().uuid('student_user_id must be a UUID'),
-  class_id:        z.string().uuid('class_id must be a UUID'),
-  enrolled_on:     z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
-  prior_level:     z.string().max(100).optional(),
-  notes_ur:        z.string().optional(),
-  amount_paid:     z.number().positive().optional(),
-  payment_method:  z.string().optional(),
+  student_user_id:   z.string().uuid('student_user_id must be a UUID'),
+  class_id:          z.string().uuid('class_id must be a UUID'),
+  class_schedule_id: z.string().uuid('class_schedule_id must be a UUID').optional().nullable(),
+  enrolled_on:       z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
+  prior_level:       z.string().max(100).optional(),
+  notes_ur:          z.string().optional(),
+  amount_paid:       z.number().positive().optional(),
+  payment_method:    z.string().optional(),
 });
 
 const updateEnrollmentSchema = z.object({
@@ -30,18 +31,19 @@ const updateEnrollmentSchema = z.object({
 
 // Enroll a NEW student — creates user + role + enrollment in one transaction.
 const enrollNewStudentSchema = z.object({
-  full_name:      z.string().min(1, 'full_name is required'),
-  full_name_ur:   z.string().optional(),
-  phone:          z.string().min(1, 'phone is required'),
-  whatsapp:       z.string().optional(),
-  date_of_birth:  z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
-  gender:         z.enum(['male', 'female', 'other']).optional(),
-  class_id:       z.string().uuid('class_id must be a UUID'),
-  enrolled_on:    z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
-  prior_level:    z.string().max(100).optional(),
-  notes_ur:       z.string().optional(),
-  amount_paid:    z.number().positive().optional(),
-  payment_method: z.string().optional(),
+  full_name:         z.string().min(1, 'full_name is required'),
+  full_name_ur:      z.string().optional(),
+  phone:             z.string().min(1, 'phone is required'),
+  whatsapp:          z.string().optional(),
+  date_of_birth:     z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
+  gender:            z.enum(['male', 'female', 'other']).optional(),
+  class_id:          z.string().uuid('class_id must be a UUID'),
+  class_schedule_id: z.string().uuid('class_schedule_id must be a UUID').optional().nullable(),
+  enrolled_on:       z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
+  prior_level:       z.string().max(100).optional(),
+  notes_ur:          z.string().optional(),
+  amount_paid:       z.number().positive().optional(),
+  payment_method:    z.string().optional(),
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
