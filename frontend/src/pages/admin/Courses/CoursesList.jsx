@@ -17,15 +17,25 @@ const TYPE_CHIP = {
   arabic:  { label: 'Arabic',  cls: 'chip chip-sand'  },
 };
 
+const DIFFICULTY_CHIP = {
+  beginner:     { label: 'Beginner',    cls: 'chip chip-green' },
+  intermediate: { label: 'Intermediate', cls: 'chip chip-gold'  },
+  advance:      { label: 'Advanced',    cls: 'chip chip-red'   },
+};
+
 function CourseCard({ course, onEdit }) {
   const navigate = useNavigate();
   const chip     = TYPE_CHIP[course.type] ?? { label: course.type, cls: 'chip chip-sand' };
+  const diffChip = DIFFICULTY_CHIP[course.difficulty_level];
 
   return (
     <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <CardBody style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span className={chip.cls}>{chip.label}</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <span className={chip.cls}>{chip.label}</span>
+            {diffChip && <span className={diffChip.cls}>{diffChip.label}</span>}
+          </div>
           {!course.is_active && (
             <span className="chip chip-red" style={{ fontSize: 10 }}>Inactive</span>
           )}
@@ -40,6 +50,15 @@ function CourseCard({ course, onEdit }) {
             {course.name_ur}
           </div>
         )}
+
+        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
+          {course.duration_months && (
+            <span>⏱ {course.duration_months} month{course.duration_months !== 1 ? 's' : ''}</span>
+          )}
+          {course.fee != null && (
+            <span>₨ {Number(course.fee).toLocaleString()} PKR</span>
+          )}
+        </div>
 
         {course.description_ur && (
           <div style={{ fontSize: 12, color: 'var(--ink-pale)', direction: 'rtl', textAlign: 'right', flex: 1, marginBottom: 12, lineHeight: 1.6 }}>
