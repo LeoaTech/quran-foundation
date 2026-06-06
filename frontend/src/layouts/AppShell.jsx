@@ -58,7 +58,7 @@ const NAV_CONFIG = {
         items: [
           { to: '/manager/dashboard', label: 'Dashboard', icon: '⊞' },
           { to: '/manager/centers', label: 'My Center', icon: '⊙', requires: 'centers.view' },
-          { to: '/manager/classes', label: 'Classes', icon: '◈', requires: 'classes.view' },
+          { to: '/manager/classes', label: 'Classrooms', icon: '◈', requires: 'classes.view' },
           { to: '/manager/teachers', label: 'Teachers', icon: '◉' },
           { to: '/manager/enrollments', label: 'Enrollment', icon: '○', requires: 'enrollments.view' },
           { to: '/manager/attendance', label: 'Attendance', icon: '☑', requires: 'attendance.view' },
