@@ -10,6 +10,7 @@ import EmptyState from '../../../components/EmptyState';
 import WithdrawModal from './WithdrawModal';
 import { getClassEnrollments, getCenterEnrollments } from '../../../api/enrollments';
 import { getClasses } from '../../../api/classes';
+import { getCenters } from '../../../api/centers';
 
 const STATUS_VARIANT = {
   active: 'green',
@@ -26,33 +27,43 @@ function tdStyle(hasBorder = true) {
 }
 
 export default function EnrollmentsList() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const centerId = user?.center_id;
+  const isGlobal = role === 'super_admin' || role === 'finance_manager';
+  const [selectedCenterId, setSelectedCenterId] = useState('');
+  const activeCenterId = isGlobal ? selectedCenterId : user?.center_id;
 
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [search, setSearch] = useState('');
   const [withdrawTarget, setWithdrawTarget] = useState(null);
 
+  const { data: centersData } = useQuery({
+    queryKey: ['centers'],
+    queryFn: getCenters,
+    enabled: isGlobal,
+    staleTime: 5 * 60_000,
+  });
+  const centers = centersData?.data ?? centersData ?? [];
+
   const { data: classesRaw = [], isLoading: classesLoading } = useQuery({
-    queryKey: ['classes', centerId],
-    queryFn: () => getClasses(centerId, {}),
+    queryKey: ['classes', activeCenterId],
+    queryFn: () => getClasses(activeCenterId, {}),
     staleTime: 2 * 60_000,
-    enabled: !!centerId,
+    enabled: !!activeCenterId,
   });
   const classes = classesRaw?.data ?? classesRaw ?? [];
 
   const activeClassId = classFilter; // empty means "All Classes"
 
   const { data: enrollmentsRaw = [], isLoading: enrollLoading } = useQuery({
-    queryKey: ['enrollments', activeClassId || 'all', centerId, statusFilter],
+    queryKey: ['enrollments', activeClassId || 'all', activeCenterId, statusFilter],
     queryFn: () => activeClassId
       ? getClassEnrollments(activeClassId, statusFilter !== 'all' ? { status: statusFilter } : {})
-      : getCenterEnrollments(centerId, statusFilter !== 'all' ? { status: statusFilter } : {}),
+      : getCenterEnrollments(activeCenterId, statusFilter !== 'all' ? { status: statusFilter } : {}),
     staleTime: 30_000,
-    enabled: !!centerId,
+    enabled: !!activeCenterId,
   });
 
   const allRows = enrollmentsRaw?.data ?? enrollmentsRaw ?? [];
@@ -92,11 +103,29 @@ export default function EnrollmentsList() {
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        {isGlobal && (
+          <select
+            className="f-select"
+            style={{ width: 220, borderColor: 'var(--emerald)' }}
+            value={selectedCenterId}
+            onChange={(e) => {
+              setSelectedCenterId(e.target.value);
+              setClassFilter('');
+            }}
+          >
+            <option value="">— Select Center —</option>
+            {centers.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        )}
+
         <select
           className="f-select"
           style={{ width: 220 }}
           value={classFilter}
           onChange={(e) => setClassFilter(e.target.value)}
+          disabled={!activeCenterId}
         >
           <option value="">All Classes</option>
           {classes.map((c) => (
@@ -113,6 +142,7 @@ export default function EnrollmentsList() {
             <button
               key={value}
               onClick={() => setStatusFilter(value)}
+              disabled={!activeCenterId}
               style={{
                 padding: '8px 14px',
                 fontSize: 12, fontWeight: 500,
@@ -121,6 +151,7 @@ export default function EnrollmentsList() {
                 border: 'none',
                 cursor: 'pointer',
                 fontFamily: 'var(--font-body)',
+                opacity: !activeCenterId ? 0.6 : 1,
               }}
             >
               {label}
@@ -133,14 +164,23 @@ export default function EnrollmentsList() {
           placeholder="Search by name…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          disabled={!activeCenterId}
           style={{ width: 200 }}
         />
       </div>
 
-      {!centerId ? (
-        <div style={{ background: 'var(--red-light)', color: 'var(--red)', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: 13 }}>
-          No center assigned to your account.
-        </div>
+      {!activeCenterId ? (
+        isGlobal ? (
+          <EmptyState
+            icon="🏢"
+            title="No center selected"
+            description="Select a center from the dropdown list to view its enrollments."
+          />
+        ) : (
+          <div style={{ background: 'var(--red-light)', color: 'var(--red)', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: 13 }}>
+            No center assigned to your account.
+          </div>
+        )
       ) : classes.length === 0 && !classesLoading ? (
         <EmptyState
           icon="○"
