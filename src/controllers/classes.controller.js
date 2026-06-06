@@ -89,6 +89,32 @@ async function deleteCriteria(req, res, next) {
   }
 }
 
+async function listSchedules(req, res, next) {
+  try {
+    res.json(await service.listSchedules({ user: req.user, classId: req.params.class_id }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createSchedule(req, res, next) {
+  try {
+    res.status(201).json(await service.createSchedule({ user: req.user, classId: req.params.class_id, body: req.body }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteSchedule(req, res, next) {
+  try {
+    await service.deleteSchedule({ user: req.user, classId: req.params.class_id, scheduleId: req.params.schedule_id });
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+
 module.exports = {
   listClasses,
   getClass,
@@ -101,4 +127,7 @@ module.exports = {
   createCriteria,
   updateCriteria,
   deleteCriteria,
+  listSchedules,
+  createSchedule,
+  deleteSchedule
 };

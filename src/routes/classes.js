@@ -17,6 +17,7 @@ const createClassSchema = z.object({
   max_capacity:    z.number().int().positive().optional(),
   schedule_days:   z.string().optional(),
   start_time:      z.string().regex(/^\d{2}:\d{2}$/, 'start_time must be HH:MM').optional(),
+  start_date:      z.string().date('start_date must be YYYY-MM-DD').optional(),
 });
 
 const updateClassSchema = z.object({
@@ -26,6 +27,7 @@ const updateClassSchema = z.object({
   max_capacity:    z.number().int().positive().optional(),
   schedule_days:   z.string().optional(),
   start_time:      z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  start_date:      z.string().date('start_date must be YYYY-MM-DD').optional(),
   is_active:       z.boolean().optional(),
 }).refine((b) => Object.keys(b).length > 0, {
   message: 'Request body must contain at least one field to update.',
@@ -144,5 +146,35 @@ router.delete(
   requirePermission('homework_criteria.deactivate'),
   controller.deleteCriteria,
 );
+
+// Class Schedules
+const createScheduleSchema = z.object({
+  day_of_week: z.string().min(1, 'day_of_week is required'),
+  start_time:  z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'start_time must be HH:MM or HH:MM:SS'),
+  end_time:    z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'end_time must be HH:MM or HH:MM:SS').optional(),
+});
+
+router.get(
+  '/classes/:class_id/schedules',
+  requireAuth,
+  requirePermission('classes.view'),
+  controller.listSchedules,
+);
+
+router.post(
+  '/classes/:class_id/schedules',
+  requireAuth,
+  requirePermission('classes.edit'),
+  validate(createScheduleSchema),
+  controller.createSchedule,
+);
+
+router.delete(
+  '/classes/:class_id/schedules/:schedule_id',
+  requireAuth,
+  requirePermission('classes.edit'),
+  controller.deleteSchedule,
+);
+
 
 module.exports = router;

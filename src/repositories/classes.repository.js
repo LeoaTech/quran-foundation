@@ -16,8 +16,24 @@ function listClasses(centerId, { courseId, isActive } = {}) {
       'c.*',
       'cr.name as course_name',
       'cr.type as course_type',
+      'cr.duration_months as course_duration_months',
       'cl.title as course_level_title',
-      db.raw('COUNT(e.id)::int as enrolled_count')
+      db.raw('COUNT(e.id)::int as enrolled_count'),
+      // Aggregate teacher names from topic assignments for this class's course + center
+      db.raw(`
+        (SELECT STRING_AGG(DISTINCT u.full_name, ', ' ORDER BY u.full_name)
+         FROM center_teacher_topics ctt
+         JOIN users u ON u.id = ctt.teacher_user_id
+         JOIN topics t ON t.id = ctt.topic_id
+         WHERE ctt.center_id = c.center_id
+           AND t.course_id = c.course_id
+           AND ctt.is_active = true) as assigned_teachers
+      `),
+      db.raw(`
+        (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', cs.id, 'day_of_week', cs.day_of_week, 'start_time', cs.start_time, 'end_time', cs.end_time)), '[]'::json)
+         FROM class_schedules cs
+         WHERE cs.class_id = c.id AND cs.is_active = true) as schedules
+      `)
     )
     .groupBy('c.id', 'cr.id', 'cl.id')
     .orderBy('c.name', 'asc');
@@ -47,8 +63,23 @@ function listClassesForTeacher(centerId, teacherUserId, { courseId, isActive } =
       'c.*',
       'cr.name as course_name',
       'cr.type as course_type',
+      'cr.duration_months as course_duration_months',
       'cl.title as course_level_title',
-      db.raw('COUNT(e.id)::int as enrolled_count')
+      db.raw('COUNT(e.id)::int as enrolled_count'),
+      db.raw(`
+        (SELECT STRING_AGG(DISTINCT u2.full_name, ', ' ORDER BY u2.full_name)
+         FROM center_teacher_topics ctt2
+         JOIN users u2 ON u2.id = ctt2.teacher_user_id
+         JOIN topics t2 ON t2.id = ctt2.topic_id
+         WHERE ctt2.center_id = c.center_id
+           AND t2.course_id = c.course_id
+           AND ctt2.is_active = true) as assigned_teachers
+      `),
+      db.raw(`
+        (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', cs.id, 'day_of_week', cs.day_of_week, 'start_time', cs.start_time, 'end_time', cs.end_time)), '[]'::json)
+         FROM class_schedules cs
+         WHERE cs.class_id = c.id AND cs.is_active = true) as schedules
+      `)
     )
     .groupBy('c.id', 'cr.id', 'cl.id', 'ct.id');
     
@@ -58,7 +89,21 @@ function listClassesForTeacher(centerId, teacherUserId, { courseId, isActive } =
 }
 
 function getClassById(classId) {
-  return db('classes').where({ id: classId }).first();
+  return db('classes as c')
+    .leftJoin('courses as cr', 'cr.id', 'c.course_id')
+    .where('c.id', classId)
+    .select(
+      'c.*', 
+      'cr.name as course_name', 
+      'cr.difficulty_level as course_difficulty_level',
+      'cr.duration_months as course_duration_months',
+      db.raw(`
+        (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', cs.id, 'day_of_week', cs.day_of_week, 'start_time', cs.start_time, 'end_time', cs.end_time)), '[]'::json)
+         FROM class_schedules cs
+         WHERE cs.class_id = c.id AND cs.is_active = true) as schedules
+      `)
+    )
+    .first();
 }
 
 async function createClass(data) {
@@ -170,6 +215,33 @@ async function deactivateCriteria(criteriaId) {
   return row;
 }
 
+// ── Class Schedules ───────────────────────────────────────────────────────────
+
+function listSchedules(classId) {
+  return db('class_schedules')
+    .where({ class_id: classId, is_active: true })
+    .orderByRaw("CASE day_of_week WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3 WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 WHEN 'Saturday' THEN 6 WHEN 'Sunday' THEN 7 ELSE 8 END")
+    .orderBy('start_time', 'asc');
+}
+
+function getScheduleById(scheduleId) {
+  return db('class_schedules').where({ id: scheduleId }).first();
+}
+
+async function createSchedule(data) {
+  const [row] = await db('class_schedules').insert(data).returning('*');
+  return row;
+}
+
+async function deactivateSchedule(scheduleId) {
+  const [row] = await db('class_schedules')
+    .where({ id: scheduleId })
+    .update({ is_active: false, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
+
+
 module.exports = {
   listClasses,
   listClassesForTeacher,
@@ -186,4 +258,8 @@ module.exports = {
   createCriteria,
   updateCriteria,
   deactivateCriteria,
+  listSchedules,
+  getScheduleById,
+  createSchedule,
+  deactivateSchedule
 };
