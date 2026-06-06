@@ -50,9 +50,9 @@ export default function ClassesList() {
   const navigate = useNavigate();
   const centerId = user?.center_id;
 
-  const [addOpen, setAddOpen]     = useState(false);
-  const [courseFilter, setCourse] = useState('');
-  const [showAll, setShowAll]     = useState(false);
+  const [addOpen, setAddOpen]       = useState(false);
+  const [courseFilter, setCourse]   = useState('');
+  const [statusFilter, setStatus]   = useState('active');
 
   const { data: center } = useQuery({
     queryKey: ['center', centerId],
@@ -68,10 +68,10 @@ export default function ClassesList() {
   });
 
   const { data: classesRaw = [], isLoading, error } = useQuery({
-    queryKey: ['classes', centerId, courseFilter, showAll],
+    queryKey: ['classes', centerId, courseFilter, statusFilter],
     queryFn:  () => getClasses(centerId, {
       ...(courseFilter ? { course_id: courseFilter } : {}),
-      ...(!showAll    ? { is_active: true }          : {}),
+      ...(statusFilter === 'active' ? { is_active: true } : statusFilter === 'inactive' ? { is_active: false } : {}),
     }),
     staleTime: 60_000,
     enabled:  !!centerId,
@@ -102,15 +102,15 @@ export default function ClassesList() {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
-            Classes — {centerName}
+            Classrooms — {centerName}
           </h2>
           <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-            {classes.length} class{classes.length !== 1 ? 'es' : ''}
-            {!showAll ? ' (active)' : ''}
+            {classes.length} classroom{classes.length !== 1 ? 's' : ''}
+            {statusFilter === 'active' ? ' (active)' : statusFilter === 'inactive' ? ' (inactive)' : ''}
           </p>
         </div>
         <Can permission="classes.create">
-          <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add class</Button>
+          <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add Classroom</Button>
         </Can>
       </div>
 
@@ -128,25 +128,16 @@ export default function ClassesList() {
           ))}
         </select>
 
-        <div style={{ display: 'flex', gap: 0, borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1.5px solid var(--sand-deep)' }}>
-          {[{ label: 'Active', value: false }, { label: 'All', value: true }].map(({ label, value }) => (
-            <button
-              key={label}
-              onClick={() => setShowAll(value)}
-              style={{
-                padding: '8px 16px',
-                fontSize: 12, fontWeight: 500,
-                background: showAll === value ? 'var(--emerald-light)' : 'var(--white)',
-                color: showAll === value ? 'var(--emerald)' : 'var(--ink-soft)',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <select
+          className="f-select"
+          style={{ width: 150 }}
+          value={statusFilter}
+          onChange={(e) => setStatus(e.target.value)}
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
       {isLoading ? (
@@ -156,16 +147,16 @@ export default function ClassesList() {
       ) : classes.length === 0 ? (
         <EmptyState
           icon="◈"
-          title="No classes found"
-          description={courseFilter ? 'No classes for this course.' : 'Create the first class section for this center.'}
-          action={<Button variant="primary" onClick={() => setAddOpen(true)}>+ Add class</Button>}
+          title="No classrooms found"
+          description={courseFilter ? 'No classrooms for this course.' : 'Create the first classroom for this center.'}
+          action={<Button variant="primary" onClick={() => setAddOpen(true)}>+ Add Classroom</Button>}
         />
       ) : (
         <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Class name', 'Course', 'Teacher', 'Schedule', 'Students / Cap.', 'Status', ''].map((h) => (
+                {['ClassRoom Name', 'Course Level', 'Schedule', 'Students', 'Status', 'Action'].map((h) => (
                   <th key={h} style={thStyle()}>{h}</th>
                 ))}
               </tr>
@@ -195,28 +186,32 @@ export default function ClassesList() {
                     </td>
                     <td style={tdStyle(!isLast)}>
                       <div style={{ fontWeight: 500, color: 'var(--ink)' }}>
-                        {cls.course_name ?? cls.course?.name ?? '—'}
+                        {cls.course_level_title ? `${cls.course_name} — ${cls.course_level_title}` : (cls.course_name ?? cls.course?.name ?? '—')}
                         {chip && <span className={chip.cls} style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px' }}>{chip.label}</span>}
                       </div>
-                      {cls.course_level_title && (
-                        <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
-                          {cls.course_level_title}
-                        </div>
-                      )}
                     </td>
                     <td style={tdStyle(!isLast)}>
-                      <span style={{ fontSize: 12 }}>{cls.primary_teacher_name ?? '—'}</span>
-                    </td>
-                    <td style={tdStyle(!isLast)}>
-                      {cls.schedule_days && (
+                      {Array.isArray(cls.schedules) && cls.schedules.length > 0 ? (
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                          {cls.schedule_days.split(',').map((d) => (
-                            <span key={d} style={{ fontSize: 10, padding: '2px 6px', background: 'var(--sand-mid)', borderRadius: 'var(--radius-sm)', color: 'var(--ink-soft)' }}>{d.trim()}</span>
+                          {cls.schedules.map((s, idx) => (
+                            <span key={s.id || idx} style={{ fontSize: 10, padding: '2px 6px', background: 'var(--sand-mid)', borderRadius: 'var(--radius-sm)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
+                              {s.day_of_week.slice(0,3)} {formatTime(s.start_time)}
+                            </span>
                           ))}
                         </div>
-                      )}
-                      {cls.start_time && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 3 }}>{formatTime(cls.start_time)}</div>
+                      ) : (
+                        <>
+                          {cls.schedule_days && (
+                            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                              {cls.schedule_days.split(',').map((d) => (
+                                <span key={d} style={{ fontSize: 10, padding: '2px 6px', background: 'var(--sand-mid)', borderRadius: 'var(--radius-sm)', color: 'var(--ink-soft)' }}>{d.trim()}</span>
+                              ))}
+                            </div>
+                          )}
+                          {cls.start_time && (
+                            <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 3 }}>{formatTime(cls.start_time)}</div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td style={tdStyle(!isLast)}>
