@@ -55,3 +55,12 @@ export const createClassSchedule = (classId, payload) =>
 export const deleteClassSchedule = (classId, scheduleId) =>
   client.delete(`/classes/${classId}/schedules/${scheduleId}`).then((r) => r.data);
 
+
+// ClassRoom -> Class Session Plans
+
+export const getClassSessionPlans = (classId) =>
+  client.get(`/classes/${classId}/session-plans`).then((r) => r.data);
+
+export const upsertClassSessionPlan = (classId, payload) =>
+  client.put(`/classes/${classId}/session-plans`, payload).then((r) => r.data);
+
