@@ -6,7 +6,7 @@ import RTLInput from '../../../components/RTLInput';
 import { useToast } from '../../../hooks/useToast';
 import { createCourse } from '../../../api/courses';
 
-const EMPTY = { name: '', name_ur: '', name_ar: '', type: 'tajweed', description_ur: '' };
+const EMPTY = { name: '', name_ur: '', name_ar: '', type: 'tajweed', description_ur: '', difficulty_level: 'beginner', fee: 0, duration_months: '' };
 
 const COURSE_TYPES = [
   { value: 'hifz',    label: 'Hifz'    },
@@ -85,12 +85,44 @@ export default function AddCourseModal({ open, onClose }) {
           </Field>
         </div>
 
-        <Field label="Course type">
-          <select className="f-select" value={form.type} onChange={set('type')} required>
-            {COURSE_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Field label="Course type">
+            <select className="f-select" value={form.type} onChange={set('type')} required>
+              {COURSE_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Difficulty Level">
+            <select className="f-select" value={form.difficulty_level} onChange={set('difficulty_level')} required>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advance">Advanced</option>
+            </select>
+          </Field>
+
+          <Field label="Duration (Months)">
+            <input
+              type="number"
+              className="f-input"
+              value={form.duration_months}
+              onChange={(e) => setForm((f) => ({ ...f, duration_months: parseInt(e.target.value, 10) || '' }))}
+              min="1"
+              required
+            />
+          </Field>
+        </div>
+
+        <Field label="Fee (PKR)">
+          <input
+            type="number"
+            className="f-input"
+            value={form.fee}
+            onChange={(e) => setForm((f) => ({ ...f, fee: parseFloat(e.target.value) || 0 }))}
+            min="0"
+            required
+          />
         </Field>
 
         <Field label="Description (Urdu) — تفصیل">
