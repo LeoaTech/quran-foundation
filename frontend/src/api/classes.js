@@ -44,3 +44,14 @@ export const deactivateCriterion = (classId, criteriaId) =>
 // ── Enrollments (read) ────────────────────────────────────────────────────────
 export const getClassEnrollments = (classId, params = {}) =>
   client.get(`/classes/${classId}/enrollments`, { params }).then((r) => r.data);
+
+// ── Class Room Schedules ───────────────────────────────────────────────────────────
+export const getClassSchedules = (classId) =>
+  client.get(`/classes/${classId}/schedules`).then((r) => r.data);
+
+export const createClassSchedule = (classId, payload) =>
+  client.post(`/classes/${classId}/schedules`, payload).then((r) => r.data);
+
+export const deleteClassSchedule = (classId, scheduleId) =>
+  client.delete(`/classes/${classId}/schedules/${scheduleId}`).then((r) => r.data);
+
