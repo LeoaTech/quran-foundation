@@ -16,7 +16,7 @@ import {
   deleteSubtopic,
 } from '../../../api/courses';
 
-const EMPTY_TOPIC = { title: '', title_ur: '', title_ar: '', description_ur: '', display_order: '' };
+const EMPTY_TOPIC = { title: '', title_ur: '', title_ar: '', description_ur: '', description: '', display_order: '' };
 const EMPTY_SUB   = { title: '', title_ur: '', title_ar: '', display_order: '' };
 
 function Field({ label, children }) {
@@ -188,6 +188,7 @@ function TopicPanel({ courseId, topic, onMutated }) {
     title_ur:       topic.title_ur       ?? '',
     title_ar:       topic.title_ar       ?? '',
     description_ur: topic.description_ur ?? '',
+    description:    topic.description    ?? '',
     display_order:  topic.display_order  ?? '',
   });
 
@@ -218,7 +219,13 @@ function TopicPanel({ courseId, topic, onMutated }) {
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>{topic.title}</div>
           {topic.title_ur && (
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--ink-soft)', direction: 'rtl' }}>{topic.title_ur}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--ink-soft)', direction: 'rtl', marginBottom: 4 }}>{topic.title_ur}</div>
+          )}
+          {topic.description && (
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 4 }}>{topic.description}</div>
+          )}
+          {topic.description_ur && (
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', direction: 'rtl', textAlign: 'right', marginBottom: 4 }}>{topic.description_ur}</div>
           )}
         </div>
         {!editing && (
@@ -241,6 +248,16 @@ function TopicPanel({ courseId, topic, onMutated }) {
               <RTLInput value={form.title_ar} onChange={set('title_ar')} placeholder="عربي" />
             </Field>
           </div>
+          <Field label="Description (English)">
+            <textarea
+              className="f-input"
+              rows={2}
+              value={form.description}
+              onChange={set('description')}
+              placeholder="English description"
+              style={{ fontFamily: 'var(--font-body)', fontSize: 13 }}
+            />
+          </Field>
           <Field label="Description (Urdu)">
             <RTLInput multiline rows={2} value={form.description_ur} onChange={set('description_ur')} placeholder="تفصیل" />
           </Field>
@@ -331,6 +348,19 @@ function AddTopicForm({ courseId, nextOrder, onMutated, onCancel }) {
           <RTLInput value={form.title_ar} onChange={set('title_ar')} placeholder="عربي" />
         </Field>
       </div>
+      <Field label="Description (English)">
+        <textarea
+          className="f-input"
+          rows={2}
+          value={form.description}
+          onChange={set('description')}
+          placeholder="English description"
+          style={{ fontFamily: 'var(--font-body)', fontSize: 13 }}
+        />
+      </Field>
+      <Field label="Description (Urdu) — تفصیل">
+        <RTLInput multiline rows={2} value={form.description_ur} onChange={set('description_ur')} placeholder="تفصیل" />
+      </Field>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <Button type="button" size="sm" variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button type="submit" size="sm" variant="primary" disabled={busy}>{busy ? 'Adding…' : 'Add topic'}</Button>
