@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/Button';
@@ -133,10 +134,18 @@ export default function AttendanceSheet() {
   const { user }   = useAuth();
   const { can }    = usePermissions();
   const centerId   = user?.center_id;
+  const [searchParams] = useSearchParams();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [mode,          setMode]          = useState('week');  // 'week' | 'month'
   const [anchor,        setAnchor]        = useState(new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    const classId = searchParams.get('class_id');
+    const date = searchParams.get('date');
+    if (classId) setSelectedClass(classId);
+    if (date) setAnchor(date);
+  }, [searchParams]);
 
   // Compute date range
   const { from, to, dates } = useMemo(() => {
