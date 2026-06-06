@@ -48,6 +48,16 @@ async function assertTeacherOwnership(user, classId) {
 async function createAttendanceSession({ user, classId, body }) {
   const { session_date, records } = body;
 
+
+  // Validate session date to protect against empty strings, "undefined", or invalid dates
+  if (!session_date || session_date === 'Invalid Date' || session_date === 'undefined') {
+    throw new AppError(
+      'INVALID_DATE',
+      'The session date provided is missing or invalid.',
+      'سیشن کی تاریخ درست نہیں ہے۔',
+      400,
+    );
+  }
   const cls = await requireClass(classId);
   assertCenterAccess(user, cls.center_id);
   await assertTeacherOwnership(user, classId);
