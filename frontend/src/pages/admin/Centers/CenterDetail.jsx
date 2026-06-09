@@ -20,47 +20,56 @@ import { getUsers } from '../../../api/users';
 import { getCourses, getTopics } from '../../../api/courses';
 import { getCenterTeacherTopics, assignTeacherTopic, removeTeacherTopic } from '../../../api/teacherTopics';
 import ActivityLogTab from './ActivityLogTab';
-
+import ClassesList from '../../manager/Classes/ClassesList';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
-function TabBar({ tabs, active, onChange }) {
+function TabBar({ tabs, active, onChange,isMobile }) {
   return (
-    <div style={{ display: 'flex', borderBottom: '1.5px solid var(--sand-mid)', marginBottom: 24 }}>
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onChange(t.id)}
-          style={{
-            padding: '10px 20px 12px',
-            fontSize: 14, fontWeight: 500,
-            color: active === t.id ? 'var(--emerald)' : 'var(--ink-pale)',
-            borderBottom: active === t.id ? '2.5px solid var(--emerald)' : '2.5px solid transparent',
-            marginBottom: -1.5,
-            background: 'none', border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-            transition: 'color 0.2s',
-          }}
-        >
-          {t.label}
-        </button>
-      ))}
+    // <div style={{ display: 'flex', borderBottom: '1.5px solid var(--sand-mid)', marginBottom: 24 }}>
+    <div style={{
+      display: 'flex',
+      overflowX: 'auto',
+      whiteSpace: 'nowrap',
+      borderBottom: '1.5px solid var(--sand-mid)',
+      marginBottom: 24
+    }}>   
+    {tabs.map((t) => (
+      <button
+        key={t.id}
+        onClick={() => onChange(t.id)}
+        style={{
+          padding: isMobile? '10px 14px 12px': '10px 20px 12px',
+          fontSize: isMobile ? 12 :14, fontWeight: 500,
+          color: active === t.id ? 'var(--emerald)' : 'var(--ink-pale)',
+          borderBottom: active === t.id ? '2.5px solid var(--emerald)' : '2.5px solid transparent',
+          marginBottom: -1.5,
+          background: 'none', border: 'none',
+          cursor: 'pointer',
+          fontFamily: 'var(--font-body)',
+          transition: 'color 0.2s',
+          flex:'0 0 auto'
+        }}
+      >
+        {t.label}
+      </button>
+    ))}
     </div>
   );
 }
 
 // ── Overview tab ──────────────────────────────────────────────────────────────
 
-function OverviewTab({ centerId }) {
+function OverviewTab({ centerId, isMobile }) {
   const { data: overview } = useQuery({
     queryKey: ['center-overview', centerId],
-    queryFn:  () => getCenterOverview(centerId),
+    queryFn: () => getCenterOverview(centerId),
     staleTime: 3 * 60_000,
   });
 
   const { data: classesData, isLoading: classesLoading } = useQuery({
     queryKey: ['center-classes', centerId],
-    queryFn:  () => getCenterClasses(centerId, { is_active: true }),
+    queryFn: () => getCenterClasses(centerId, { is_active: true }),
     staleTime: 60_000,
   });
 
@@ -68,9 +77,16 @@ function OverviewTab({ centerId }) {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-        <MetricCard label="Total students"   value={overview?.active_students ?? '—'} variant="green" />
-        <MetricCard label="Active classes"   value={overview?.active_classes  ?? '—'} variant="blue" />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 14,
+          marginBottom: 24
+        }}
+      >
+        <MetricCard label="Total students" value={overview?.active_students ?? '—'} variant="green" />
+        <MetricCard label="Active classrooms" value={overview?.active_classes ?? '—'} variant="blue" />
         <MetricCard
           label="Avg. attendance"
           value={overview?.attendance_pct != null ? `${overview.attendance_pct}%` : '—'}
@@ -79,7 +95,7 @@ function OverviewTab({ centerId }) {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr', gap: 16 }}>
         <Card>
           <CardHeader>
             <span className="card-title">Classes</span>
@@ -90,28 +106,29 @@ function OverviewTab({ centerId }) {
             ) : classes.length === 0 ? (
               <EmptyState icon="◈" title="No active classes" description="Classes will appear here once created." />
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    {['Class', 'Course', 'Schedule', 'Capacity', 'Status'].map((h) => (
-                      <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {classes.map((cls, i) => (
-                    <tr key={cls.id}>
-                      <td style={tdStyle(i < classes.length - 1)}><b>{cls.name}</b></td>
-                      <td style={tdStyle(i < classes.length - 1)}>{cls.course_name ?? '—'}</td>
-                      <td style={tdStyle(i < classes.length - 1)}>{cls.schedule_days ?? '—'}</td>
-                      <td style={tdStyle(i < classes.length - 1)}>{cls.max_capacity ?? '—'}</td>
-                      <td style={tdStyle(i < classes.length - 1)}>
-                        <Badge variant={cls.is_active ? 'green' : 'sand'}>{cls.is_active ? 'Active' : 'Inactive'}</Badge>
-                      </td>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ minWidth: 600, width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Class', 'Course', 'Schedule', 'Capacity', 'Status'].map((h) => (
+                        <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {classes.map((cls, i) => (
+                      <tr key={cls.id}>
+                        <td style={tdStyle(i < classes.length - 1)}><b>{cls.name}</b></td>
+                        <td style={tdStyle(i < classes.length - 1)}>{cls.course_name ?? '—'}</td>
+                        <td style={tdStyle(i < classes.length - 1)}>{cls.schedule_days ?? '—'}</td>
+                        <td style={tdStyle(i < classes.length - 1)}>{cls.max_capacity ?? '—'}</td>
+                        <td style={tdStyle(i < classes.length - 1)}>
+                          <Badge variant={cls.is_active ? 'green' : 'sand'}>{cls.is_active ? 'Active' : 'Inactive'}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
             )}
           </CardBody>
         </Card>
@@ -138,21 +155,21 @@ function OverviewTab({ centerId }) {
 
 // ── Classrooms tab ────────────────────────────────────────────────────────────
 
-function ClassroomsTab({ centerId }) {
-  const qc    = useQueryClient();
+function ClassroomsTab({ centerId, isMobile }) {
+  const qc = useQueryClient();
   const toast = useToast();
   const { role } = useAuth();
   const canEdit = role === 'super_admin' || role === 'center_manager';
 
   const { data: roomsData, isLoading } = useQuery({
     queryKey: ['classrooms', centerId],
-    queryFn:  () => getClassrooms(centerId),
+    queryFn: () => getClassrooms(centerId),
     staleTime: 60_000,
   });
   const rooms = roomsData ?? [];
 
   // Inline editing state
-  const [editId,   setEditId]   = useState(null);
+  const [editId, setEditId] = useState(null);
   const [editVals, setEditVals] = useState({});
 
   // Add row state
@@ -176,8 +193,8 @@ function ClassroomsTab({ centerId }) {
     setAddBusy(true);
     try {
       await createClassroom(centerId, {
-        name:     newRoom.name,
-        name_ur:  newRoom.name_ur || undefined,
+        name: newRoom.name,
+        name_ur: newRoom.name_ur || undefined,
         capacity: newRoom.capacity ? parseInt(newRoom.capacity, 10) : undefined,
       });
       await qc.invalidateQueries({ queryKey: ['classrooms', centerId] });
@@ -195,100 +212,97 @@ function ClassroomsTab({ centerId }) {
     <Card>
       <CardHeader>
         <span className="card-title">Classrooms</span>
-        <Can permission="centers.edit">
-          <Button size="sm" variant="outline" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? 'Cancel' : '+ Add classroom'}
-          </Button>
-        </Can>
+
       </CardHeader>
       <CardBody style={{ padding: 0 }}>
         {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><LoadingSpinner /></div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                {['Name', 'Name (Urdu)', 'Capacity', canEdit ? 'Actions' : ''].filter(Boolean).map((h) => (
-                  <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Add row */}
-              {showAdd && (
-                <tr style={{ background: 'var(--emerald-pale)' }}>
-                  <td style={tdStyle(true)}>
-                    <input className="f-input" style={{ padding: '6px 10px' }} placeholder="Room name" value={newRoom.name} onChange={(e) => setNewRoom((n) => ({ ...n, name: e.target.value }))} autoFocus />
-                  </td>
-                  <td style={tdStyle(true)}>
-                    <RTLInput style={{ padding: '6px 10px', fontSize: 14 }} placeholder="کمرہ کا نام" value={newRoom.name_ur} onChange={(e) => setNewRoom((n) => ({ ...n, name_ur: e.target.value }))} />
-                  </td>
-                  <td style={tdStyle(true)}>
-                    <input className="f-input" style={{ padding: '6px 10px', width: 80 }} type="number" min="1" placeholder="Cap." value={newRoom.capacity} onChange={(e) => setNewRoom((n) => ({ ...n, capacity: e.target.value }))} />
-                  </td>
-                  <td style={tdStyle(true)}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Button size="sm" variant="primary" disabled={!newRoom.name || addBusy} onClick={addRoom}>{addBusy ? '…' : 'Save'}</Button>
-                      <Button size="sm" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-                    </div>
-                  </td>
-                </tr>
-              )}
+          // <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          //   <thead>
+          //     <tr>
+          //       {['Name', 'Name (Urdu)', 'Capacity', canEdit ? 'Actions' : ''].filter(Boolean).map((h) => (
+          //         <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' }}>{h}</th>
+          //       ))}
+          //     </tr>
+          //   </thead>
+          //   <tbody>
+          //     {/* Add row */}
+          //     {showAdd && (
+          //       <tr style={{ background: 'var(--emerald-pale)' }}>
+          //         <td style={tdStyle(true)}>
+          //           <input className="f-input" style={{ padding: '6px 10px' }} placeholder="Room name" value={newRoom.name} onChange={(e) => setNewRoom((n) => ({ ...n, name: e.target.value }))} autoFocus />
+          //         </td>
+          //         <td style={tdStyle(true)}>
+          //           <RTLInput style={{ padding: '6px 10px', fontSize: 14 }} placeholder="کمرہ کا نام" value={newRoom.name_ur} onChange={(e) => setNewRoom((n) => ({ ...n, name_ur: e.target.value }))} />
+          //         </td>
+          //         <td style={tdStyle(true)}>
+          //           <input className="f-input" style={{ padding: '6px 10px', width: 80 }} type="number" min="1" placeholder="Cap." value={newRoom.capacity} onChange={(e) => setNewRoom((n) => ({ ...n, capacity: e.target.value }))} />
+          //         </td>
+          //         <td style={tdStyle(true)}>
+          //           <div style={{ display: 'flex', gap: 8 }}>
+          //             <Button size="sm" variant="primary" disabled={!newRoom.name || addBusy} onClick={addRoom}>{addBusy ? '…' : 'Save'}</Button>
+          //             <Button size="sm" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+          //           </div>
+          //         </td>
+          //       </tr>
+          //     )}
 
-              {rooms.length === 0 && !showAdd && (
-                <tr>
-                  <td colSpan={canEdit ? 4 : 3} style={{ padding: 0 }}>
-                    <EmptyState icon="⊙" title="No classrooms yet" description="Add classrooms to this center." />
-                  </td>
-                </tr>
-              )}
+          //     {rooms.length === 0 && !showAdd && (
+          //       <tr>
+          //         <td colSpan={canEdit ? 4 : 3} style={{ padding: 0 }}>
+          //           <EmptyState icon="⊙" title="No classrooms yet" description="Add classrooms to this center." />
+          //         </td>
+          //       </tr>
+          //     )}
 
-              {rooms.map((room, i) => {
-                const isEditing = editId === room.id;
-                return (
-                  <tr key={room.id} onMouseEnter={(e) => { if (!isEditing) e.currentTarget.style.background = 'var(--sand)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
-                    <td style={tdStyle(i < rooms.length - 1)}>
-                      {isEditing ? (
-                        <input className="f-input" style={{ padding: '6px 10px' }} value={editVals.name ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, name: e.target.value }))} autoFocus />
-                      ) : (
-                        <span
-                          style={{ cursor: canEdit ? 'text' : 'default', fontWeight: 500 }}
-                          title={canEdit ? 'Click to edit' : undefined}
-                          onClick={() => { if (canEdit) { setEditId(room.id); setEditVals({ name: room.name, name_ur: room.name_ur ?? '', capacity: room.capacity }); } }}
-                        >
-                          {room.name}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ ...tdStyle(i < rooms.length - 1), fontFamily: 'var(--font-display)', fontSize: 14, direction: 'rtl' }}>
-                      {isEditing ? (
-                        <RTLInput style={{ padding: '6px 10px', fontSize: 14 }} value={editVals.name_ur ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, name_ur: e.target.value }))} />
-                      ) : (room.name_ur ?? '—')}
-                    </td>
-                    <td style={tdStyle(i < rooms.length - 1)}>
-                      {isEditing ? (
-                        <input className="f-input" style={{ padding: '6px 10px', width: 80 }} type="number" min="1" value={editVals.capacity ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, capacity: e.target.value }))} />
-                      ) : (room.capacity ?? '—')}
-                    </td>
-                    {canEdit && (
-                      <td style={tdStyle(i < rooms.length - 1)}>
-                        {isEditing ? (
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <Button size="sm" variant="primary" onClick={() => saveEdit(room.id)}>Save</Button>
-                            <Button size="sm" variant="outline" onClick={() => setEditId(null)}>Cancel</Button>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setEditId(room.id); setEditVals({ name: room.name, name_ur: room.name_ur ?? '', capacity: room.capacity }); }} style={{ background: 'none', border: 'none', color: 'var(--emerald)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
-                            Edit
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          //     {rooms.map((room, i) => {
+          //       const isEditing = editId === room.id;
+          //       return (
+          //         <tr key={room.id} onMouseEnter={(e) => { if (!isEditing) e.currentTarget.style.background = 'var(--sand)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
+          //           <td style={tdStyle(i < rooms.length - 1)}>
+          //             {isEditing ? (
+          //               <input className="f-input" style={{ padding: '6px 10px' }} value={editVals.name ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, name: e.target.value }))} autoFocus />
+          //             ) : (
+          //               <span
+          //                 style={{ cursor: canEdit ? 'text' : 'default', fontWeight: 500 }}
+          //                 title={canEdit ? 'Click to edit' : undefined}
+          //                 onClick={() => { if (canEdit) { setEditId(room.id); setEditVals({ name: room.name, name_ur: room.name_ur ?? '', capacity: room.capacity }); } }}
+          //               >
+          //                 {room.name}
+          //               </span>
+          //             )}
+          //           </td>
+          //           <td style={{ ...tdStyle(i < rooms.length - 1), fontFamily: 'var(--font-display)', fontSize: 14, direction: 'rtl' }}>
+          //             {isEditing ? (
+          //               <RTLInput style={{ padding: '6px 10px', fontSize: 14 }} value={editVals.name_ur ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, name_ur: e.target.value }))} />
+          //             ) : (room.name_ur ?? '—')}
+          //           </td>
+          //           <td style={tdStyle(i < rooms.length - 1)}>
+          //             {isEditing ? (
+          //               <input className="f-input" style={{ padding: '6px 10px', width: 80 }} type="number" min="1" value={editVals.capacity ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, capacity: e.target.value }))} />
+          //             ) : (room.capacity ?? '—')}
+          //           </td>
+          //           {canEdit && (
+          //             <td style={tdStyle(i < rooms.length - 1)}>
+          //               {isEditing ? (
+          //                 <div style={{ display: 'flex', gap: 8 }}>
+          //                   <Button size="sm" variant="primary" onClick={() => saveEdit(room.id)}>Save</Button>
+          //                   <Button size="sm" variant="outline" onClick={() => setEditId(null)}>Cancel</Button>
+          //                 </div>
+          //               ) : (
+          //                 <button onClick={() => { setEditId(room.id); setEditVals({ name: room.name, name_ur: room.name_ur ?? '', capacity: room.capacity }); }} style={{ background: 'none', border: 'none', color: 'var(--emerald)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+          //                   Edit
+          //                 </button>
+          //               )}
+          //             </td>
+          //           )}
+          //         </tr>
+          //       );
+          //     })}
+          //   </tbody>
+          // </table>
+          <ClassesList />
         )}
       </CardBody>
     </Card>
@@ -297,20 +311,20 @@ function ClassroomsTab({ centerId }) {
 
 // ── Settings tab ──────────────────────────────────────────────────────────────
 
-function SettingsTab({ centerId, center }) {
-  const qc    = useQueryClient();
+function SettingsTab({ centerId, center, isMobile }) {
+  const qc = useQueryClient();
   const toast = useToast();
   const { role } = useAuth();
   const canEdit = role === 'super_admin' || role === 'center_manager';
 
   const [form, setForm] = useState({
-    name:       center?.name       ?? '',
-    name_ur:    center?.name_ur    ?? '',
-    city:       center?.city       ?? '',
-    address:    center?.address    ?? '',
+    name: center?.name ?? '',
+    name_ur: center?.name_ur ?? '',
+    city: center?.city ?? '',
+    address: center?.address ?? '',
     address_ur: center?.address_ur ?? '',
-    phone:      center?.phone      ?? '',
-    is_active:  center?.is_active  ?? true,
+    phone: center?.phone ?? '',
+    is_active: center?.is_active ?? true,
   });
   const [busy, setBusy] = useState(false);
 
@@ -337,7 +351,7 @@ function SettingsTab({ centerId, center }) {
       <CardHeader><span className="card-title">Center details</span></CardHeader>
       <CardBody>
         <form onSubmit={handleSave}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' :  '1fr 1fr', gap: '0 20px' }}>
             <FormField label="Name (English)">
               <input className="f-input" value={form.name} onChange={set('name')} required disabled={!canEdit} />
             </FormField>
@@ -388,10 +402,10 @@ function FormField({ label, children }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'overview',   label: 'Overview' },
+  { id: 'overview', label: 'Overview' },
   { id: 'classrooms', label: 'Classrooms' },
-  { id: 'activity',   label: 'Activity' },
-  { id: 'settings',   label: 'Settings' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 export default function CenterDetail() {
@@ -399,6 +413,9 @@ export default function CenterDetail() {
   const navigate = useNavigate();
   const { role, user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+
+  const isMobile = useIsMobile();
+
 
   // Scoping: center_manager can only view their own center
   if (role === 'center_manager' && user?.center_id && user.center_id !== id) {
@@ -408,7 +425,7 @@ export default function CenterDetail() {
 
   const { data: center, isLoading, error } = useQuery({
     queryKey: ['center', id],
-    queryFn:  () => getCenter(id),
+    queryFn: () => getCenter(id),
     staleTime: 60_000,
   });
 
@@ -448,7 +465,7 @@ export default function CenterDetail() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-soft)' }}>
-              {center?.city  && <span>⊙ {center.city}</span>}
+              {center?.city && <span>⊙ {center.city}</span>}
               {center?.phone && <span>📞 {center.phone}</span>}
             </div>
             {center?.address_ur && (
@@ -461,12 +478,12 @@ export default function CenterDetail() {
       </div>
 
       {/* ── Tabs ── */}
-      <TabBar tabs={TABS} active={activeTab} onChange={setActiveTab} />
+      <TabBar isMobile={isMobile} tabs={TABS} active={activeTab} onChange={setActiveTab} />
 
-      {activeTab === 'overview'   && <OverviewTab   centerId={id} />}
-      {activeTab === 'classrooms' && <ClassroomsTab centerId={id} />}
-      {activeTab === 'activity'   && <ActivityLogTab centerId={id} />}
-      {activeTab === 'settings'   && <SettingsTab   centerId={id} center={center} />}
+      {activeTab === 'overview' && <OverviewTab centerId={id} isMobile={isMobile} />}
+      {activeTab === 'classrooms' && <ClassroomsTab centerId={id} isMobile={isMobile} />}
+      {activeTab === 'activity' && <ActivityLogTab centerId={id} isMobile={isMobile} />}
+      {activeTab === 'settings' && <SettingsTab centerId={id} center={center} isMobile={isMobile} />}
     </>
   );
 }
