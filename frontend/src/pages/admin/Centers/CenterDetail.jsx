@@ -403,7 +403,7 @@ function FormField({ label, children }) {
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'classrooms', label: 'Classrooms' },
+  // { id: 'classrooms', label: 'Classrooms' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -481,7 +481,7 @@ export default function CenterDetail() {
       <TabBar isMobile={isMobile} tabs={TABS} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'overview' && <OverviewTab centerId={id} isMobile={isMobile} />}
-      {activeTab === 'classrooms' && <ClassroomsTab centerId={id} isMobile={isMobile} />}
+      {/* {activeTab === 'classrooms' && <ClassroomsTab centerId={id} isMobile={isMobile} />} */}
       {activeTab === 'activity' && <ActivityLogTab centerId={id} isMobile={isMobile} />}
       {activeTab === 'settings' && <SettingsTab centerId={id} center={center} isMobile={isMobile} />}
     </>
