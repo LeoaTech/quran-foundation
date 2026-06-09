@@ -41,7 +41,7 @@ import {
   formatTimeShort,
   sessionPlanKey,
 } from '../../../utils/classSessions';
-
+import TopicAssignmentTab from './CenterLevelTopicAssignment/TopicAssignmentTab';
 const TYPE_CHIP = {
   hifz: { label: 'Hifz', cls: 'chip chip-green' },
   nazra: { label: 'Nazra', cls: 'chip chip-blue' },
@@ -328,6 +328,8 @@ function TeachersTab({ classId, centerId, courseId }) {
     </>
   );
 }
+
+
 
 // ── Homework Criteria tab ─────────────────────────────────────────────────────
 function HomeworkCriteriaTab({ classId, courseId }) {
@@ -1021,236 +1023,9 @@ function ClassSchedulesTab({ cls, classId }) {
 }
 
 // ── Topic Assignment tab ─────────────────────────────────────────────────────
-function TopicAssignmentTab({ cls }) {
-  const centerId = cls.center_id;
-  const courseId = cls.course_id;
-  const qc = useQueryClient();
-  const toast = useToast();
-  const { role } = useAuth();
-  const canEdit = role === 'super_admin' || role === 'center_manager';
+//Moved into the CenterLevelTopicAssignment/TopicAssignmentTab.jsx
 
-  const [showAdd, setShowAdd] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ teacher_user_id: '', topic_id: '' });
-  const [busy, setBusy] = useState(false);
 
-  // Fetch assignments
-  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['teacher-topics', centerId],
-    queryFn: () => getCenterTeacherTopics(centerId),
-    enabled: !!centerId,
-  });
-
-  // Filter assignments for this course
-  const classAssignments = assignments.filter((a) => a.course_id === courseId);
-
-  // Fetch teachers
-  const { data: teachersData, isLoading: teachersLoading } = useQuery({
-    queryKey: ['center-teachers', centerId],
-    queryFn: () => getUsers({ center_id: centerId, role: 'teacher', per_page: 200 }),
-    enabled: !!centerId,
-  });
-  const teachers = teachersData?.data ?? [];
-
-  // Fetch topics
-  const { data: topicsData, isLoading: topicsLoading } = useQuery({
-    queryKey: ['topics', courseId],
-    queryFn: () => getTopics(courseId),
-    enabled: !!courseId,
-  });
-  const topics = topicsData?.data ?? topicsData ?? [];
-
-  function handleEdit(as) {
-    setEditingId(as.id);
-    setForm({
-      teacher_user_id: as.teacher_user_id,
-      topic_id: as.topic_id,
-    });
-    setShowAdd(true);
-  }
-
-  async function handleAssign(e) {
-    e.preventDefault();
-    if (!form.teacher_user_id || !form.topic_id) {
-      toast.error('Please select both a topic and a teacher.');
-      return;
-    }
-    setBusy(true);
-    try {
-      if (editingId) {
-        await updateTeacherTopic(centerId, editingId, {
-          teacher_user_id: form.teacher_user_id,
-          topic_id: form.topic_id,
-        });
-        toast.success('Topic assignment updated successfully.');
-      } else {
-        await assignTeacherTopic(centerId, {
-          teacher_user_id: form.teacher_user_id,
-          topic_id: form.topic_id,
-        });
-        toast.success('Topic assigned successfully.');
-      }
-      await qc.invalidateQueries({ queryKey: ['teacher-topics', centerId] });
-      setForm({ teacher_user_id: '', topic_id: '' });
-      setEditingId(null);
-      setShowAdd(false);
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message ?? 'Failed to save topic assignment.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRemove(assignmentId) {
-    if (!window.confirm('Are you sure you want to remove this topic assignment?')) return;
-    try {
-      await removeTeacherTopic(centerId, assignmentId);
-      await qc.invalidateQueries({ queryKey: ['teacher-topics', centerId] });
-      toast.success('Assignment removed.');
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message ?? 'Failed to remove assignment.');
-    }
-  }
-
-  if (assignmentsLoading || teachersLoading || topicsLoading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><LoadingSpinner size={28} /></div>;
-  }
-
-  return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        {canEdit && !showAdd && (
-          <Button size="sm" variant="primary" onClick={() => { setEditingId(null); setForm({ teacher_user_id: '', topic_id: '' }); setShowAdd(true); }}>
-            + Assign topic
-          </Button>
-        )}
-      </div>
-
-      {showAdd && (
-        <Card style={{ marginBottom: 20 }}>
-          <CardHeader>
-            <span className="card-title">{editingId ? 'Edit Topic Assignment' : 'Assign Topic to Teacher'}</span>
-          </CardHeader>
-          <CardBody>
-            <form onSubmit={handleAssign}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px', marginBottom: 16 }}>
-                <div className="f-group">
-                  <label className="f-label">Select Topic</label>
-                  <select
-                    className="f-select"
-                    value={form.topic_id}
-                    onChange={(e) => setForm((f) => ({ ...f, topic_id: e.target.value }))}
-                    required
-                  >
-                    <option value="">-- Select Topic --</option>
-                    {topics.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.display_order}. {t.title} {t.title_ur ? `(${t.title_ur})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="f-group">
-                  <label className="f-label">Select Teacher</label>
-                  <select
-                    className="f-select"
-                    value={form.teacher_user_id}
-                    onChange={(e) => setForm((f) => ({ ...f, teacher_user_id: e.target.value }))}
-                    required
-                  >
-                    <option value="">-- Select Teacher --</option>
-                    {teachers.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.full_name} {t.full_name_ur ? `(${t.full_name_ur})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <Button type="button" size="sm" variant="outline" onClick={() => { setShowAdd(false); setEditingId(null); setForm({ teacher_user_id: '', topic_id: '' }); }} disabled={busy}>
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" variant="primary" disabled={busy || !form.teacher_user_id || !form.topic_id}>
-                  {busy ? 'Saving...' : (editingId ? 'Save Changes' : 'Assign Topic')}
-                </Button>
-              </div>
-            </form>
-          </CardBody>
-        </Card>
-      )}
-
-      {classAssignments.length === 0 ? (
-        <EmptyState
-          icon="📖"
-          title="No topic assignments"
-          description="Assign topics of this course to teachers in this center class."
-        />
-      ) : (
-        <div style={{ border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                {['Topic', 'Assigned Teacher', 'Assigned On', ''].map((h, index) => (
-                  <th key={h} style={{
-                    textAlign: 'left',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: 'var(--ink-pale)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    padding: '10px 14px 8px',
-                    borderBottom: '1px solid var(--sand-mid)',
-                    ...(index === 3 ? { width: 140 } : {})
-                  }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {classAssignments.map((as, i) => (
-                <tr key={as.id}>
-                  <td style={{ padding: '10px 14px', fontSize: 13, borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    <b>{as.topic_title}</b>
-                    {as.topic_title_ur && (
-                      <span style={{ fontSize: 11, color: 'var(--ink-soft)', marginLeft: 8, fontFamily: 'var(--font-display)' }}>
-                        ({as.topic_title_ur})
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    <div>{as.teacher_name}</div>
-                    {as.teacher_name_ur && (
-                      <div style={{ fontSize: 11, color: 'var(--ink-pale)' }}>{as.teacher_name_ur}</div>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-soft)', borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none' }}>
-                    {new Date(as.created_at).toLocaleDateString()}
-                  </td>
-                  <td style={{ padding: '10px 14px', borderBottom: i < classAssignments.length - 1 ? '1px solid var(--sand)' : 'none', whiteSpace: 'nowrap' }}>
-                    {canEdit && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(as)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleRemove(as.id)} style={{ color: 'var(--red)' }}>
-                          Remove
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </>
-  );
-}
 
 
 // ── Settings tab (replaces read-only ScheduleTab) ────────────────────────────
