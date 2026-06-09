@@ -76,8 +76,8 @@ export default function Enrollment() {
   });
   const courseFees = feesData ?? [];
 
-  const selectedClass = filteredClasses.find(c => c.id === classId);
-  const selectedFee = coursesData.find(f => f.id === selectedClass?.course_id);
+  const selectedClass = filteredClasses?.find(c => c?.id === classId);
+  const selectedFee = coursesData?.find(f => f?.id === selectedClass?.course_id);
   // Auto-select course when arriving with only class_id preset
   useEffect(() => {
     if (!presetClassId || courseId) return;
@@ -94,8 +94,8 @@ export default function Enrollment() {
       return;
     }
 
-    if (selectedFee && Number(cashReceived) !== Number(selectedFee.fee)) {
-      setErrorMsg(`Full course level fee (PKR ${selectedFee.fee}) must be received in cash before enrollment is confirmed.`);
+    if (selectedFee && Number(cashReceived) !== Number(selectedFee?.fee)) {
+      setErrorMsg(`Full course level fee (PKR ${selectedFee?.fee}) must be received in cash before enrollment is confirmed.`);
       return;
     }
 
@@ -342,6 +342,7 @@ export default function Enrollment() {
                   <label>Level</label>
                   <select value={priorLevel} onChange={(e) => setPriorLevel(e.target.value)}>
                     <option value="">— Select level —</option>
+                    <option value="None">None</option>
                     <option value="Beginner">Beginner</option>
                     <option value="Intermediate">Intermediate</option>
                     <option value="Advanced">Advanced</option>
@@ -365,7 +366,7 @@ export default function Enrollment() {
                   <label>Course Level Fee (Auto)</label>
                   <div style={{ display: 'flex', border: '1.5px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--rule2)', overflow: 'hidden' }}>
                     <div style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)', borderRight: '1.5px solid var(--rule)' }}>PKR</div>
-                    <input type="text" value={selectedFee ? selectedFee.fee : '0'} readOnly style={{ border: 'none', background: 'transparent', flex: 1, padding: '8px 11px', color: 'var(--ink-muted)' }} />
+                    <input type="text" value={selectedFee ? selectedFee?.fee : '0'} readOnly style={{ border: 'none', background: 'transparent', flex: 1, padding: '8px 11px', color: 'var(--ink-muted)' }} />
                   </div>
                 </div>
 
@@ -390,7 +391,7 @@ export default function Enrollment() {
                       style={{ border: 'none', background: 'transparent', flex: 1, padding: '8px 11px', outline: 'none' }}
                     />
                   </div>
-                  {selectedFee && <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4 }}>Must match fee exactly (PKR {selectedFee.fee}).</div>}
+                  {selectedFee && <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4 }}>Must match fee exactly (PKR {selectedFee?.fee}).</div>}
                 </div>
               </div>
             </div>
