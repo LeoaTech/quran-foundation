@@ -7,6 +7,7 @@ import Button from '../../../components/Button';
 import RTLInput from '../../../components/RTLInput';
 import { recordDonation } from '../../../api/donations';
 import { getStudents, getUsers } from '../../../api/users';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 const DONOR_TYPES = [
   { id: 'student', label: 'Student', icon: '🎓' },
@@ -19,7 +20,7 @@ export default function RecordDonation() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
-
+  const isMobile = useIsMobile();
   const [donorType, setDonorType] = useState('visitor');
   const [donorUserId, setDonorUserId] = useState('');
   const [donorName, setDonorName] = useState('');
@@ -147,7 +148,7 @@ export default function RecordDonation() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr 1fr', marginBottom: 24 }}>
+        <div style={{ display: 'grid', gap: 24, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', marginBottom: 24 }}>
           {(donorType === 'student' || donorType === 'teacher') ? (
             <div className="field">
               <label>Select {donorType === 'student' ? 'Student' : 'Teacher'} <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -213,7 +214,7 @@ export default function RecordDonation() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr 1fr', marginBottom: 24 }}>
+        <div style={{ display: 'grid', gap: 24, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', marginBottom: 24 }}>
           <div className="field">
             <label>Amount (PKR) <span style={{ color: 'var(--red)' }}>*</span></label>
             <div style={{ display: 'flex', alignItems: 'center' }}>

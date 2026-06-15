@@ -9,6 +9,7 @@ import { useOrgReport } from '../../../hooks/useReports';
 import { getCenters } from '../../../api/centers';
 import { getCenterOverview } from '../../../api/reports';
 import { useQuery, useQueries } from '@tanstack/react-query';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -39,13 +40,14 @@ function attendanceBg(pct) {
 }
 
 export default function OrgReport() {
+  const isMobile = useIsMobile()
   const [month, setMonth] = useState(currentMonth());
 
   const { data: overview, isLoading } = useOrgReport();
 
   const { data: centersRaw = [] } = useQuery({
     queryKey: ['centers'],
-    queryFn:  getCenters,
+    queryFn: getCenters,
     staleTime: 5 * 60_000,
   });
   const centers = centersRaw?.data ?? centersRaw ?? [];
@@ -56,8 +58,8 @@ export default function OrgReport() {
   const trendQueries = useQueries({
     queries: centers.flatMap((c) =>
       months6.map((m) => ({
-        queryKey:  ['report-center', c.id, m],
-        queryFn:   () => getCenterOverview(c.id, m),
+        queryKey: ['report-center', c.id, m],
+        queryFn: () => getCenterOverview(c.id, m),
         staleTime: 5 * 60_000,
       }))
     ),
@@ -75,8 +77,8 @@ export default function OrgReport() {
   // Sort centers by attendance for the ranking table
   const centerOverviews = useQueries({
     queries: centers.map((c) => ({
-      queryKey:  ['report-center', c.id, month],
-      queryFn:   () => getCenterOverview(c.id, month),
+      queryKey: ['report-center', c.id, month],
+      queryFn: () => getCenterOverview(c.id, month),
       staleTime: 5 * 60_000,
     })),
   });
@@ -93,7 +95,7 @@ export default function OrgReport() {
   return (
     <div>
       {/* Header */}
-      <div className="report-header" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }} data-no-print="1">
+      <div className="report-header" style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 12 : 10, flexDirection: isMobile && 'column', justifyContent: 'space-between', marginBottom: 24 }} data-no-print="1">
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
             Organisation Report
@@ -109,15 +111,15 @@ export default function OrgReport() {
       </div>
 
       {/* Row 1 — metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-        <MetricCard label="Total students"   value={stats.total_students    ?? '—'} variant="green"   />
-        <MetricCard label="Active centers"   value={stats.active_centers    ?? '—'} variant="blue"    />
-        <MetricCard label="Avg. attendance"  value={stats.avg_attendance_pct != null ? `${stats.avg_attendance_pct}%` : '—'} variant={stats.avg_attendance_pct >= 75 ? 'green' : stats.avg_attendance_pct >= 60 ? 'gold' : 'red'} />
-        <MetricCard label="Teachers"         value={stats.total_teachers    ?? '—'} variant="neutral" />
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+        <MetricCard label="Total students" value={stats.total_students ?? '—'} variant="green" />
+        <MetricCard label="Active centers" value={stats.active_centers ?? '—'} variant="blue" />
+        <MetricCard label="Avg. attendance" value={stats.avg_attendance_pct != null ? `${stats.avg_attendance_pct}%` : '—'} variant={stats.avg_attendance_pct >= 75 ? 'green' : stats.avg_attendance_pct >= 60 ? 'gold' : 'red'} />
+        <MetricCard label="Teachers" value={stats.total_teachers ?? '—'} variant="neutral" />
       </div>
 
       {/* Row 2 — enrollments by course + centers ranked */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 24 }}>
         <Card>
           <CardHeader><span className="card-title">Enrollments by course</span></CardHeader>
           <CardBody>

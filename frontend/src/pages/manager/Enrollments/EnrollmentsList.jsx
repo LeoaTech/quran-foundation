@@ -11,6 +11,7 @@ import WithdrawModal from './WithdrawModal';
 import { getClassEnrollments, getCenterEnrollments } from '../../../api/enrollments';
 import { getClasses } from '../../../api/classes';
 import { getCenters } from '../../../api/centers';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 const STATUS_VARIANT = {
   active: 'green',
@@ -80,13 +81,14 @@ export default function EnrollmentsList() {
 
   const isLoading = classesLoading || enrollLoading;
 
+  const isMobile = useIsMobile();
   function handleWithdrawSuccess() {
     qc.invalidateQueries({ queryKey: ['enrollments'] });
   }
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', flexDirection: isMobile && 'column', gap: isMobile && 12, justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
             Enrollments
@@ -232,7 +234,8 @@ export default function EnrollmentsList() {
                       {en.course_level_title && <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Level: {en.course_level_title}</div>}
                     </td>
                     <td style={tdStyle(!isLast)}>
-                      <span style={{ fontSize: 12 }}>{en.enrolled_on ?? '—'}</span>
+
+                      <span style={{ fontSize: 12 }}>{new Date(en.enrolled_on)?.toLocaleDateString() ?? '—'}</span>
                     </td>
                     <td style={tdStyle(!isLast)}>
                       <Badge variant={STATUS_VARIANT[status] ?? 'sand'}>{status}</Badge>

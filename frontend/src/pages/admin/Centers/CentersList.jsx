@@ -10,13 +10,14 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import AddCenterModal from './AddCenterModal';
 import { getCenters, getCenterOverview } from '../../../api/centers';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 export default function CentersList() {
   const { role, user } = useAuth();
   const { can } = usePermissions();
   const navigate = useNavigate();
   const [showAdd, setShowAdd] = useState(false);
-
+  const isMobile = useIsMobile()
   // center_manager goes straight to their own center
   useEffect(() => {
     if (role === 'center_manager' && user?.center_id) {
@@ -35,7 +36,7 @@ export default function CentersList() {
   const reportQueries = useQueries({
     queries: centers.map((c) => ({
       queryKey: ['center-overview', c.id],
-      queryFn:  () => getCenterOverview(c.id),
+      queryFn: () => getCenterOverview(c.id),
       staleTime: 3 * 60_000,
       enabled: centers.length > 0,
     })),
@@ -83,7 +84,7 @@ export default function CentersList() {
               <thead>
                 <tr>
                   {['Name', 'Name (Urdu)', 'City', 'Students', 'Teachers', 'Attendance', 'Status', ''].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0 14px 10px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>
+                    <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 14px 10px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>
                       {h}
                     </th>
                   ))}
@@ -92,7 +93,7 @@ export default function CentersList() {
               <tbody>
                 {centers.map((center) => {
                   const report = reportByIndex[center.id];
-                  const pct    = report?.attendance_pct ?? null;
+                  const pct = report?.attendance_pct ?? null;
 
                   return (
                     <tr

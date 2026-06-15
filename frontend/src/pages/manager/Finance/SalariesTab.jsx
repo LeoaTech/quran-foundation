@@ -8,6 +8,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import { getStaffDetails, recordSalaryPayment, getSalaryPayments } from '../../../api/salaries';
 import { getCenters } from '../../../api/centers';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ function RecordPaymentModal({ centerId, staff, onClose, onSuccess }) {
           )}
 
           {/* Amount + date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div className="f-group">
               <label className="f-label">Amount (PKR) <span style={{ color: 'var(--red)' }}>*</span></label>
               <input
@@ -409,6 +410,7 @@ export default function SalariesTab({ centerId: propCenterId }) {
   const { user, role } = useAuth();
   const qc = useQueryClient();
   const isGlobal = role === 'super_admin' || role === 'finance_manager';
+  const isMobile = useIsMobile();
 
   const defaultCenter = propCenterId || user?.center_id || '';
   const [selectedCenter, setSelectedCenter] = useState(defaultCenter);
@@ -532,7 +534,7 @@ export default function SalariesTab({ centerId: propCenterId }) {
       ) : (
         <>
           {/* ── Summary cards (selected month/year) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
             <div style={{ background: 'var(--white)', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-pale)', marginBottom: 5 }}>Total Payable</p>
               <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>PKR {fmt(totalPayable)}</p>

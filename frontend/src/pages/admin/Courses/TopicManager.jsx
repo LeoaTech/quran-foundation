@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../../../components/Button';
 import Can from '../../../components/Can';
@@ -15,9 +15,10 @@ import {
   updateSubtopic,
   deleteSubtopic,
 } from '../../../api/courses';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 const EMPTY_TOPIC = { title: '', title_ur: '', title_ar: '', description_ur: '', description: '', display_order: '' };
-const EMPTY_SUB   = { title: '', title_ur: '', title_ar: '', display_order: '' };
+const EMPTY_SUB = { title: '', title_ur: '', title_ar: '', display_order: '' };
 
 function Field({ label, children }) {
   return (
@@ -43,10 +44,10 @@ function ConfirmDelete({ message, onConfirm, onCancel }) {
 // ── Subtopic row ──────────────────────────────────────────────────────────────
 function SubtopicRow({ courseId, topicId, sub, onMutated }) {
   const toast = useToast();
-  const [editing, setEditing]   = useState(false);
+  const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [form, setForm]         = useState({ title: sub.title ?? '', title_ur: sub.title_ur ?? '', title_ar: sub.title_ar ?? '', display_order: sub.display_order ?? '' });
-  const [busy, setBusy]         = useState(false);
+  const [form, setForm] = useState({ title: sub.title ?? '', title_ur: sub.title_ur ?? '', title_ar: sub.title_ar ?? '', display_order: sub.display_order ?? '' });
+  const [busy, setBusy] = useState(false);
 
   function set(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -179,19 +180,29 @@ function AddSubtopicForm({ courseId, topicId, nextOrder, onMutated, onCancel }) 
 
 // ── Topic panel (right side) ──────────────────────────────────────────────────
 function TopicPanel({ courseId, topic, onMutated }) {
-  const toast    = useToast();
-  const [editing, setEditing]     = useState(false);
+  const toast = useToast();
+  const [editing, setEditing] = useState(false);
   const [addingSub, setAddingSub] = useState(false);
-  const [busy, setBusy]           = useState(false);
+  const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
-    title:          topic.title          ?? '',
-    title_ur:       topic.title_ur       ?? '',
-    title_ar:       topic.title_ar       ?? '',
+    title: topic.title ?? '',
+    title_ur: topic.title_ur ?? '',
+    title_ar: topic.title_ar ?? '',
     description_ur: topic.description_ur ?? '',
-    description:    topic.description    ?? '',
-    display_order:  topic.display_order  ?? '',
+    description: topic.description ?? '',
+    display_order: topic.display_order ?? '',
   });
 
+  useEffect(() => {
+    setForm({
+      title: topic.title ?? '',
+      title_ur: topic.title_ur ?? '',
+      title_ar: topic.title_ar ?? '',
+      description_ur: topic.description_ur ?? '',
+      description: topic.description ?? '',
+      display_order: topic.display_order ?? '',
+    });
+  }, [topic]);
   function set(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
@@ -312,7 +323,7 @@ function TopicPanel({ courseId, topic, onMutated }) {
 
 // ── Add topic form ────────────────────────────────────────────────────────────
 function AddTopicForm({ courseId, nextOrder, onMutated, onCancel }) {
-  const toast   = useToast();
+  const toast = useToast();
   const [form, setForm] = useState({ ...EMPTY_TOPIC, display_order: nextOrder });
   const [busy, setBusy] = useState(false);
 
@@ -371,19 +382,20 @@ function AddTopicForm({ courseId, nextOrder, onMutated, onCancel }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function TopicManager({ courseId }) {
-  const qc    = useQueryClient();
+  const qc = useQueryClient();
   const toast = useToast();
 
+  const isMobile = useIsMobile();
   const [selectedId, setSelectedId] = useState(null);
   const [addingTopic, setAddingTopic] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const { data: topics = [], isLoading } = useQuery({
-    queryKey:  ['topics', courseId],
-    queryFn:   () => getTopics(courseId),
+    queryKey: ['topics', courseId],
+    queryFn: () => getTopics(courseId),
     staleTime: 2 * 60_000,
-    enabled:   !!courseId,
+    enabled: !!courseId,
   });
 
   function refetch() {
@@ -416,9 +428,9 @@ export default function TopicManager({ courseId }) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 0, height: 560, border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', gap: 0, height: 560, border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', flexDirection: isMobile && "column" }}>
       {/* Left: topic list */}
-      <div style={{ width: '40%', borderRight: '1px solid var(--sand-mid)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: isMobile ? '100%' : '40%', borderRight: '1px solid var(--sand-mid)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sand-mid)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Topics ({topics.length})</span>
           {!addingTopic && (

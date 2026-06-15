@@ -9,23 +9,24 @@ import EmptyState from '../../../components/EmptyState';
 import AddCourseModal from './AddCourseModal';
 import EditCourseModal from './EditCourseModal';
 import { getCourses } from '../../../api/courses';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 const TYPE_CHIP = {
-  hifz:    { label: 'Hifz',    cls: 'chip chip-green' },
-  nazra:   { label: 'Nazra',   cls: 'chip chip-blue'  },
-  tajweed: { label: 'Tajweed', cls: 'chip chip-gold'  },
-  arabic:  { label: 'Arabic',  cls: 'chip chip-sand'  },
+  hifz: { label: 'Hifz', cls: 'chip chip-green' },
+  nazra: { label: 'Nazra', cls: 'chip chip-blue' },
+  tajweed: { label: 'Tajweed', cls: 'chip chip-gold' },
+  arabic: { label: 'Arabic', cls: 'chip chip-sand' },
 };
 
 const DIFFICULTY_CHIP = {
-  beginner:     { label: 'Beginner',    cls: 'chip chip-green' },
-  intermediate: { label: 'Intermediate', cls: 'chip chip-gold'  },
-  advance:      { label: 'Advanced',    cls: 'chip chip-red'   },
+  beginner: { label: 'Beginner', cls: 'chip chip-green' },
+  intermediate: { label: 'Intermediate', cls: 'chip chip-gold' },
+  advance: { label: 'Advanced', cls: 'chip chip-red' },
 };
 
 function CourseCard({ course, onEdit }) {
   const navigate = useNavigate();
-  const chip     = TYPE_CHIP[course.type] ?? { label: course.type, cls: 'chip chip-sand' };
+  const chip = TYPE_CHIP[course.type] ?? { label: course.type, cls: 'chip chip-sand' };
   const diffChip = DIFFICULTY_CHIP[course.difficulty_level];
 
   return (
@@ -91,12 +92,12 @@ function CourseCard({ course, onEdit }) {
 }
 
 export default function CoursesList() {
-  const [addOpen, setAddOpen]       = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
-
+  const isMobile = useIsMobile();
   const { data: courses = [], isLoading, error } = useQuery({
     queryKey: ['courses'],
-    queryFn:  getCourses,
+    queryFn: getCourses,
     staleTime: 2 * 60_000,
   });
 
@@ -146,7 +147,7 @@ export default function CoursesList() {
           }
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(3, 1fr)', gap: 20 }}>
           {courses.map((c) => (
             <CourseCard key={c.id} course={c} onEdit={setEditCourse} />
           ))}

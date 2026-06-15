@@ -11,9 +11,11 @@ import { getStaffDetails } from '../../../api/salaries';
 import { createUser, removeUserFromCenter, updateStaffProfile } from '../../../api/users';
 import { getCenters } from '../../../api/centers';
 import { getRoles } from '../../../api/rbac';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 export default function TeachersList() {
   const { user, role } = useAuth();
+  const isMobile = useIsMobile();
   const isGlobal = role === 'super_admin' || role === 'finance_manager';
   const centerId = user?.center_id;
 
@@ -146,9 +148,9 @@ export default function TeachersList() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: isMobile && 'column', justifyContent: 'space-between', marginBottom: 24 }}>
         <PageHeader title={isGlobal ? "Staff Management" : "Teachers & Staff"} subtitle={selectedCenter === 'all' ? 'Manage staff across all centers' : 'Manage teachers and staff salaries'} />
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: "column", gap: 12 }}>
           {isGlobal && (
             <select
               className="f-input"

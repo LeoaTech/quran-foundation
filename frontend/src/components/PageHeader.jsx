@@ -50,7 +50,7 @@ export default function PageHeader({ title, subtitle, action }) {
       {action && (
         <Button
           variant={action.variant ?? "primary"}
-          size="md"
+          size={isMobile ? "sm" : "md"}
           onClick={action.onClick}
           style={{ width: isMobile ? "100%" : "auto" }}
         >

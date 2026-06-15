@@ -4,11 +4,11 @@ import Button from '../../../components/Button';
 import Can from '../../../components/Can';
 import { useRoles, useRolePermissions, useToggleRolePermission, useSetRolePermissions } from '../../../hooks/usePermissions';
 import { useToast } from '../../../hooks/useToast';
-import RBACTabs       from './RBACTabs';
+import RBACTabs from './RBACTabs';
 import CreateRoleModal from './CreateRoleModal';
-import EditRoleModal   from './EditRoleModal';
+import EditRoleModal from './EditRoleModal';
 import DeleteRoleModal from './DeleteRoleModal';
-
+import { useIsMobile } from "../../../hooks/useIsMobile";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MODULE_ICONS = {
@@ -118,24 +118,25 @@ export default function RBACPage() {
   const { data: rolesRaw = [], isLoading: rolesLoading } = useRoles({ include: 'permissions' });
   const roles = Array.isArray(rolesRaw) ? rolesRaw : [];
 
-  const [selectedRoleId, setSelectedRoleId]     = useState(null);
-  const [createOpen,     setCreateOpen]          = useState(false);
-  const [editRole,       setEditRole]            = useState(null);
-  const [deleteRole,     setDeleteRole]          = useState(null);
+  const [selectedRoleId, setSelectedRoleId] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editRole, setEditRole] = useState(null);
+  const [deleteRole, setDeleteRole] = useState(null);
 
   // Permission matrix state
-  const [localGranted,  setLocalGranted]  = useState(new Set()); // current UI state (Set of perm IDs)
-  const [initGranted,   setInitGranted]   = useState(new Set()); // last-synced server state
-  const [inFlight,      setInFlight]      = useState(new Set()); // per-toggle spinner set
-  const [expanded,      setExpanded]      = useState({});        // module collapse state
-  const [isSaving,      setIsSaving]      = useState(false);
+  const [localGranted, setLocalGranted] = useState(new Set()); // current UI state (Set of perm IDs)
+  const [initGranted, setInitGranted] = useState(new Set()); // last-synced server state
+  const [inFlight, setInFlight] = useState(new Set()); // per-toggle spinner set
+  const [expanded, setExpanded] = useState({});        // module collapse state
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data: permData, isLoading: permsLoading } = useRolePermissions(selectedRoleId);
-  const { mutateAsync: togglePermission }           = useToggleRolePermission();
-  const { mutateAsync: saveAllPermissions }         = useSetRolePermissions();
+  const { mutateAsync: togglePermission } = useToggleRolePermission();
+  const { mutateAsync: saveAllPermissions } = useSetRolePermissions();
 
   const selectedRole = roles.find((r) => r.id === selectedRoleId);
 
+  const isMobile = useIsMobile()
   // Initialize local state when role or server data changes
   useEffect(() => {
     if (!permData) return;
@@ -188,7 +189,7 @@ export default function RBACPage() {
   }, [localGranted, selectedRoleId, togglePermission, toast]);
 
   // Grant / revoke all in a module
-  const handleGrantAll  = (modulePerms) => setLocalGranted((prev) => { const s = new Set(prev); modulePerms.forEach((p) => s.add(p.id)); return s; });
+  const handleGrantAll = (modulePerms) => setLocalGranted((prev) => { const s = new Set(prev); modulePerms.forEach((p) => s.add(p.id)); return s; });
   const handleRevokeAll = (modulePerms) => {
     if (!window.confirm(`Revoke all permissions in this module from "${selectedRole?.name}"?`)) return;
     setLocalGranted((prev) => { const s = new Set(prev); modulePerms.forEach((p) => s.delete(p.id)); return s; });
@@ -229,7 +230,7 @@ export default function RBACPage() {
       </div>
 
       {/* Two-panel layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '300px 1fr', gap: 16, alignItems: 'start' }}>
 
         {/* ── Left panel — roles list ── */}
         <div style={{
@@ -383,9 +384,9 @@ export default function RBACPage() {
                             </thead>
                             <tbody>
                               {perms.map((perm, i) => {
-                                const granted  = localGranted.has(perm.id);
-                                const loading  = inFlight.has(perm.id);
-                                const isLast   = i === perms.length - 1;
+                                const granted = localGranted.has(perm.id);
+                                const loading = inFlight.has(perm.id);
+                                const isLast = i === perms.length - 1;
                                 return (
                                   <tr key={perm.id} style={{ background: granted ? 'rgba(42,170,132,0.03)' : 'transparent' }}>
                                     <td style={{ padding: '9px 16px', fontSize: 13, color: 'var(--ink-mid)', borderBottom: isLast ? 'none' : '1px solid var(--sand)', fontWeight: granted ? 500 : 400 }}>

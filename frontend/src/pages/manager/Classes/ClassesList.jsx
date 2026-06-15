@@ -11,18 +11,19 @@ import AddClassModal from './AddClassModal';
 import { getClasses } from '../../../api/classes';
 import { getCourses } from '../../../api/courses';
 import { getCenter } from '../../../api/centers';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 const TYPE_CHIP = {
-  hifz:    { label: 'Hifz',    cls: 'chip chip-green' },
-  nazra:   { label: 'Nazra',   cls: 'chip chip-blue'  },
-  tajweed: { label: 'Tajweed', cls: 'chip chip-gold'  },
-  arabic:  { label: 'Arabic',  cls: 'chip chip-sand'  },
+  hifz: { label: 'Hifz', cls: 'chip chip-green' },
+  nazra: { label: 'Nazra', cls: 'chip chip-blue' },
+  tajweed: { label: 'Tajweed', cls: 'chip chip-gold' },
+  arabic: { label: 'Arabic', cls: 'chip chip-sand' },
 };
 
 function capacityColor(enrolled, max) {
   if (!max) return 'var(--ink-mid)';
   const pct = enrolled / max;
-  if (pct >= 1)   return 'var(--red)';
+  if (pct >= 1) return 'var(--red)';
   if (pct >= 0.8) return 'var(--amber)';
   return 'var(--emerald)';
 }
@@ -50,35 +51,37 @@ export default function ClassesList() {
   const navigate = useNavigate();
   const centerId = user?.center_id;
 
-  const [addOpen, setAddOpen]       = useState(false);
-  const [courseFilter, setCourse]   = useState('');
-  const [statusFilter, setStatus]   = useState('active');
+  const isMobile = useIsMobile();
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [courseFilter, setCourse] = useState('');
+  const [statusFilter, setStatus] = useState('active');
 
   const { data: center } = useQuery({
     queryKey: ['center', centerId],
-    queryFn:  () => getCenter(centerId),
+    queryFn: () => getCenter(centerId),
     staleTime: 10 * 60_000,
-    enabled:  !!centerId,
+    enabled: !!centerId,
   });
 
   const { data: coursesRaw = [] } = useQuery({
     queryKey: ['courses'],
-    queryFn:  getCourses,
+    queryFn: getCourses,
     staleTime: 5 * 60_000,
   });
 
   const { data: classesRaw = [], isLoading, error } = useQuery({
     queryKey: ['classes', centerId, courseFilter, statusFilter],
-    queryFn:  () => getClasses(centerId, {
+    queryFn: () => getClasses(centerId, {
       ...(courseFilter ? { course_id: courseFilter } : {}),
       ...(statusFilter === 'active' ? { is_active: true } : statusFilter === 'inactive' ? { is_active: false } : {}),
     }),
     staleTime: 60_000,
-    enabled:  !!centerId,
+    enabled: !!centerId,
   });
 
-  const classes  = classesRaw?.data ?? classesRaw ?? [];
-  const courses  = coursesRaw?.data ?? coursesRaw ?? [];
+  const classes = classesRaw?.data ?? classesRaw ?? [];
+  const courses = coursesRaw?.data ?? coursesRaw ?? [];
   const centerName = center?.name ?? 'My Center';
 
   if (!centerId) {
@@ -99,7 +102,7 @@ export default function ClassesList() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', flexDirection: isMobile && 'column', gap: isMobile && 12, justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
             Classrooms — {centerName}
@@ -163,9 +166,9 @@ export default function ClassesList() {
             </thead>
             <tbody>
               {classes.map((cls, i) => {
-                const isLast   = i === classes.length - 1;
+                const isLast = i === classes.length - 1;
                 const enrolled = cls.enrolled_count ?? cls.student_count ?? 0;
-                const cap      = cls.max_capacity;
+                const cap = cls.max_capacity;
                 const capColor = capacityColor(enrolled, cap);
                 const courseType = cls.course_type ?? cls.course?.type;
                 const chip = TYPE_CHIP[courseType] ?? null;
@@ -195,7 +198,7 @@ export default function ClassesList() {
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                           {cls.schedules.map((s, idx) => (
                             <span key={s.id || idx} style={{ fontSize: 10, padding: '2px 6px', background: 'var(--sand-mid)', borderRadius: 'var(--radius-sm)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
-                              {s.day_of_week.slice(0,3)} {formatTime(s.start_time)}
+                              {s.day_of_week.slice(0, 3)} {formatTime(s.start_time)}
                             </span>
                           ))}
                         </div>

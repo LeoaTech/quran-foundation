@@ -43,6 +43,7 @@ import {
 } from '../../../utils/classSessions';
 import TopicAssignmentTab from './CenterLevelTopicAssignment/TopicAssignmentTab';
 import HomeworkCriteriaTab from './ClassSessionHomeWork/HomeworkCriteriaTab';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 const TYPE_CHIP = {
   hifz: { label: 'Hifz', cls: 'chip chip-green' },
   nazra: { label: 'Nazra', cls: 'chip chip-blue' },
@@ -70,26 +71,31 @@ function normalizeDate(date) {
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 function TabBar({ tabs, active, onChange }) {
   return (
-    <div style={{ display: 'flex', borderBottom: '1.5px solid var(--sand-mid)', marginBottom: 24 }}>
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onChange(t.id)}
-          style={{
-            padding: '10px 20px 12px',
-            fontSize: 14, fontWeight: 500,
-            color: active === t.id ? 'var(--emerald)' : 'var(--ink-pale)',
-            borderBottom: active === t.id ? '2.5px solid var(--emerald)' : '2.5px solid transparent',
-            marginBottom: -1.5,
-            background: 'none', border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-            transition: 'color 0.2s',
-          }}
-        >
-          {t.label}
-        </button>
-      ))}
+    <div style={{
+      display: 'flex',
+      overflowX: 'auto',
+      whiteSpace: 'nowrap',
+      borderBottom: '1.5px solid var(--sand-mid)',
+      marginBottom: 24
+    }}>      {tabs.map((t) => (
+      <button
+        key={t.id}
+        onClick={() => onChange(t.id)}
+        style={{
+          padding: '10px 20px 12px',
+          fontSize: 14, fontWeight: 500,
+          color: active === t.id ? 'var(--emerald)' : 'var(--ink-pale)',
+          borderBottom: active === t.id ? '2.5px solid var(--emerald)' : '2.5px solid transparent',
+          marginBottom: -1.5,
+          background: 'none', border: 'none',
+          cursor: 'pointer',
+          fontFamily: 'var(--font-body)',
+          transition: 'color 0.2s',
+        }}
+      >
+        {t.label}
+      </button>
+    ))}
     </div>
   );
 }
@@ -104,7 +110,7 @@ function Field({ label, children }) {
 }
 
 // ── Students tab ──────────────────────────────────────────────────────────────
-function StudentsTab({ classId, cls }) {
+function StudentsTab({ classId, cls, isMobile }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -143,7 +149,7 @@ function StudentsTab({ classId, cls }) {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile && 'column', gap: isMobile && 8, marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             className="f-input"
@@ -333,7 +339,7 @@ function TeachersTab({ classId, centerId, courseId }) {
 
 
 // ── Homework Criteria tab ─────────────────────────────────────────────────────
- // Moved this Part into ClassSessionHomeWork/HomeWorkCriteriaTab.jsx
+// Moved this Part into ClassSessionHomeWork/HomeWorkCriteriaTab.jsx
 
 // ── Class Tab (Schedules & Projected Sessions) ──────────────────────────────────
 
@@ -1054,7 +1060,7 @@ export default function ClassDetail() {
   const { id: classId } = useParams();
   const navigate = useNavigate();
   const [tab, setTab] = useState('students');
-
+  const isMobile = useIsMobile();
   const { data: cls, isLoading, error } = useQuery({
     queryKey: ['class', classId],
     queryFn: () => getClass(classId),
@@ -1124,7 +1130,7 @@ export default function ClassDetail() {
 
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === 'students' && <StudentsTab classId={classId} cls={cls} />}
+      {tab === 'students' && <StudentsTab classId={classId} cls={cls} isMobile={isMobile} />}
       {tab === 'teachers' && <TeachersTab classId={classId} centerId={cls.center_id} courseId={cls.course_id} />}
       {tab === 'schedules' && <ClassSchedulesTab cls={cls} classId={classId} />}
       {tab === 'topic-assignment' && <TopicAssignmentTab cls={cls} />}

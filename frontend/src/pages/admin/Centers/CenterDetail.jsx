@@ -24,36 +24,35 @@ import ClassesList from '../../manager/Classes/ClassesList';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
-function TabBar({ tabs, active, onChange,isMobile }) {
+function TabBar({ tabs, active, onChange, isMobile }) {
   return (
-    // <div style={{ display: 'flex', borderBottom: '1.5px solid var(--sand-mid)', marginBottom: 24 }}>
     <div style={{
       display: 'flex',
       overflowX: 'auto',
       whiteSpace: 'nowrap',
       borderBottom: '1.5px solid var(--sand-mid)',
       marginBottom: 24
-    }}>   
-    {tabs.map((t) => (
-      <button
-        key={t.id}
-        onClick={() => onChange(t.id)}
-        style={{
-          padding: isMobile? '10px 14px 12px': '10px 20px 12px',
-          fontSize: isMobile ? 12 :14, fontWeight: 500,
-          color: active === t.id ? 'var(--emerald)' : 'var(--ink-pale)',
-          borderBottom: active === t.id ? '2.5px solid var(--emerald)' : '2.5px solid transparent',
-          marginBottom: -1.5,
-          background: 'none', border: 'none',
-          cursor: 'pointer',
-          fontFamily: 'var(--font-body)',
-          transition: 'color 0.2s',
-          flex:'0 0 auto'
-        }}
-      >
-        {t.label}
-      </button>
-    ))}
+    }}>
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          style={{
+            padding: isMobile ? '10px 14px 12px' : '10px 20px 12px',
+            fontSize: isMobile ? 12 : 14, fontWeight: 500,
+            color: active === t.id ? 'var(--emerald)' : 'var(--ink-pale)',
+            borderBottom: active === t.id ? '2.5px solid var(--emerald)' : '2.5px solid transparent',
+            marginBottom: -1.5,
+            background: 'none', border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-body)',
+            transition: 'color 0.2s',
+            flex: '0 0 auto'
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -351,7 +350,7 @@ function SettingsTab({ centerId, center, isMobile }) {
       <CardHeader><span className="card-title">Center details</span></CardHeader>
       <CardBody>
         <form onSubmit={handleSave}>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' :  '1fr 1fr', gap: '0 20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0 20px' }}>
             <FormField label="Name (English)">
               <input className="f-input" value={form.name} onChange={set('name')} required disabled={!canEdit} />
             </FormField>

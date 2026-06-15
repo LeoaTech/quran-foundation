@@ -1,3 +1,5 @@
+import { useIsMobile } from "../hooks/useIsMobile";
+
 const SIZE = {
   sm: { padding: '6px 14px', fontSize: 12 },
   md: { padding: '9px 18px', fontSize: 13 },
@@ -39,6 +41,8 @@ export default function Button({
   children,
   ...rest
 }) {
+
+  const isMobile = useIsMobile()
   const v = VARIANT[variant] ?? VARIANT.primary;
   const s = SIZE[size] ?? SIZE.md;
 
@@ -52,6 +56,7 @@ export default function Button({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
+        // width: isMobile && '100%',
         padding: s.padding,
         fontSize: s.fontSize,
         fontFamily: 'var(--font-body)',

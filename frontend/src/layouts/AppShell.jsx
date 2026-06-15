@@ -243,8 +243,18 @@ export default function AppShell() {
     setSidebarOpen(false);
   };
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isMobile && sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobile, sidebarOpen]);
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div style={{ display: "flex", minHeight: "100vh", width: "100%", maxWidth: "100vw" }}>
       {/* Sidebar Overlay for Mobile */}
       {isMobile && (
         <div

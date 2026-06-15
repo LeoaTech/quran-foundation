@@ -6,6 +6,7 @@ import Button from '../../../components/Button';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import { getDonations } from '../../../api/donations';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 function thStyle() {
   return { textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' };
@@ -18,7 +19,7 @@ function tdStyle(hasBorder = true) {
 export default function DonationsList() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
-
+  const isMobile = useIsMobile();
   const [donorTypeFilter, setDonorTypeFilter] = useState('');
   const [page, setPage] = useState(1);
 
@@ -41,7 +42,7 @@ export default function DonationsList() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile && 12, flexDirection: isMobile && 'column', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
             Donations
@@ -82,7 +83,7 @@ export default function DonationsList() {
           action={<Button variant="primary" onClick={() => navigate(`${role === 'super_admin' ? '/admin' : role === 'finance_manager' ? '/finance' : '/manager'}/donations/new`)}>+ Record Donation</Button>}
         />
       ) : (
-        <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ overflowX: 'auto', background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>

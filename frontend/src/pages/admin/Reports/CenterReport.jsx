@@ -9,7 +9,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import Button from '../../../components/Button';
 import { useCenterReport } from '../../../hooks/useReports';
 import { getCenters, getCenter } from '../../../api/centers';
-
+import { useIsMobile } from "../../../hooks/useIsMobile";
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
@@ -34,8 +34,8 @@ function exportCSV(report, centerName, month) {
   ]);
   const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url;
   a.download = `${centerName}-${month}.csv`;
   a.click();
@@ -44,12 +44,12 @@ function exportCSV(report, centerName, month) {
 
 export default function CenterReport() {
   const { user, role } = useAuth();
-  const [month, setMonth]     = useState(currentMonth());
+  const [month, setMonth] = useState(currentMonth());
   const [centerId, setCenterId] = useState(user?.center_id ?? '');
 
   const { data: centersRaw = [] } = useQuery({
     queryKey: ['centers'],
-    queryFn:  getCenters,
+    queryFn: getCenters,
     staleTime: 5 * 60_000,
     enabled: role === 'super_admin',
   });
@@ -57,25 +57,25 @@ export default function CenterReport() {
 
   const { data: centerData } = useQuery({
     queryKey: ['center', centerId],
-    queryFn:  () => getCenter(centerId),
+    queryFn: () => getCenter(centerId),
     staleTime: 10 * 60_000,
-    enabled:  !!centerId,
+    enabled: !!centerId,
   });
 
   const { data: report, isLoading } = useCenterReport(centerId, month);
 
   const centerName = centerData?.name ?? 'Center';
-  const stats      = report ?? {};
-  const classes    = stats.classes ?? [];
-  const criteria   = stats.homework_criteria ?? [];
-
+  const stats = report ?? {};
+  const classes = stats.classes ?? [];
+  const criteria = stats.homework_criteria ?? [];
+  const isMobile = useIsMobile()
   const thStyle = { textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' };
   const tdStyle = (last) => ({ padding: '10px 14px', fontSize: 13, color: 'var(--ink-mid)', borderBottom: last ? 'none' : '1px solid var(--sand)', verticalAlign: 'middle' });
 
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', flexDirection: isMobile && 'column', gap: isMobile && 12, justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
             {centerName} — Monthly Report
@@ -104,11 +104,11 @@ export default function CenterReport() {
       ) : (
         <>
           {/* Section 1 — Overview metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-            <MetricCard label="Students"            value={stats.active_students    ?? '—'} variant="green"   />
-            <MetricCard label="Active classes"      value={stats.active_classes     ?? '—'} variant="blue"    />
-            <MetricCard label="Attendance"          value={stats.attendance_pct != null ? `${stats.attendance_pct}%` : '—'} variant={stats.attendance_pct >= 75 ? 'green' : stats.attendance_pct >= 60 ? 'gold' : 'red'} />
-            <MetricCard label="New enrollments"     value={stats.new_enrollments    ?? '—'} variant="neutral" />
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+            <MetricCard label="Students" value={stats.active_students ?? '—'} variant="green" />
+            <MetricCard label="Active classes" value={stats.active_classes ?? '—'} variant="blue" />
+            <MetricCard label="Attendance" value={stats.attendance_pct != null ? `${stats.attendance_pct}%` : '—'} variant={stats.attendance_pct >= 75 ? 'green' : stats.attendance_pct >= 60 ? 'gold' : 'red'} />
+            <MetricCard label="New enrollments" value={stats.new_enrollments ?? '—'} variant="neutral" />
           </div>
 
           {/* Section 2 — Class breakdown */}
