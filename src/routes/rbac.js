@@ -164,7 +164,10 @@ router.patch(
 router.get(
   '/users/:userId/permissions',
   requireAuth,
-  requirePermission('roles.assign'),
+  async (req, res, next) => {
+    if (req.user.id === req.params.userId) return next();
+    return requirePermission('roles.assign')(req, res, next);
+  },
   controller.getUserPermissions,
 );
 
