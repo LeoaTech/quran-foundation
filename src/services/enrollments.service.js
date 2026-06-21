@@ -149,7 +149,8 @@ async function createEnrollment({ user, body }) {
 async function enrollNewStudent({ user, body }) {
   const {
     full_name, full_name_ur, phone, whatsapp, date_of_birth, gender,
-    class_id, class_schedule_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method
+    class_id, class_schedule_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method,
+    profile_picture, qualification, occupation, marital_status, is_repeater, address, center_manager_name, center_manager_contact
   } = body;
 
   // ── Pre-flight checks (outside transaction — read-only) ─────────────────
@@ -201,6 +202,16 @@ async function enrollNewStudent({ user, body }) {
       password_hash,
       preferred_lang: 'ur',
       is_active:    true,
+      metadata:     JSON.stringify({
+        profile_picture: profile_picture || null,
+        qualification: qualification || null,
+        occupation: occupation || null,
+        marital_status: marital_status || null,
+        is_repeater: is_repeater || false,
+        address: address || null,
+        center_manager_name: center_manager_name || null,
+        center_manager_contact: center_manager_contact || null,
+      }),
     }).returning('*');
 
     // 2. Assign the 'student' role scoped to this center

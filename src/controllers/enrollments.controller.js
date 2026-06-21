@@ -1,4 +1,5 @@
 const service = require('../services/enrollments.service');
+const { uploadImage } = require('../services/cloudinary.service');
 
 async function createEnrollment(req, res, next) {
   try {
@@ -10,7 +11,16 @@ async function createEnrollment(req, res, next) {
 
 async function enrollNewStudent(req, res, next) {
   try {
-    res.status(201).json(await service.enrollNewStudent({ user: req.user, body: req.body }));
+    const body = { ...req.body };
+    
+    if (req.file) {
+      const profilePictureUrl = await uploadImage(req.file.buffer, 'profiles');
+      if (profilePictureUrl) {
+        body.profile_picture = profilePictureUrl;
+      }
+    }
+
+    res.status(201).json(await service.enrollNewStudent({ user: req.user, body }));
   } catch (err) {
     next(err);
   }

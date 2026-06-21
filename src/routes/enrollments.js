@@ -3,6 +3,7 @@ const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
 const { requirePermission, requireAnyPermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
+const upload       = require('../middleware/upload');
 const controller   = require('../controllers/enrollments.controller');
 
 const router = Router();
@@ -42,8 +43,15 @@ const enrollNewStudentSchema = z.object({
   enrolled_on:       z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
   prior_level:       z.string().max(100).optional(),
   notes_ur:          z.string().optional(),
-  amount_paid:       z.number().positive().optional(),
+  amount_paid:       z.coerce.number().positive().optional(),
   payment_method:    z.string().optional(),
+  qualification:     z.string().max(100).optional(),
+  occupation:        z.string().max(100).optional(),
+  marital_status:    z.string().max(50).optional(),
+  is_repeater:       z.string().optional().transform(v => v === 'true' || v === 'yes' || v === 'on'),
+  address:           z.string().optional(),
+  center_manager_name: z.string().max(255).optional(),
+  center_manager_contact: z.string().max(50).optional(),
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -62,6 +70,7 @@ router.post(
   '/enrollments/enroll-student',
   requireAuth,
   requirePermission('enrollments.create'),
+  upload.single('profile_picture'),
   validate(enrollNewStudentSchema),
   controller.enrollNewStudent,
 );
