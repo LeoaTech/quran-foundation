@@ -69,8 +69,16 @@ async function listUsers({ user, query = {} } = {}) {
   const total      = parseInt(meta.total, 10);
   const totalPages = Math.ceil(total / perPage);
 
+  const parsedRows = rows.map(row => {
+    let metadata = row.metadata;
+    if (typeof metadata === 'string') {
+      try { metadata = JSON.parse(metadata); } catch(e) { metadata = {}; }
+    }
+    return { ...row, metadata: metadata || {} };
+  });
+
   return {
-    data: rows,
+    data: parsedRows,
     meta: { page, per_page: perPage, total, total_pages: totalPages },
   };
 }
@@ -144,6 +152,43 @@ async function updateUser({ user: caller, userId, body }) {
   const updated = await repo.updateUser(userId, body);
   return updated;
 }
+
+async function updateProfile({ user: caller, userId, body }) {
+  const target = await repo.getUserById(userId);
+  if (!target) throw notFound();
+
+  // Allow self-update or super_admin/center_manager
+  if (caller.id !== userId && !caller.roles.includes('super_admin') && !caller.roles.includes('center_manager')) {
+    throw forbidden();
+  }
+
+  const { profile_picture, qualification, occupation, marital_status, is_repeater, address, center_manager_name, center_manager_contact, ...rest } = body;
+  
+  delete rest.password_hash;
+  delete rest.password;
+  delete rest.role;
+  delete rest.center_id;
+
+  let metadata = target.metadata || {};
+  if (typeof metadata === 'string') {
+    try { metadata = JSON.parse(metadata); } catch(e) { metadata = {}; }
+  }
+
+  if (profile_picture !== undefined) metadata.profile_picture = profile_picture;
+  if (qualification !== undefined) metadata.qualification = qualification;
+  if (occupation !== undefined) metadata.occupation = occupation;
+  if (marital_status !== undefined) metadata.marital_status = marital_status;
+  if (is_repeater !== undefined) metadata.is_repeater = is_repeater;
+  if (address !== undefined) metadata.address = address;
+  if (center_manager_name !== undefined) metadata.center_manager_name = center_manager_name;
+  if (center_manager_contact !== undefined) metadata.center_manager_contact = center_manager_contact;
+
+  rest.metadata = JSON.stringify(metadata);
+
+  const updated = await repo.updateUser(userId, rest);
+  return updated;
+}
+
 
 async function updateStaffProfile({ user: caller, userId, oldCenterId, body }) {
   const { role, center_id: newCenterId, base_salary, joining_date, payment_method, bank_name, account_number, ...userData } = body;
@@ -331,4 +376,5 @@ module.exports = {
   linkGuardian,
   listGuardians,
   removeUserFromCenter,
+  updateProfile
 };

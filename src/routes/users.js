@@ -3,6 +3,7 @@ const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
 const { requirePermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
+const upload       = require('../middleware/upload');
 const controller   = require('../controllers/users.controller');
 
 const router = Router();
@@ -41,8 +42,21 @@ const updateUserSchema = z.object({
   gender:         z.enum(GENDERS).optional(),
   preferred_lang: z.enum(LANGS).optional(),
   is_active:      z.boolean().optional(),
+  is_active:      z.boolean().optional(),
+  qualification:  z.string().max(100).optional(),
+  occupation:     z.string().max(100).optional(),
+  marital_status: z.string().max(50).optional(),
+  is_repeater:    z.string().optional().transform(v => v === 'true' || v === 'yes' || v === 'on'),
+  address:        z.string().optional(),
+  center_manager_name: z.string().max(255).optional(),
+  center_manager_contact: z.string().max(50).optional(),
 }).refine((b) => Object.keys(b).length > 0, {
   message: 'Request body must contain at least one field to update.',
+});
+
+const changePasswordSchema = z.object({
+  current_password: z.string().min(1, 'Current password is required'),
+  new_password: z.string().min(6, 'New password must be at least 6 characters'),
 });
 
 const updateStaffProfileSchema = z.object({
@@ -101,6 +115,17 @@ router.patch(
   validate(updateUserSchema),
   controller.updateUser,
 );
+
+// Additional Metadata: profile update with file upload
+router.patch(
+  '/users/:user_id/profile',
+  requireAuth,
+  upload.single('profile_picture'),
+  validate(updateUserSchema),
+  controller.updateProfile,
+);
+
+
 
 router.patch(
   '/users/:user_id/center/:center_id/staff_profile',

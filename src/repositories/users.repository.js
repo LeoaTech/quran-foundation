@@ -17,10 +17,15 @@ function listUsers({ centerId, role, search, isActive, page = 1, perPage = 20 } 
       'u.preferred_lang',
       'u.is_active',
       'u.created_at',
+      'u.metadata',
       'r.name as role',
       'ur.center_id',
     )
     .orderBy('u.full_name', 'asc');
+
+  if (role === 'student') {
+    query.select(db.raw(`(SELECT string_agg(c.name, ', ') FROM enrollments e JOIN classes cl ON e.class_id = cl.id JOIN courses c ON cl.course_id = c.id WHERE e.student_user_id = u.id AND e.status = 'active') as enrolled_courses`));
+  }
 
   if (centerId !== undefined && centerId !== 'all') query.where('ur.center_id', centerId);
   if (role !== undefined) query.where('r.name', role);

@@ -1,4 +1,5 @@
 const service = require('../services/users.service');
+const { uploadImage } = require('../services/cloudinary.service');
 
 async function listUsers(req, res, next) {
   try {
@@ -87,6 +88,25 @@ async function updateStaffProfile(req, res, next) {
   }
 }
 
+async function updateProfile(req, res, next) {
+  try {
+    const body = { ...req.body };
+    
+    if (req.file) {
+      const profilePictureUrl = await uploadImage(req.file.buffer, 'profiles');
+      if (profilePictureUrl) {
+        body.profile_picture = profilePictureUrl;
+      }
+    }
+
+    res.json(await service.updateProfile({ user: req.user, userId: req.params.user_id, body }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+
+
 module.exports = {
   listUsers,
   getUser,
@@ -98,4 +118,5 @@ module.exports = {
   linkGuardian,
   listGuardians,
   removeUserFromCenter,
+  updateProfile
 };
