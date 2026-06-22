@@ -100,6 +100,7 @@ export default function AppRoutes() {
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/centers" element={<CentersList />} />
             <Route path="/admin/centers/:id" element={<CenterDetail />} />
+            <Route path="/admin/classes/:id" element={<ClassDetail />} />
             <Route path="/admin/org" element={<OrgSettings />} />
             <Route path="/admin/courses" element={<CoursesList />} />
             <Route path="/admin/courses/:id" element={<CourseDetail />} />
@@ -130,6 +131,7 @@ export default function AppRoutes() {
             <Route path="/manager/salaries" element={<SalariesTab />} />
             <Route path="/manager/attendance" element={<AttendanceSheet />} />
             <Route path="/manager/reports" element={<CenterReport />} />
+            <Route path="/manager/users/:userId" element={<UserProfilePage />} />
           </Route>
 
           {/* ── Teacher ── */}
