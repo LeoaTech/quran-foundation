@@ -50,6 +50,9 @@ const updateUserSchema = z.object({
   address:        z.string().optional(),
   center_manager_name: z.string().max(255).optional(),
   center_manager_contact: z.string().max(50).optional(),
+  father_name:     z.string().max(255).optional(),
+  full_name:       z.string().min(1).optional(),
+  full_name_ur:    z.string().optional(),
 }).refine((b) => Object.keys(b).length > 0, {
   message: 'Request body must contain at least one field to update.',
 });
