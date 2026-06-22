@@ -23,12 +23,13 @@ export default function ShareCredentialsModal({ isOpen, onClose, user }) {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(`Your new password is: ${newPassword}`);
+    const text = `Assalamu Alaikum ${user.full_name},\n\nYour account credentials for the Quran Foundation LMS have been generated.\n\nPhone (Login): ${user.phone}\nPassword: ${newPassword}\n\nPlease login using your phone number and change your password after first login.`;
+    navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard');
   };
 
   const handleWhatsApp = () => {
-    const text = `Assalamu Alaikum ${user.full_name},\n\nYour account credentials for the Quran Foundation LMS have been generated.\n\nPassword: ${newPassword}\n\nPlease login and change your password.`;
+    const text = `Assalamu Alaikum ${user.full_name},\n\nYour account credentials for the Quran Foundation LMS have been generated.\n\nPhone (Login): ${user.phone}\nPassword: ${newPassword}\n\nPlease login using your phone number and change your password after first login.`;
     const url = `https://wa.me/${user.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
