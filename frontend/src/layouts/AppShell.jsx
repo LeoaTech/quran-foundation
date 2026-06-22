@@ -118,26 +118,12 @@ const NAV_CONFIG = {
     badgeClass: "badge-teacher",
     sections: [
       {
-        title: "My Classes",
+        title: "Navigation",
         items: [
           { to: '/teacher/dashboard', label: 'Dashboard', icon: '⊞' },
-          { to: '/teacher/attendance', label: 'Attendance', icon: '☑', requires: 'attendance.mark' },
-          { to: '/teacher/progress', label: 'Log Progress', icon: '◈', requires: 'progress.create' },
-          { to: '/teacher/progress/class', label: 'Class Overview', icon: '◉', requires: 'progress.view' },
-          { to: '/teacher/assessments', label: 'Assessments', icon: '▦', requires: 'assessments.view' },
+          { to: '/teacher/classes', label: 'My Classrooms', icon: '◈' },
         ],
       },
-      {
-        title: "Reports",
-        items: [
-          {
-            to: "/teacher/reports/homework",
-            label: "HW Report",
-            icon: "▦",
-            requires: "reports.view_student"
-          }
-        ]
-      }
     ]
   },
 
