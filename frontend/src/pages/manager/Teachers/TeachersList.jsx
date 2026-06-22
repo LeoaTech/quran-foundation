@@ -12,6 +12,7 @@ import { createUser, removeUserFromCenter, updateStaffProfile } from '../../../a
 import { getCenters } from '../../../api/centers';
 import { getRoles } from '../../../api/rbac';
 import { useIsMobile } from '../../../hooks/useIsMobile';
+import ShareCredentialsModal from '../../../components/ShareCredentialsModal';
 
 export default function TeachersList() {
   const { user, role } = useAuth();
@@ -41,6 +42,7 @@ export default function TeachersList() {
 
   const [editId, setEditId] = useState(null);
   const [editCenterId, setEditCenterId] = useState(null);
+  const [shareUser, setShareUser] = useState(null);
 
   const { data: centersData } = useQuery({
     queryKey: ['centers'],
@@ -314,6 +316,14 @@ export default function TeachersList() {
                         <Button
                           size="sm"
                           variant="outline"
+                          style={{ color: 'var(--ink)', borderColor: 'var(--ink)' }}
+                          onClick={() => setShareUser({ id: s.user_id, full_name: s.full_name, phone: s.phone })}
+                        >
+                          Share Credentials
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           style={{ color: 'var(--red)', border: 'none' }}
                           onClick={() => handleRemove(s.user_id, s.center_id, s.full_name)} >
                           Remove
@@ -327,6 +337,12 @@ export default function TeachersList() {
           </div>
         )}
       </div>
+
+      <ShareCredentialsModal
+        isOpen={!!shareUser}
+        user={shareUser}
+        onClose={() => setShareUser(null)}
+      />
     </>
   );
 }
