@@ -81,7 +81,7 @@ const td = (hasBorder = true) => ({
 
 // ── Record Payment Modal ───────────────────────────────────────────────────────
 
-function RecordPaymentModal({ centerId, staff, onClose, onSuccess }) {
+function RecordPaymentModal({ centerId, staff, onClose, onSuccess, isMobile }) {
   const toast = useToast();
   const [form, setForm] = useState({
     staff_user_id: '',
@@ -488,6 +488,7 @@ export default function SalariesTab({ centerId: propCenterId }) {
           staff={staffForModal}
           onClose={() => { setShowModal(false); setPreselectedStaff(null); }}
           onSuccess={handleSuccess}
+          isMobile={isMobile}
         />
       )}
 
