@@ -27,7 +27,7 @@ export default function Enrollment() {
   const [fullName, setFullName] = useState('');
   const [fullNameUr, setFullNameUr] = useState('');
   const [phone, setPhone] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [fatherName, setFatherName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
   const [profilePicture, setProfilePicture] = useState(null);
@@ -149,7 +149,9 @@ export default function Enrollment() {
         formData.append('full_name', fullName);
         if (fullNameUr) formData.append('full_name_ur', fullNameUr);
         formData.append('phone', phone);
-        if (whatsapp) formData.append('whatsapp', whatsapp);
+        // WhatsApp always mirrors phone
+        formData.append('whatsapp', phone);
+        if (fatherName) formData.append('father_name', fatherName);
         if (dob) formData.append('date_of_birth', dob);
         if (gender) formData.append('gender', gender);
         formData.append('class_id', classId);
@@ -175,8 +177,8 @@ export default function Enrollment() {
         // Reset specific form fields
         setFullName('');
         setFullNameUr('');
+        setFatherName('');
         setPhone('');
-        setWhatsapp('');
         setDob('');
         setGender('');
         setProfilePicture(null);
@@ -288,10 +290,13 @@ export default function Enrollment() {
                   <div className="field">
                     <label>Phone <span style={{ color: 'var(--red)' }}>*</span></label>
                     <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" required />
+                    <small style={{ color: 'var(--ink-pale)', fontSize: 11, marginTop: 4, display: 'block' }}>
+                      Enter a number with an active WhatsApp account — same number will be used for WhatsApp.
+                    </small>
                   </div>
                   <div className="field">
-                    <label>WhatsApp</label>
-                    <input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+92 3xx xxxxxxx" />
+                    <label>Father's Name</label>
+                    <input type="text" value={fatherName} onChange={(e) => setFatherName(e.target.value)} placeholder="e.g. Muhammad Ali" />
                   </div>
                   <div className="field">
                     <label>Date of birth</label>
