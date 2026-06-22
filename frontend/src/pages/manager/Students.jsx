@@ -36,6 +36,7 @@ export default function Students() {
     queryFn: () => getStudents({ role: 'student', center_id: selectedCenter === 'all' ? undefined : selectedCenter }),
     staleTime: 60_000,
   });
+
   const students = studentsData?.data ?? studentsData ?? [];
 
   const withdrawMutation = useMutation({
@@ -114,7 +115,7 @@ export default function Students() {
                 {students.map((student) => {
                   const avatarUrl = student.metadata?.profile_picture;
                   const initials = student.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'S';
-                  
+
                   return (
                     <tr
                       key={student.id}
@@ -155,7 +156,7 @@ export default function Students() {
                             size="sm"
                             variant="outline"
                             style={{ color: 'var(--blue)', borderColor: 'var(--blue)' }}
-                            onClick={() => navigate(`/admin/users/${student.id}`)}
+                            onClick={() => navigate(`/manager/users/${student.id}`)}
                           >
                             Edit
                           </Button>
