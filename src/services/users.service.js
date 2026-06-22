@@ -189,6 +189,57 @@ async function updateProfile({ user: caller, userId, body }) {
   return updated;
 }
 
+async function changePassword({ user: caller, userId, body }) {
+  if (caller.id !== userId) {
+    throw forbidden();
+  }
+
+  const target = await repo.getUserById(userId);
+  if (!target) throw notFound();
+
+  const { current_password, new_password } = body;
+  const isMatch = await bcrypt.compare(current_password, target.password_hash);
+  
+  if (!isMatch) {
+    throw new AppError('UNAUTHORIZED', 'Incorrect current password', 'موجودہ پاس ورڈ غلط ہے', 401);
+  }
+
+  const password_hash = await bcrypt.hash(new_password, 10);
+  await db('users').where({ id: userId }).update({ password_hash });
+}
+
+async function regeneratePassword({ user: caller, userId }) {
+  // Only center_managers and super_admins can regenerate passwords for users
+  if (!caller.roles.includes('super_admin') && !caller.roles.includes('center_manager')) {
+    throw forbidden();
+  }
+
+  const target = await repo.getUserById(userId);
+  if (!target) throw notFound();
+
+  // If center_manager, verify center scope
+  if (!caller.roles.includes('super_admin')) {
+    const targetRoles = await db('user_roles').where({ user_id: userId, center_id: caller.center_id }).first();
+    if (!targetRoles && caller.id !== userId) {
+      throw forbidden();
+    }
+  }
+
+  const newPassword = generateTempPassword();
+  const password_hash = await bcrypt.hash(newPassword, 10);
+  await db('users').where({ id: userId }).update({ password_hash });
+
+  activityLog.log({
+    actor: caller,
+    action: 'user.password_regenerate',
+    entity_type: 'user',
+    entity_id: userId,
+    center_id: caller.center_id,
+    summary_en: `Regenerated password for "${target.full_name}"`,
+  }).catch(() => {});
+
+  return { new_password: newPassword };
+}
 
 async function updateStaffProfile({ user: caller, userId, oldCenterId, body }) {
   const { role, center_id: newCenterId, base_salary, joining_date, payment_method, bank_name, account_number, ...userData } = body;
@@ -376,5 +427,7 @@ module.exports = {
   linkGuardian,
   listGuardians,
   removeUserFromCenter,
-  updateProfile
+  updateProfile,
+  changePassword,
+  regeneratePassword,
 };

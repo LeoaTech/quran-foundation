@@ -116,7 +116,7 @@ router.patch(
   controller.updateUser,
 );
 
-// Additional Metadata: profile update with file upload
+// Advanced profile update with file upload
 router.patch(
   '/users/:user_id/profile',
   requireAuth,
@@ -125,7 +125,19 @@ router.patch(
   controller.updateProfile,
 );
 
+router.post(
+  '/users/:user_id/change-password',
+  requireAuth,
+  validate(changePasswordSchema),
+  controller.changePassword,
+);
 
+router.post(
+  '/users/:user_id/regenerate-password',
+  requireAuth,
+  requirePermission('users.edit'),
+  controller.regeneratePassword,
+);
 
 router.patch(
   '/users/:user_id/center/:center_id/staff_profile',

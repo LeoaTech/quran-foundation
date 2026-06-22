@@ -105,7 +105,23 @@ async function updateProfile(req, res, next) {
   }
 }
 
+async function changePassword(req, res, next) {
+  try {
+    await service.changePassword({ user: req.user, userId: req.params.user_id, body: req.body });
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
 
+async function regeneratePassword(req, res, next) {
+  try {
+    const result = await service.regeneratePassword({ user: req.user, userId: req.params.user_id });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
 
 module.exports = {
   listUsers,
@@ -118,5 +134,7 @@ module.exports = {
   linkGuardian,
   listGuardians,
   removeUserFromCenter,
-  updateProfile
+  updateProfile,
+  changePassword,
+  regeneratePassword,
 };
