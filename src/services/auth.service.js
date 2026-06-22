@@ -161,7 +161,7 @@ async function changePassword({ userId, current_password, new_password }) {
 // Creates a new user with the 'student' role at the selected center.
 // Everything runs in a DB transaction so any failure rolls back completely.
 
-async function signup({ full_name, full_name_ur, phone, password, center_id }) {
+async function signup({ full_name, full_name_ur, phone, password, center_id, father_name }) {
   const db = require('../db/knex');
 
   // 1. Check that center exists and is active
@@ -189,6 +189,7 @@ async function signup({ full_name, full_name_ur, phone, password, center_id }) {
       password_hash,
       preferred_lang: 'ur',
       is_active: true,
+      metadata: father_name ? JSON.stringify({ father_name }) : null,
     }).returning('*');
 
     const roleRow = await trx('roles').where({ name: 'student' }).first();
