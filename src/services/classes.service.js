@@ -63,8 +63,12 @@ async function assertClassAccess(user, cls) {
 
   if (user.roles.includes('teacher')) {
     const entry = await repo.getClassTeacherEntry(cls.id, user.id);
-    if (!entry) throw forbidden();
-    return;
+    if (entry) return;
+    
+    const hasTopicAccess = await repo.hasTeacherTopicAccess(cls.center_id, cls.course_id, user.id);
+    if (hasTopicAccess) return;
+
+    throw forbidden();
   }
 
   throw forbidden();

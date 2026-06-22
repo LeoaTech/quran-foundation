@@ -48,8 +48,10 @@ function listClassesForTeacher(centerId, teacherUserId, { courseId, isActive } =
   const query = db('classes as c')
     .join('courses as cr', 'cr.id', 'c.course_id')
     .leftJoin('course_levels as cl', 'cl.id', 'c.course_level_id')
-    .join('class_teachers as ct', function () {
-      this.on('ct.class_id', '=', 'c.id').andOnVal('ct.is_active', '=', true);
+    .leftJoin('class_teachers as ct', function () {
+      this.on('ct.class_id', '=', 'c.id')
+          .andOnVal('ct.is_active', '=', true)
+          .andOnVal('ct.teacher_user_id', '=', teacherUserId);
     })
     .leftJoin('enrollments as e', function() {
       this.on('e.class_id', '=', 'c.id')
@@ -57,7 +59,18 @@ function listClassesForTeacher(centerId, teacherUserId, { courseId, isActive } =
           .andOnVal('e.is_active', '=', true);
     })
     .where('c.center_id', centerId)
-    .where('ct.teacher_user_id', teacherUserId)
+    .where(function() {
+      this.whereNotNull('ct.id')
+          .orWhereExists(function() {
+            this.select('*')
+                .from('center_teacher_topics as ctt')
+                .join('topics as t', 't.id', 'ctt.topic_id')
+                .whereRaw('ctt.center_id = c.center_id')
+                .whereRaw('t.course_id = c.course_id')
+                .where('ctt.teacher_user_id', teacherUserId)
+                .where('ctt.is_active', true);
+          });
+    })
     .orderBy('c.name', 'asc')
     .select(
       'c.*',
@@ -81,7 +94,7 @@ function listClassesForTeacher(centerId, teacherUserId, { courseId, isActive } =
          WHERE cs.class_id = c.id AND cs.is_active = true) as schedules
       `)
     )
-    .groupBy('c.id', 'cr.id', 'cl.id', 'ct.id');
+    .groupBy('c.id', 'cr.id', 'cl.id');
     
   if (courseId !== undefined) query.where('c.course_id', courseId);
   if (isActive !== undefined) query.where('c.is_active', isActive);
@@ -144,6 +157,21 @@ function getClassTeacherEntry(classId, teacherUserId) {
   return db('class_teachers')
     .where({ class_id: classId, teacher_user_id: teacherUserId, is_active: true })
     .first();
+}
+
+// Check whether a user has any active topic assignments for a given course in a center
+async function hasTeacherTopicAccess(centerId, courseId, teacherUserId) {
+  const result = await db('center_teacher_topics as ctt')
+    .join('topics as t', 't.id', 'ctt.topic_id')
+    .where({
+      'ctt.center_id': centerId,
+      't.course_id': courseId,
+      'ctt.teacher_user_id': teacherUserId,
+      'ctt.is_active': true
+    })
+    .select(db.raw('1'))
+    .first();
+  return !!result;
 }
 
 // Get a class_teachers row by its own PK (used for DELETE).
@@ -299,6 +327,7 @@ module.exports = {
   updateClass,
   listTeachers,
   getClassTeacherEntry,
+  hasTeacherTopicAccess,
   getClassTeacherById,
   assignTeacher,
   deactivateTeacher,
