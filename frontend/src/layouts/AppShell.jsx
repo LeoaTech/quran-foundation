@@ -69,6 +69,7 @@ const NAV_CONFIG = {
           { to: '/manager/centers', label: 'My Center', icon: '⊙', requires: 'centers.view' },
           { to: '/manager/classes', label: 'Classrooms', icon: '◈', requires: 'classes.view' },
           { to: '/manager/teachers', label: 'Teachers', icon: '◉' },
+          { to: '/manager/students', label: 'Students', icon: '○' },
           { to: '/manager/enrollments', label: 'Enrollment', icon: '○', requires: 'enrollments.view' },
           { to: '/manager/attendance', label: 'Attendance', icon: '☑', requires: 'attendance.view' },
         ],
@@ -196,20 +197,26 @@ export default function AppShell() {
 
   const rawConfig = NAV_CONFIG[role ?? "student"] ?? NAV_CONFIG.student;
 
-  const config =
-    role === "center_manager" && user?.center_id
-      ? {
-          ...rawConfig,
-          sections: rawConfig.sections.map((section) => ({
-            ...section,
-            items: section.items.map((item) =>
-              item.label === "My Center"
-                ? { ...item, to: `/manager/centers/${user.center_id}` }
-                : item
-            )
-          }))
-        }
-      : rawConfig;
+  const config = { ...rawConfig, sections: [...(rawConfig.sections || [])] };
+
+  if (role === "center_manager" && user?.center_id) {
+    config.sections = config.sections.map((section) => ({
+      ...section,
+      items: section.items.map((item) =>
+        item.label === "My Center"
+          ? { ...item, to: `/manager/centers/${user.center_id}` }
+          : item
+      )
+    }));
+  }
+
+  // Add Profile Settings at the end of every config
+  config.sections.push({
+    title: "Account",
+    items: [
+      { to: '/settings/profile', label: 'Profile Settings', icon: '⚙' }
+    ]
+  });
 
   // Returns true if this nav item should be shown.
   // When permissions are not loaded, all items are shown (prevents layout flash).
