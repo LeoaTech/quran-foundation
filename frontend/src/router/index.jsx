@@ -43,6 +43,8 @@ import FinanceDashboard from '../pages/finance/Dashboard';
 
 // Teacher
 import TeacherDashboard from '../pages/teacher/Dashboard';
+import TeacherClassesList from '../pages/teacher/Classes/ClassesList';
+import TeacherClassDetail from '../pages/teacher/Classes/ClassDetail';
 import MarkAttendance from '../pages/teacher/Attendance/MarkAttendance';
 import AttendanceSheet from '../pages/teacher/Attendance/AttendanceSheet';
 import ProgressLogger from '../pages/teacher/Progress/ProgressLogger';
@@ -137,6 +139,8 @@ export default function AppRoutes() {
           {/* ── Teacher ── */}
           <Route element={<ProtectedRoute roles={['teacher']} />}>
             <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
+            <Route path="/teacher/classes" element={<TeacherClassesList />} />
+            <Route path="/teacher/classes/:id" element={<TeacherClassDetail />} />
             <Route path="/teacher/attendance" element={<MarkAttendance />} />
             <Route path="/teacher/attendance/sheet" element={<AttendanceSheet />} />
             <Route path="/teacher/progress" element={<ProgressLogger />} />
