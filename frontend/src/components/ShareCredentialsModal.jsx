@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import client from '../api/client';
 import { useToast } from '../hooks/useToast';
 
@@ -6,6 +6,13 @@ export default function ShareCredentialsModal({ isOpen, onClose, user }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const toast = useToast();
+
+  // Reset password whenever the modal opens for a different user 
+  useEffect(() => {
+    if (isOpen) {
+      setNewPassword('');
+    }
+  }, [isOpen, user?.id]);
 
   if (!isOpen || !user) return null;
 
