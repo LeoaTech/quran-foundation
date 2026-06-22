@@ -59,6 +59,7 @@ import MyAssessments from '../pages/student/Assessments/MyAssessments';
 
 // Shared
 import StudentReport from '../pages/shared/Reports/StudentReport';
+import Students from '../pages/manager/Students';
 
 export const ROLE_DASHBOARDS = {
   super_admin:     '/admin/dashboard',
@@ -103,7 +104,7 @@ export default function AppRoutes() {
             <Route path="/admin/courses" element={<CoursesList />} />
             <Route path="/admin/courses/:id" element={<CourseDetail />} />
             <Route path="/admin/teachers" element={<TeachersList />} />
-            <Route path="/admin/students" element={<StudentsList />} />
+            <Route path="/admin/students" element={<Students />} />
             <Route path="/admin/donations" element={<DonationsList />} />
             <Route path="/admin/donations/new" element={<RecordDonation />} />
             <Route path="/admin/salaries" element={<SalariesTab />} />
@@ -120,6 +121,7 @@ export default function AppRoutes() {
             <Route path="/manager/centers/:id" element={<CenterDetail />} />
             <Route path="/manager/classes" element={<ClassesList />} />
             <Route path="/manager/classes/:id" element={<ClassDetail />} />
+            <Route path="/manager/students" element={<Students />} />
             <Route path="/manager/enrollment" element={<EnrollmentForm />} />
             <Route path="/manager/enrollments" element={<EnrollmentsList />} />
             <Route path="/manager/teachers" element={<TeachersList />} />
@@ -161,6 +163,7 @@ export default function AppRoutes() {
           </Route>
 
           {/* ── Shared (any authenticated role) ── */}
+          <Route path="/settings/profile" element={<UserProfilePage />} />
           <Route path="/reports/students/:userId" element={<StudentReport />} />
 
           {/* ── Shared RBAC Routes ── */}
