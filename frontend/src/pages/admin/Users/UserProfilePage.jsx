@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import PageHeader from '../../../components/PageHeader';
@@ -11,6 +11,7 @@ import UserProfileTabs from './UserProfileTabs';
 export default function UserProfilePage() {
   const { userId: paramUserId } = useParams();
   const { user: authUser, role } = useAuth();
+  const navigate = useNavigate();
   const userId = paramUserId || authUser?.id;
   const isOwnProfile = userId === authUser?.id;
 
@@ -27,23 +28,27 @@ export default function UserProfilePage() {
   const [activeTab, setActiveTab] = useState('profile');
 
   // Profile Form State
+  const [fullName, setFullName] = useState('');
+  const [fullNameUr, setFullNameUr] = useState('');
+  const [fatherName, setFatherName] = useState('');
   const [phone, setPhone] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
   const [qualification, setQualification] = useState('');
   const [occupation, setOccupation] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
   const [address, setAddress] = useState('');
   const [profilePicture, setProfilePicture] = useState(null);
-  
+
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     if (user) {
+      setFullName(user.full_name || '');
+      setFullNameUr(user.full_name_ur || '');
       setPhone(user.phone || '');
-      setWhatsapp(user.whatsapp || '');
       const meta = typeof user.metadata === 'string' ? JSON.parse(user.metadata || '{}') : (user.metadata || {});
+      setFatherName(meta.father_name || '');
       setQualification(meta.qualification || '');
       setOccupation(meta.occupation || '');
       setMaritalStatus(meta.maritalStatus || meta.marital_status || '');
@@ -75,10 +80,14 @@ export default function UserProfilePage() {
   });
 
   const handleProfileSubmit = (e) => {
-    e.preventDefault();
+    e.preventDefault();    
     const formData = new FormData();
+    formData.append('full_name', fullName);
+    if (fullNameUr) formData.append('full_name_ur', fullNameUr);
     formData.append('phone', phone);
-    formData.append('whatsapp', whatsapp);
+    // WhatsApp always mirrors phone
+    formData.append('whatsapp', phone);
+    formData.append('father_name', fatherName || "");
     formData.append('qualification', qualification);
     formData.append('occupation', occupation);
     formData.append('marital_status', maritalStatus);
@@ -86,6 +95,7 @@ export default function UserProfilePage() {
     if (profilePicture) {
       formData.append('profile_picture', profilePicture);
     }
+
     updateProfileMutation.mutate(formData);
   };
 
@@ -108,12 +118,24 @@ export default function UserProfilePage() {
 
   return (
     <div>
+      {/* Back button — only when viewing someone else's profile */}
+      {paramUserId && (
+        <div style={{ marginBottom: 8 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-pale)', fontSize: 13, padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            ← Back
+          </button>
+        </div>
+      )}
       <PageHeader title={isOwnProfile ? "My Profile Settings" : "User Profile"} />
-      
-      {paramUserId && <UserProfileTabs userId={userId} />}
+
+      {/* Only super admins can see Permissions tab — others get 403 */}
+      {paramUserId && role === 'super_admin' && <UserProfileTabs userId={userId} />}
 
       <div style={{ display: 'flex', gap: 24, flexDirection: 'column', marginTop: 24 }}>
-        
+
         {/* Header summary */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
           {avatarUrl ? (
@@ -167,14 +189,30 @@ export default function UserProfilePage() {
 
         {activeTab === 'profile' && (
           <form onSubmit={handleProfileSubmit} style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', display: 'grid', gap: 16, gridTemplateColumns: '1fr 1fr' }}>
+
+            {/* Name fields */}
             <div className="field">
-              <label>Phone</label>
-              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required />
+              <label>Full Name <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Ahmed Ali" required />
             </div>
             <div className="field">
-              <label>WhatsApp</label>
-              <input type="text" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} />
+              <label>Full Name (Urdu)</label>
+              <input type="text" value={fullNameUr} onChange={e => setFullNameUr(e.target.value)} placeholder="احمد علی" dir="rtl" />
             </div>
+            <div className="field">
+              <label>Father's Name</label>
+              <input type="text" value={fatherName} onChange={e => setFatherName(e.target.value)} placeholder="e.g. Muhammad Ali" />
+            </div>
+
+            {/* Phone */}
+            <div className="field">
+              <label>Phone / WhatsApp <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" required />
+              <small style={{ color: 'var(--ink-pale)', fontSize: 11, marginTop: 4, display: 'block' }}>
+                Enter a number with an active WhatsApp account. It will be used for both calling and WhatsApp.
+              </small>
+            </div>
+
             <div className="field">
               <label>Qualification</label>
               <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
@@ -215,7 +253,7 @@ export default function UserProfilePage() {
               <label>Address</label>
               <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2} />
             </div>
-            
+
             <div style={{ gridColumn: 'span 2', textAlign: 'right', marginTop: 12 }}>
               <button type="submit" disabled={updateProfileMutation.isPending} style={{ padding: '10px 24px', background: 'var(--emerald)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer' }}>
                 {updateProfileMutation.isPending ? 'Saving...' : 'Save Profile'}
