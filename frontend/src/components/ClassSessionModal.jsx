@@ -15,6 +15,7 @@ export default function ClassSessionModal({
   onClose,
   classId,
   session,
+  canEdit,
   topics = [],
   enrolledCount = 0,
   onMarkAttendance,
