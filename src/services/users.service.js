@@ -1,8 +1,8 @@
-const crypto    = require('crypto');
-const bcrypt    = require('bcryptjs');
-const repo      = require('../repositories/users.repository');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const repo = require('../repositories/users.repository');
 const activityLog = require('./activityLog.service');
-const db        = require('../db/knex');
+const db = require('../db/knex');
 const { AppError } = require('../utils/errors');
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ const VALID_ROLES = ['super_admin', 'center_manager', 'finance_manager', 'teache
 // ── Users ──────────────────────────────────────────────────────────────────────
 
 async function listUsers({ user, query = {} } = {}) {
-  const page    = Math.max(1, parseInt(query.page    || '1',  10));
+  const page = Math.max(1, parseInt(query.page || '1', 10));
   const perPage = Math.min(100, parseInt(query.per_page || '20', 10));
 
   // center_managers may only see users in their own center
@@ -54,8 +54,8 @@ async function listUsers({ user, query = {} } = {}) {
 
   const filters = {
     centerId,
-    role:     query.role,
-    search:   query.search,
+    role: query.role,
+    search: query.search,
     isActive: query.is_active !== undefined ? query.is_active === 'true' : undefined,
     page,
     perPage,
@@ -66,13 +66,13 @@ async function listUsers({ user, query = {} } = {}) {
     repo.countUsers(filters),
   ]);
 
-  const total      = parseInt(meta.total, 10);
+  const total = parseInt(meta.total, 10);
   const totalPages = Math.ceil(total / perPage);
 
   const parsedRows = rows.map(row => {
     let metadata = row.metadata;
     if (typeof metadata === 'string') {
-      try { metadata = JSON.parse(metadata); } catch(e) { metadata = {}; }
+      try { metadata = JSON.parse(metadata); } catch (e) { metadata = {}; }
     }
     return { ...row, metadata: metadata || {} };
   });
@@ -95,6 +95,13 @@ async function createUser({ user: caller, body }) {
   // center_manager may only create users in their own center
   assertCenterScope(caller, centerId);
 
+  if (userData.phone) {
+    const existing = await repo.checkPhoneUnique(userData.phone);
+    if (existing) {
+      throw new AppError('CONFLICT', 'An account with this phone number already exists.', 'اس فون نمبر کا اکاؤنٹ پہلے سے موجود ہے۔', 409);
+    }
+  }
+
   if (!VALID_ROLES.includes(role)) {
     throw new AppError(
       'VALIDATION_ERROR',
@@ -105,8 +112,8 @@ async function createUser({ user: caller, body }) {
     );
   }
 
-  const tempPassword   = generateTempPassword();
-  const password_hash  = await bcrypt.hash(tempPassword, 10);
+  const tempPassword = generateTempPassword();
+  const password_hash = await bcrypt.hash(tempPassword, 10);
 
   const newUser = await db.transaction((trx) =>
     repo.createUser(
@@ -116,14 +123,14 @@ async function createUser({ user: caller, body }) {
   );
 
   activityLog.log({
-    actor:       caller,
-    action:      'user.create',
+    actor: caller,
+    action: 'user.create',
     entity_type: 'user',
-    entity_id:   newUser.id,
-    center_id:   centerId || null,
-    summary_en:  `Created user "${newUser.full_name}" with role "${role}"`,
-    metadata:    { full_name: newUser.full_name, role, center_id: centerId },
-  }).catch(() => {});
+    entity_id: newUser.id,
+    center_id: centerId || null,
+    summary_en: `Created user "${newUser.full_name}" with role "${role}"`,
+    metadata: { full_name: newUser.full_name, role, center_id: centerId },
+  }).catch(() => { });
 
   return { id: newUser.id, full_name: newUser.full_name, temp_password: tempPassword };
 }
@@ -145,6 +152,13 @@ async function updateUser({ user: caller, userId, body }) {
     }
   }
 
+  if (body.phone) {
+    const existing = await repo.checkPhoneUnique(body.phone, userId);
+    if (existing) {
+      throw new AppError('CONFLICT', 'An account with this phone number already exists.', 'اس فون نمبر کا اکاؤنٹ پہلے سے موجود ہے۔', 409);
+    }
+  }
+
   // Disallow changing password through this endpoint
   delete body.password_hash;
   delete body.password;
@@ -162,8 +176,18 @@ async function updateProfile({ user: caller, userId, body }) {
     throw forbidden();
   }
 
-  const { profile_picture, qualification, occupation, marital_status, is_repeater, address, center_manager_name, center_manager_contact, ...rest } = body;
-  
+  if (body.phone) {
+    const existing = await repo.checkPhoneUnique(body.phone, userId);
+    if (existing) {
+      throw new AppError('CONFLICT', 'An account with this phone number already exists.', 'اس فون نمبر کا اکاؤنٹ پہلے سے موجود ہے۔', 409);
+    }
+  }
+
+  const { full_name, full_name_ur, profile_picture, father_name, qualification, occupation, marital_status, is_repeater, address, center_manager_name, center_manager_contact, ...rest } = body;
+
+  if (full_name !== undefined) rest.full_name = full_name;
+  if (full_name_ur !== undefined) rest.full_name_ur = full_name_ur;
+
   delete rest.password_hash;
   delete rest.password;
   delete rest.role;
@@ -171,8 +195,10 @@ async function updateProfile({ user: caller, userId, body }) {
 
   let metadata = target.metadata || {};
   if (typeof metadata === 'string') {
-    try { metadata = JSON.parse(metadata); } catch(e) { metadata = {}; }
+    try { metadata = JSON.parse(metadata); } catch (e) { metadata = {}; }
   }
+
+  console.log(metadata, "metadata", body, "Body");
 
   if (profile_picture !== undefined) metadata.profile_picture = profile_picture;
   if (qualification !== undefined) metadata.qualification = qualification;
@@ -182,6 +208,7 @@ async function updateProfile({ user: caller, userId, body }) {
   if (address !== undefined) metadata.address = address;
   if (center_manager_name !== undefined) metadata.center_manager_name = center_manager_name;
   if (center_manager_contact !== undefined) metadata.center_manager_contact = center_manager_contact;
+  if (father_name !== undefined) metadata.father_name = father_name;
 
   rest.metadata = JSON.stringify(metadata);
 
@@ -199,7 +226,7 @@ async function changePassword({ user: caller, userId, body }) {
 
   const { current_password, new_password } = body;
   const isMatch = await bcrypt.compare(current_password, target.password_hash);
-  
+
   if (!isMatch) {
     throw new AppError('UNAUTHORIZED', 'Incorrect current password', 'موجودہ پاس ورڈ غلط ہے', 401);
   }
@@ -236,7 +263,7 @@ async function regeneratePassword({ user: caller, userId }) {
     entity_id: userId,
     center_id: caller.center_id,
     summary_en: `Regenerated password for "${target.full_name}"`,
-  }).catch(() => {});
+  }).catch(() => { });
 
   return { new_password: newPassword };
 }
@@ -246,6 +273,13 @@ async function updateStaffProfile({ user: caller, userId, oldCenterId, body }) {
 
   const target = await repo.getUserById(userId);
   if (!target) throw notFound();
+
+  if (userData.phone) {
+    const existing = await repo.checkPhoneUnique(userData.phone, userId);
+    if (existing) {
+      throw new AppError('CONFLICT', 'An account with this phone number already exists.', 'اس فون نمبر کا اکاؤنٹ پہلے سے موجود ہے۔', 409);
+    }
+  }
 
   // Validate permission on the *old* center
   assertCenterScope(caller, oldCenterId);
@@ -297,7 +331,7 @@ async function updateStaffProfile({ user: caller, userId, oldCenterId, body }) {
     entity_id: userId,
     center_id: newCenterId || oldCenterId,
     summary_en: `Updated staff profile for "${target.full_name}"`,
-  }).catch(() => {});
+  }).catch(() => { });
 
   return updated;
 }
@@ -335,14 +369,14 @@ async function assignRole({ user: caller, userId, body }) {
 
   const assignment = await repo.assignRole({ userId, roleId: roleRow.id, centerId: centerId || null });
   activityLog.log({
-    actor:       caller,
-    action:      'user.role_assign',
+    actor: caller,
+    action: 'user.role_assign',
     entity_type: 'user_role',
-    entity_id:   userId,
-    center_id:   centerId || null,
-    summary_en:  `Assigned role "${role}" to "${target.full_name}"`,
-    metadata:    { target_user_id: userId, role, center_id: centerId },
-  }).catch(() => {});
+    entity_id: userId,
+    center_id: centerId || null,
+    summary_en: `Assigned role "${role}" to "${target.full_name}"`,
+    metadata: { target_user_id: userId, role, center_id: centerId },
+  }).catch(() => { });
   return assignment;
 }
 
@@ -369,13 +403,13 @@ async function removeUserFromCenter({ user: caller, userId, centerId }) {
   });
 
   activityLog.log({
-    actor:       caller,
-    action:      'user.remove_center',
+    actor: caller,
+    action: 'user.remove_center',
     entity_type: 'user',
-    entity_id:   userId,
-    center_id:   centerId,
-    summary_en:  `Removed user "${target.full_name}" from center`,
-  }).catch(() => {});
+    entity_id: userId,
+    center_id: centerId,
+    summary_en: `Removed user "${target.full_name}" from center`,
+  }).catch(() => { });
 }
 
 // ── Guardians ──────────────────────────────────────────────────────────────────
@@ -403,10 +437,10 @@ async function linkGuardian({ user: caller, userId, body }) {
   }
 
   return repo.linkGuardian({
-    studentUserId:  userId,
+    studentUserId: userId,
     guardianUserId: body.guardian_user_id,
-    relation:       body.relation,
-    isPrimary:      body.is_primary,
+    relation: body.relation,
+    isPrimary: body.is_primary,
   });
 }
 

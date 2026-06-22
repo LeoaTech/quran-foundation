@@ -187,6 +187,13 @@ async function updateUser(userId, data) {
   return row;
 }
 
+async function checkPhoneUnique(phone, excludeUserId = null) {
+  const query = db('users').where({ phone });
+  if (excludeUserId) query.whereNot({ id: excludeUserId });
+  const existing = await query.first();
+  return existing;
+}
+
 // ── Roles ──────────────────────────────────────────────────────────────────────
 
 function getRoleByName(name) {
@@ -258,6 +265,7 @@ module.exports = {
   createUser,
   updateUser,
   updateStaffProfile,
+  checkPhoneUnique,
   getRoleByName,
   getUserRoleEntry,
   assignRole,
