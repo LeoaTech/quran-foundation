@@ -30,6 +30,14 @@ export default function Enrollment() {
   const [whatsapp, setWhatsapp] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [qualification, setQualification] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [maritalStatus, setMaritalStatus] = useState('');
+  const [isRepeater, setIsRepeater] = useState(false);
+  const [address, setAddress] = useState('');
+  const [centerManagerName, setCenterManagerName] = useState('');
+  const [centerManagerContact, setCenterManagerContact] = useState('');
 
   const [courseId, setCourseId] = useState(presetCourseId);
   const [classId, setClassId] = useState(presetClassId);
@@ -137,20 +145,30 @@ export default function Enrollment() {
           return;
         }
 
-        const res = await enrollNewStudent({
-          full_name: fullName,
-          full_name_ur: fullNameUr || undefined,
-          phone,
-          whatsapp: whatsapp || undefined,
-          date_of_birth: dob || undefined,
-          gender: gender || undefined,
-          class_id: classId,
-          enrolled_on: enrollDate,
-          prior_level: priorLevel || undefined,
-          notes_ur: notesUr || undefined,
-          amount_paid: cashReceived ? Number(cashReceived) : undefined,
-          payment_method: 'cash',
-        });
+        const formData = new FormData();
+        formData.append('full_name', fullName);
+        if (fullNameUr) formData.append('full_name_ur', fullNameUr);
+        formData.append('phone', phone);
+        if (whatsapp) formData.append('whatsapp', whatsapp);
+        if (dob) formData.append('date_of_birth', dob);
+        if (gender) formData.append('gender', gender);
+        formData.append('class_id', classId);
+        if (enrollDate) formData.append('enrolled_on', enrollDate);
+        if (priorLevel) formData.append('prior_level', priorLevel);
+        if (notesUr) formData.append('notes_ur', notesUr);
+        if (cashReceived) formData.append('amount_paid', Number(cashReceived));
+        formData.append('payment_method', 'cash');
+        
+        if (profilePicture) formData.append('profile_picture', profilePicture);
+        if (qualification) formData.append('qualification', qualification);
+        if (occupation) formData.append('occupation', occupation);
+        if (maritalStatus) formData.append('marital_status', maritalStatus);
+        formData.append('is_repeater', isRepeater ? 'true' : 'false');
+        if (address) formData.append('address', address);
+        if (centerManagerName) formData.append('center_manager_name', centerManagerName);
+        if (centerManagerContact) formData.append('center_manager_contact', centerManagerContact);
+
+        const res = await enrollNewStudent(formData);
 
         toast.success(`${res.student.full_name} enrolled! Temp password: ${res.student.temp_password}`);
 
@@ -161,6 +179,14 @@ export default function Enrollment() {
         setWhatsapp('');
         setDob('');
         setGender('');
+        setProfilePicture(null);
+        setQualification('');
+        setOccupation('');
+        setMaritalStatus('');
+        setIsRepeater(false);
+        setAddress('');
+        setCenterManagerName('');
+        setCenterManagerContact('');
         setClassId(presetClassId);
         setCourseId(presetCourseId);
         setCashReceived('');
@@ -278,6 +304,58 @@ export default function Enrollment() {
                       <option value="male">Male</option>
                       <option value="female">Female</option>
                     </select>
+                  </div>
+                  <div className="field">
+                    <label>Profile Picture</label>
+                    <input type="file" accept="image/*" onChange={(e) => setProfilePicture(e.target.files[0])} />
+                  </div>
+                  <div className="field">
+                    <label>Qualification</label>
+                    <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
+                      <option value="">— Select —</option>
+                      <option value="Matric">Matric</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Bachelors">Bachelors</option>
+                      <option value="Masters">Masters</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Occupation</label>
+                    <select value={occupation} onChange={(e) => setOccupation(e.target.value)}>
+                      <option value="">— Select —</option>
+                      <option value="Student">Student</option>
+                      <option value="Employee">Employee</option>
+                      <option value="Business">Business</option>
+                      <option value="Unemployed">Unemployed</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Marital Status</label>
+                    <select value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
+                      <option value="">— Select —</option>
+                      <option value="Single">Single</option>
+                      <option value="Married">Married</option>
+                      <option value="Divorced">Divorced</option>
+                      <option value="Widowed">Widowed</option>
+                    </select>
+                  </div>
+                  <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8, height: '100%', marginTop: 24 }}>
+                    <input type="checkbox" id="repeater" checked={isRepeater} onChange={(e) => setIsRepeater(e.target.checked)} style={{ width: 'auto' }} />
+                    <label htmlFor="repeater" style={{ margin: 0 }}>Are you Repeater?</label>
+                  </div>
+                  <div className="field" style={{ gridColumn: 'span 2' }}>
+                    <label>Complete Address</label>
+                    <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows="2" placeholder="House #, Street, City..." />
+                  </div>
+                  <div className="field">
+                    <label>Center Manager Name</label>
+                    <input type="text" value={centerManagerName} onChange={(e) => setCenterManagerName(e.target.value)} placeholder="Name of Center Organizer" />
+                  </div>
+                  <div className="field">
+                    <label>Center Manager Contact</label>
+                    <input type="tel" value={centerManagerContact} onChange={(e) => setCenterManagerContact(e.target.value)} placeholder="+92 3xx xxxxxxx" />
                   </div>
                 </div>
               )}
