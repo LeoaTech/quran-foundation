@@ -46,10 +46,12 @@ function tdStyle(hasBorder = true) {
   return { padding: '11px 14px', fontSize: 13, color: 'var(--ink-mid)', borderBottom: hasBorder ? '1px solid var(--sand)' : 'none', verticalAlign: 'middle' };
 }
 
-export default function ClassesList() {
-  const { user } = useAuth();
+export default function ClassesList({ centerIdProp, hideHeader }) {
+  const { user, role } = useAuth();
   const navigate = useNavigate();
-  const centerId = user?.center_id;
+  const centerId = centerIdProp || user?.center_id;
+  
+  const detailPath = role === 'super_admin' ? '/admin/classes' : '/manager/classes';
 
   const isMobile = useIsMobile();
 
@@ -102,20 +104,22 @@ export default function ClassesList() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', flexDirection: isMobile && 'column', gap: isMobile && 12, justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
-            Classrooms — {centerName}
-          </h2>
-          <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-            {classes.length} classroom{classes.length !== 1 ? 's' : ''}
-            {statusFilter === 'active' ? ' (active)' : statusFilter === 'inactive' ? ' (inactive)' : ''}
-          </p>
+      {!hideHeader && (
+        <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'flex-end', flexDirection: isMobile && 'column', gap: isMobile && 12, justifyContent: 'space-between', marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--ink)', lineHeight: 1.2, marginBottom: 3 }}>
+              Classrooms — {centerName}
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+              {classes.length} classroom{classes.length !== 1 ? 's' : ''}
+              {statusFilter === 'active' ? ' (active)' : statusFilter === 'inactive' ? ' (inactive)' : ''}
+            </p>
+          </div>
+          <Can permission="classes.create">
+            <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add Classroom</Button>
+          </Can>
         </div>
-        <Can permission="classes.create">
-          <Button variant="primary" onClick={() => setAddOpen(true)}>+ Add Classroom</Button>
-        </Can>
-      </div>
+      )}
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
@@ -176,7 +180,7 @@ export default function ClassesList() {
                 return (
                   <tr
                     key={cls.id}
-                    onClick={() => navigate(`/manager/classes/${cls.id}`)}
+                    onClick={() => navigate(`${detailPath}/${cls.id}`)}
                     style={{ cursor: 'pointer' }}
                     onMouseEnter={(e) => e.currentTarget.querySelectorAll('td').forEach((td) => (td.style.background = 'var(--sand)'))}
                     onMouseLeave={(e) => e.currentTarget.querySelectorAll('td').forEach((td) => (td.style.background = ''))}
@@ -231,7 +235,7 @@ export default function ClassesList() {
                       </Badge>
                     </td>
                     <td style={tdStyle(!isLast)} onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/manager/classes/${cls.id}`)}>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`${detailPath}/${cls.id}`)}>
                         View →
                       </Button>
                     </td>

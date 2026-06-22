@@ -22,6 +22,7 @@ import { getCenterTeacherTopics, assignTeacherTopic, removeTeacherTopic } from '
 import ActivityLogTab from './ActivityLogTab';
 import ClassesList from '../../manager/Classes/ClassesList';
 import { useIsMobile } from '../../../hooks/useIsMobile';
+
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
 function TabBar({ tabs, active, onChange, isMobile }) {
@@ -155,156 +156,35 @@ function OverviewTab({ centerId, isMobile }) {
 // ── Classrooms tab ────────────────────────────────────────────────────────────
 
 function ClassroomsTab({ centerId, isMobile }) {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const { role } = useAuth();
-  const canEdit = role === 'super_admin' || role === 'center_manager';
-
-  const { data: roomsData, isLoading } = useQuery({
-    queryKey: ['classrooms', centerId],
-    queryFn: () => getClassrooms(centerId),
+  const { data: classesData, isLoading } = useQuery({
+    queryKey: ['center-classes', centerId, 'all'],
+    queryFn: () => getCenterClasses(centerId),
     staleTime: 60_000,
   });
-  const rooms = roomsData ?? [];
 
-  // Inline editing state
-  const [editId, setEditId] = useState(null);
-  const [editVals, setEditVals] = useState({});
-
-  // Add row state
-  const [showAdd, setShowAdd] = useState(false);
-  const [newRoom, setNewRoom] = useState({ name: '', name_ur: '', capacity: '' });
-  const [addBusy, setAddBusy] = useState(false);
-
-  async function saveEdit(roomId) {
-    try {
-      await updateClassroom(centerId, roomId, editVals);
-      await qc.invalidateQueries({ queryKey: ['classrooms', centerId] });
-      toast.success('Classroom updated.');
-    } catch {
-      toast.error('Failed to update classroom.');
-    }
-    setEditId(null);
-  }
-
-  async function addRoom(e) {
-    e.preventDefault();
-    setAddBusy(true);
-    try {
-      await createClassroom(centerId, {
-        name: newRoom.name,
-        name_ur: newRoom.name_ur || undefined,
-        capacity: newRoom.capacity ? parseInt(newRoom.capacity, 10) : undefined,
-      });
-      await qc.invalidateQueries({ queryKey: ['classrooms', centerId] });
-      toast.success('Classroom added.');
-      setNewRoom({ name: '', name_ur: '', capacity: '' });
-      setShowAdd(false);
-    } catch {
-      toast.error('Failed to add classroom.');
-    } finally {
-      setAddBusy(false);
-    }
-  }
+  const classes = classesData?.data ?? classesData ?? [];
+  
+  const totalClassrooms = classes.length;
+  const totalStudents = classes.reduce((sum, cls) => sum + (cls.enrolled_count ?? cls.student_count ?? 0), 0);
+  const totalCourses = new Set(classes.map(c => c.course_id).filter(Boolean)).size;
 
   return (
-    <Card>
-      <CardHeader>
-        <span className="card-title">Classrooms</span>
+    <>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 14,
+          marginBottom: 24
+        }}
+      >
+        <MetricCard label="Total classrooms" value={isLoading ? '—' : totalClassrooms} variant="blue" />
+        <MetricCard label="Students enrolled" value={isLoading ? '—' : totalStudents} variant="green" />
+        <MetricCard label="Active courses" value={isLoading ? '—' : totalCourses} variant="gold" />
+      </div>
 
-      </CardHeader>
-      <CardBody style={{ padding: 0 }}>
-        {isLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><LoadingSpinner /></div>
-        ) : (
-          // <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          //   <thead>
-          //     <tr>
-          //       {['Name', 'Name (Urdu)', 'Capacity', canEdit ? 'Actions' : ''].filter(Boolean).map((h) => (
-          //         <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)' }}>{h}</th>
-          //       ))}
-          //     </tr>
-          //   </thead>
-          //   <tbody>
-          //     {/* Add row */}
-          //     {showAdd && (
-          //       <tr style={{ background: 'var(--emerald-pale)' }}>
-          //         <td style={tdStyle(true)}>
-          //           <input className="f-input" style={{ padding: '6px 10px' }} placeholder="Room name" value={newRoom.name} onChange={(e) => setNewRoom((n) => ({ ...n, name: e.target.value }))} autoFocus />
-          //         </td>
-          //         <td style={tdStyle(true)}>
-          //           <RTLInput style={{ padding: '6px 10px', fontSize: 14 }} placeholder="کمرہ کا نام" value={newRoom.name_ur} onChange={(e) => setNewRoom((n) => ({ ...n, name_ur: e.target.value }))} />
-          //         </td>
-          //         <td style={tdStyle(true)}>
-          //           <input className="f-input" style={{ padding: '6px 10px', width: 80 }} type="number" min="1" placeholder="Cap." value={newRoom.capacity} onChange={(e) => setNewRoom((n) => ({ ...n, capacity: e.target.value }))} />
-          //         </td>
-          //         <td style={tdStyle(true)}>
-          //           <div style={{ display: 'flex', gap: 8 }}>
-          //             <Button size="sm" variant="primary" disabled={!newRoom.name || addBusy} onClick={addRoom}>{addBusy ? '…' : 'Save'}</Button>
-          //             <Button size="sm" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-          //           </div>
-          //         </td>
-          //       </tr>
-          //     )}
-
-          //     {rooms.length === 0 && !showAdd && (
-          //       <tr>
-          //         <td colSpan={canEdit ? 4 : 3} style={{ padding: 0 }}>
-          //           <EmptyState icon="⊙" title="No classrooms yet" description="Add classrooms to this center." />
-          //         </td>
-          //       </tr>
-          //     )}
-
-          //     {rooms.map((room, i) => {
-          //       const isEditing = editId === room.id;
-          //       return (
-          //         <tr key={room.id} onMouseEnter={(e) => { if (!isEditing) e.currentTarget.style.background = 'var(--sand)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
-          //           <td style={tdStyle(i < rooms.length - 1)}>
-          //             {isEditing ? (
-          //               <input className="f-input" style={{ padding: '6px 10px' }} value={editVals.name ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, name: e.target.value }))} autoFocus />
-          //             ) : (
-          //               <span
-          //                 style={{ cursor: canEdit ? 'text' : 'default', fontWeight: 500 }}
-          //                 title={canEdit ? 'Click to edit' : undefined}
-          //                 onClick={() => { if (canEdit) { setEditId(room.id); setEditVals({ name: room.name, name_ur: room.name_ur ?? '', capacity: room.capacity }); } }}
-          //               >
-          //                 {room.name}
-          //               </span>
-          //             )}
-          //           </td>
-          //           <td style={{ ...tdStyle(i < rooms.length - 1), fontFamily: 'var(--font-display)', fontSize: 14, direction: 'rtl' }}>
-          //             {isEditing ? (
-          //               <RTLInput style={{ padding: '6px 10px', fontSize: 14 }} value={editVals.name_ur ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, name_ur: e.target.value }))} />
-          //             ) : (room.name_ur ?? '—')}
-          //           </td>
-          //           <td style={tdStyle(i < rooms.length - 1)}>
-          //             {isEditing ? (
-          //               <input className="f-input" style={{ padding: '6px 10px', width: 80 }} type="number" min="1" value={editVals.capacity ?? ''} onChange={(e) => setEditVals((v) => ({ ...v, capacity: e.target.value }))} />
-          //             ) : (room.capacity ?? '—')}
-          //           </td>
-          //           {canEdit && (
-          //             <td style={tdStyle(i < rooms.length - 1)}>
-          //               {isEditing ? (
-          //                 <div style={{ display: 'flex', gap: 8 }}>
-          //                   <Button size="sm" variant="primary" onClick={() => saveEdit(room.id)}>Save</Button>
-          //                   <Button size="sm" variant="outline" onClick={() => setEditId(null)}>Cancel</Button>
-          //                 </div>
-          //               ) : (
-          //                 <button onClick={() => { setEditId(room.id); setEditVals({ name: room.name, name_ur: room.name_ur ?? '', capacity: room.capacity }); }} style={{ background: 'none', border: 'none', color: 'var(--emerald)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
-          //                   Edit
-          //                 </button>
-          //               )}
-          //             </td>
-          //           )}
-          //         </tr>
-          //       );
-          //     })}
-          //   </tbody>
-          // </table>
-          <ClassesList />
-        )}
-      </CardBody>
-    </Card>
+      <ClassesList centerIdProp={centerId} hideHeader={true} />
+    </>
   );
 }
 
@@ -402,7 +282,7 @@ function FormField({ label, children }) {
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  // { id: 'classrooms', label: 'Classrooms' },
+  { id: 'classrooms', label: 'Classrooms' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -480,7 +360,7 @@ export default function CenterDetail() {
       <TabBar isMobile={isMobile} tabs={TABS} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'overview' && <OverviewTab centerId={id} isMobile={isMobile} />}
-      {/* {activeTab === 'classrooms' && <ClassroomsTab centerId={id} isMobile={isMobile} />} */}
+      {activeTab === 'classrooms' && <ClassroomsTab centerId={id} isMobile={isMobile} />}
       {activeTab === 'activity' && <ActivityLogTab centerId={id} isMobile={isMobile} />}
       {activeTab === 'settings' && <SettingsTab centerId={id} center={center} isMobile={isMobile} />}
     </>
