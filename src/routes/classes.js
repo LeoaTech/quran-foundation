@@ -16,7 +16,7 @@ const createClassSchema = z.object({
   course_level_id: z.string().uuid('course_level_id must be a UUID').optional(),
   max_capacity:    z.number().int().positive().optional(),
   schedule_days:   z.string().optional(),
-  start_time:      z.string().regex(/^\d{2}:\d{2}$/, 'start_time must be HH:MM').optional(),
+  start_time:      z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'start_time must be HH:MM or HH:MM:SS').optional(),
   start_date:      z.string().date('start_date must be YYYY-MM-DD').optional(),
 });
 
@@ -26,7 +26,7 @@ const updateClassSchema = z.object({
   course_level_id: z.string().uuid().optional(),
   max_capacity:    z.number().int().positive().optional(),
   schedule_days:   z.string().optional(),
-  start_time:      z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  start_time:      z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   start_date:      z.string().date('start_date must be YYYY-MM-DD').optional(),
   is_active:       z.boolean().optional(),
 }).refine((b) => Object.keys(b).length > 0, {
@@ -65,7 +65,6 @@ const updateCriteriaSchema = z.object({
 router.get(
   '/centers/:center_id/classes',
   requireAuth,
-  requirePermission('classes.view'),
   controller.listClasses,
 );
 
