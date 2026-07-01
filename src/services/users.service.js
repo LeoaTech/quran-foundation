@@ -90,12 +90,23 @@ async function getUser({ user: caller, userId }) {
 }
 
 async function createUser({ user: caller, body }) {
-  const { role, center_id: centerId, base_salary, joining_date, payment_method, bank_name, account_number, ...userData } = body;
+  const {
+    role, center_id: centerId, base_salary, joining_date, payment_method, bank_name, account_number,
+    // Minor-specific fields — extracted so they don't land on the users row directly
+    is_minor, guardian_name, guardian_phone, guardian_relation,
+    ...userData
+  } = body;
 
   // center_manager may only create users in their own center
   assertCenterScope(caller, centerId);
 
-  if (userData.phone) {
+  // For minor students: phone is null (guardian holds the contact phone).
+  // For all other users: phone must be unique.
+  if (is_minor && role === 'student') {
+    // Minor — no phone stored on their user record
+    userData.phone    = null;
+    userData.whatsapp = null;
+  } else if (userData.phone) {
     const existing = await repo.checkPhoneUnique(userData.phone);
     if (existing) {
       throw new AppError('CONFLICT', 'An account with this phone number already exists.', 'اس فون نمبر کا اکاؤنٹ پہلے سے موجود ہے۔', 409);
@@ -115,12 +126,61 @@ async function createUser({ user: caller, body }) {
   const tempPassword = generateTempPassword();
   const password_hash = await bcrypt.hash(tempPassword, 10);
 
-  const newUser = await db.transaction((trx) =>
-    repo.createUser(
-      { userData: { ...userData, password_hash }, roleData: { role, center_id: centerId }, staffData: { base_salary, joining_date, payment_method, bank_name, account_number } },
+  const newUser = await db.transaction(async (trx) => {
+    const created = await repo.createUser(
+      {
+        userData: { ...userData, password_hash, is_minor: is_minor || false },
+        roleData: { role, center_id: centerId },
+        staffData: { base_salary, joining_date, payment_method, bank_name, account_number },
+      },
       trx,
-    ),
-  );
+    );
+
+    // If this is a minor student and a guardian phone was provided, create/find the
+    // guardian user and link them via the guardians table.
+    if (is_minor && role === 'student' && guardian_phone) {
+      let guardianUser = await trx('users').where({ phone: guardian_phone }).first();
+
+      if (!guardianUser) {
+        // Guardian is not yet in the system — create a basic guardian account.
+        const guardianName = guardian_name || 'Guardian';
+        const guardianPassword = generateTempPassword();
+        const guardianHash = await bcrypt.hash(guardianPassword, 10);
+
+        const [newGuardian] = await trx('users').insert({
+          full_name: guardianName,
+          phone: guardian_phone,
+          whatsapp: guardian_phone,
+          password_hash: guardianHash,
+          preferred_lang: 'ur',
+          is_active: true,
+          is_minor: false,
+        }).returning('*');
+
+        // Assign the 'guardian' role scoped to this center
+        const guardianRoleRow = await trx('roles').where({ name: 'guardian' }).first();
+        if (guardianRoleRow) {
+          await trx('user_roles').insert({
+            user_id: newGuardian.id,
+            role_id: guardianRoleRow.id,
+            center_id: centerId || null,
+          }).onConflict(['user_id', 'role_id', 'center_id']).ignore();
+        }
+
+        guardianUser = newGuardian;
+      }
+
+      // Link student → guardian in the guardians table
+      await trx('guardians').insert({
+        student_user_id: created.id,
+        guardian_user_id: guardianUser.id,
+        relation: guardian_relation || null,
+        is_primary: true,
+      }).onConflict(['student_user_id', 'guardian_user_id']).ignore();
+    }
+
+    return created;
+  });
 
   activityLog.log({
     actor: caller,
@@ -128,8 +188,8 @@ async function createUser({ user: caller, body }) {
     entity_type: 'user',
     entity_id: newUser.id,
     center_id: centerId || null,
-    summary_en: `Created user "${newUser.full_name}" with role "${role}"`,
-    metadata: { full_name: newUser.full_name, role, center_id: centerId },
+    summary_en: `Created user "${newUser.full_name}" with role "${role}"${is_minor ? ' (minor, linked to guardian)' : ''}`,
+    metadata: { full_name: newUser.full_name, role, center_id: centerId, is_minor: is_minor || false },
   }).catch(() => { });
 
   return { id: newUser.id, full_name: newUser.full_name, temp_password: tempPassword };

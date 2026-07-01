@@ -15,22 +15,38 @@ const GENDERS = ['male', 'female', 'other'];
 const LANGS   = ['en', 'ur', 'ar'];
 
 const createUserSchema = z.object({
-  full_name:      z.string().min(1, 'full_name is required'),
-  full_name_ur:   z.string().optional(),
-  phone:          z.string().min(1, 'phone is required'),
-  whatsapp:       z.string().optional(),
-  email:          z.string().email().optional(),
-  date_of_birth:  z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
-  gender:         z.enum(GENDERS).optional(),
-  preferred_lang: z.enum(LANGS).optional(),
-  role:           z.enum(ROLES, { errorMap: () => ({ message: `role must be one of: ${ROLES.join(', ')}` }) }),
-  center_id:      z.string().uuid('center_id must be a UUID').optional(),
-  base_salary:    z.number().min(0).optional(),
-  joining_date:   z.string().date().optional(),
-  payment_method: z.string().optional(),
-  bank_name:      z.string().optional(),
-  account_number: z.string().optional(),
-});
+  full_name:         z.string().min(1, 'full_name is required'),
+  full_name_ur:      z.string().optional(),
+  // Phone is optional at schema level; .refine() enforces it for non-minor students.
+  phone:             z.string().optional(),
+  whatsapp:          z.string().optional(),
+  email:             z.string().email().optional(),
+  date_of_birth:     z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
+  gender:            z.enum(GENDERS).optional(),
+  preferred_lang:    z.enum(LANGS).optional(),
+  role:              z.enum(ROLES, { errorMap: () => ({ message: `role must be one of: ${ROLES.join(', ')}` }) }),
+  center_id:         z.string().uuid('center_id must be a UUID').optional(),
+  base_salary:       z.number().min(0).optional(),
+  joining_date:      z.string().date().optional(),
+  payment_method:    z.string().optional(),
+  bank_name:         z.string().optional(),
+  account_number:    z.string().optional(),
+  // Minor student fields (only used when role = 'student')
+  is_minor:          z.boolean().optional().default(false),
+  guardian_name:     z.string().max(255).optional(),
+  guardian_phone:    z.string().optional(),
+  guardian_relation: z.string().max(50).optional(),
+}).refine(
+  (data) => data.role !== 'student' || data.is_minor || (!!data.phone && data.phone.trim().length > 0),
+  { message: 'phone is required for adult students', path: ['phone'] },
+).refine(
+  (data) => data.role !== 'student' || !data.is_minor || (!!data.guardian_phone && data.guardian_phone.trim().length > 0),
+  { message: 'guardian_phone is required for minor students', path: ['guardian_phone'] },
+).refine(
+  // Non-student roles always need a phone
+  (data) => data.role === 'student' || (!!data.phone && data.phone.trim().length > 0),
+  { message: 'phone is required', path: ['phone'] },
+);
 
 const updateUserSchema = z.object({
   full_name:      z.string().min(1).optional(),

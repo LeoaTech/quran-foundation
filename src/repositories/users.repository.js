@@ -16,6 +16,7 @@ function listUsers({ centerId, role, search, isActive, page = 1, perPage = 20 } 
       'u.date_of_birth',
       'u.preferred_lang',
       'u.is_active',
+      'u.is_minor',
       'u.created_at',
       'u.metadata',
       'r.name as role',
@@ -25,6 +26,8 @@ function listUsers({ centerId, role, search, isActive, page = 1, perPage = 20 } 
 
   if (role === 'student') {
     query.select(db.raw(`(SELECT string_agg(c.name, ', ') FROM enrollments e JOIN classes cl ON e.class_id = cl.id JOIN courses c ON cl.course_id = c.id WHERE e.student_user_id = u.id AND e.status = 'active') as enrolled_courses`));
+  } else if (role === 'guardian') {
+    query.select(db.raw(`(SELECT string_agg(ch.full_name, ', ') FROM guardians g JOIN users ch ON g.student_user_id = ch.id WHERE g.guardian_user_id = u.id) as children_names`));
   }
 
   if (centerId !== undefined && centerId !== 'all') query.where('ur.center_id', centerId);
