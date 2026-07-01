@@ -44,6 +44,13 @@ router.get(
   controller.listSessionsByClass,
 );
 
+router.get(
+  '/attendance/sessions/:session_id/records',
+  requireAuth,
+  requirePermission('attendance.view'),
+  controller.getSessionRecords,
+);
+
 router.patch(
   '/attendance/sessions/:session_id/records/:record_id',
   requireAuth,

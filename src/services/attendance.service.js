@@ -201,9 +201,20 @@ async function getStudentAttendance({ user, studentUserId, query = {} }) {
   };
 }
 
+async function getSessionRecords({ user, sessionId }) {
+  const session = await repo.getSessionById(sessionId);
+  if (!session || !session.is_active) throw notFound('Attendance session');
+
+  const cls = await requireClass(session.class_id);
+  assertCenterAccess(user, cls.center_id);
+
+  return repo.listRecordsBySession(sessionId);
+}
+
 module.exports = {
   createAttendanceSession,
   listSessionsByClass,
   correctRecord,
   getStudentAttendance,
+  getSessionRecords,
 };

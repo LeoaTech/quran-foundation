@@ -49,9 +49,21 @@ async function getStudentAttendance(req, res, next) {
   }
 }
 
+async function getSessionRecords(req, res, next) {
+  try {
+    res.json(await service.getSessionRecords({
+      user:      req.user,
+      sessionId: req.params.session_id,
+    }));
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createAttendanceSession,
   listSessionsByClass,
   correctRecord,
   getStudentAttendance,
+  getSessionRecords,
 };
