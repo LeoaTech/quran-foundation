@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from './Modal';
 import Button from './Button';
@@ -6,7 +6,7 @@ import LoadingSpinner from './LoadingSpinner';
 import RTLInput from './RTLInput';
 import { useToast } from '../hooks/useToast';
 import { getClassEnrollments } from '../api/classes';
-import { getClassAttendance, createAttendanceSession, updateRecord } from '../api/attendance';
+import { getClassAttendance, createAttendanceSession, updateRecord, getSessionRecords } from '../api/attendance';
 import { formatTimeShort } from '../utils/classSessions';
 
 const STATUS_STYLE = {
@@ -111,8 +111,8 @@ export default function SessionAttendanceModal({
   open,
   onClose,
   classId,
-  attendanceSessionId, 
-  sessionId,           
+  attendanceSessionId,
+  sessionId,
   sessionDate,
   dayOfWeek,
   startTime,
@@ -124,6 +124,12 @@ export default function SessionAttendanceModal({
   const [records, setRecords] = useState({});
   const [saving, setSaving] = useState(false);
   const editable = mode === 'mark';
+  // Reset the state whenever the modal closes
+  useEffect(() => {
+    if (!open) {
+      setRecords({});
+    }
+  }, [open]);
 
   const { data: enrollmentsRaw = [], isLoading: enrollLoading } = useQuery({
     queryKey: ['class-enrollments', classId, 'active'],
@@ -151,31 +157,53 @@ export default function SessionAttendanceModal({
     )
     : null;
 
+  // Fetch the individual records for the matched session — listSessionsByClass only
+  // returns summary counts; we need the per-student record_ids to PATCH them.
+  const existingSessionId = existingSession?.session_id ?? existingSession?.id;
+  const { data: sessionRecordsRaw = [], isLoading: recordsLoading } = useQuery({
+    queryKey: ['attendance-records', existingSessionId],
+    queryFn: () => getSessionRecords(existingSessionId),
+    enabled: open && !!existingSessionId,
+    staleTime: 15_000,
+  });
+  const sessionRecords = sessionRecordsRaw?.data ?? sessionRecordsRaw ?? [];
+
   useEffect(() => {
-    if (!open || !students.length) return;
+    // Stop if modal is closed, students haven't loaded, or session data is loading.
+    if (!open || !students.length || sessionLoading) return;
+    
+    // Stop if we have ALREADY initialized `records` for this session!
+    // This entirely prevents infinite re-rendering loops and reverting user clicks.
+    if (Object.keys(records).length > 0) return;
 
     if (existingSession) {
+      // Wait for individual records to load before populating edit state
+      if (recordsLoading) return;
       const map = {};
-      (existingSession.records ?? []).forEach((r) => {
+      sessionRecords.forEach((r) => {
         map[r.student_user_id] = {
           status: r.status,
           note_ur: r.note_ur ?? '',
-          record_id: r.id,
+          record_id: r.record_id ?? r.id, // handle both aliases just in case
         };
       });
+      // Fill in any enrolled students not yet in the records
       students.forEach((s) => {
         const id = s.student_user_id ?? s.id;
         if (!map[id]) map[id] = { status: 'present', note_ur: '' };
       });
       setRecords(map);
     } else {
+      // New session — initialize all students as present
       const map = {};
       students.forEach((s) => {
         map[s.student_user_id ?? s.id] = { status: 'present', note_ur: '' };
       });
       setRecords(map);
     }
-  }, [open, students, existingSession]);
+  }, [open, students, sessionLoading, existingSession, recordsLoading, sessionRecords, records]);
+
+
 
   const counts = useMemo(() => {
     const vals = Object.values(records);
@@ -219,17 +247,21 @@ export default function SessionAttendanceModal({
         sessionId;
 
       if (attendanceId) {
-        // Edit Exsting records
+        // Edit existing records — use record_id stored in local state map (DB alias)
         await Promise.all(
           students.map(async (s) => {
             const id = s.student_user_id ?? s.id;
             const rec = records[id];
-            const existing = (existingSession.records ?? []).find((r) => r.student_user_id === id);
-            if (existing && rec && (existing.status !== rec.status || (existing.note_ur ?? '') !== (rec.note_ur ?? ''))) {
-              await updateRecord(attendanceId, existing.id, {
-                status: rec.status,
-                note_ur: rec.note_ur || null,
-              });
+            // Find the original record from our separately-fetched sessionRecords
+            const original = sessionRecords.find((r) => r.student_user_id === id);
+            if (!rec || !original?.record_id) return; // skip if no record to update
+            const statusChanged = original.status !== rec.status;
+            const noteChanged = (original.note_ur ?? '') !== (rec.note_ur ?? '');
+            if (statusChanged || noteChanged) {
+              const updatePayload = { status: rec.status };
+              // Only include note_ur if it's a non-empty string — backend schema rejects null
+              if (rec.note_ur) updatePayload.note_ur = rec.note_ur;
+              await updateRecord(attendanceId, original.record_id, updatePayload);
             }
           }),
         );
@@ -241,6 +273,9 @@ export default function SessionAttendanceModal({
       }
 
       await qc.invalidateQueries({ queryKey: ['class-attendance', classId] });
+      if (attendanceId) {
+        await qc.invalidateQueries({ queryKey: ['attendance-records', attendanceId] });
+      }
       toast.success(`Attendance saved for ${sessionDate}.`);
       onClose();
     } catch (err) {
@@ -256,7 +291,7 @@ export default function SessionAttendanceModal({
     startTime ? `${formatTimeShort(startTime)}${endTime ? ` – ${formatTimeShort(endTime)}` : ''}` : '',
   ].filter(Boolean).join(' · ');
 
-  const isLoading = enrollLoading || sessionLoading;
+  const isLoading = enrollLoading || sessionLoading || (!!existingSessionId && recordsLoading);
   const title = editable
     ? (existingSession ? 'Edit Attendance' : 'Mark Attendance')
     : 'Attendance Sheet';
