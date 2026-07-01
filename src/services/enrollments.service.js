@@ -149,6 +149,7 @@ async function createEnrollment({ user, body }) {
 async function enrollNewStudent({ user, body }) {
   const {
     full_name, full_name_ur, phone, whatsapp, date_of_birth, gender,
+    is_minor, guardian_name, guardian_phone, guardian_relation,
     class_id, class_schedule_id, enrolled_on, prior_level, notes_ur, amount_paid, payment_method,
     profile_picture, qualification, occupation, marital_status, is_repeater, address, center_manager_name, center_manager_contact
   } = body;
@@ -171,16 +172,19 @@ async function enrollNewStudent({ user, body }) {
     }
   }
 
-  // Duplicate phone check — prevent creating a second user with the same phone.
-  if (phone) {
-    const existingUser = await db('users').where({ phone }).first();
-    if (existingUser) {
-      // Check if this user is already enrolled in this class
-      const existingEnrollment = await repo.getActiveEnrollmentForStudent(class_id, existingUser.id);
-      if (existingEnrollment) {
-        throw new AppError('ENROLLMENT_CONFLICT', 'A student with this phone is already enrolled in this class.', 'اس فون نمبر والا طالب علم پہلے سے اس کلاس میں داخل ہے۔', 409);
+  // For ADULT students: check phone uniqueness.
+  // For MINOR students: no phone on their record — guardian phone is used for contact.
+  if (!is_minor) {
+    if (phone) {
+      const existingUser = await db('users').where({ phone }).first();
+      if (existingUser) {
+        // Check if this user is already enrolled in this class
+        const existingEnrollment = await repo.getActiveEnrollmentForStudent(class_id, existingUser.id);
+        if (existingEnrollment) {
+          throw new AppError('ENROLLMENT_CONFLICT', 'A student with this phone is already enrolled in this class.', 'اس فون نمبر والا طالب علم پہلے سے اس کلاس میں داخل ہے۔', 409);
+        }
+        throw new AppError('USER_EXISTS', `A user with phone ${phone} already exists (${existingUser.full_name}). Use the standard enrollment endpoint with their user ID.`, 'اس فون نمبر کا صارف پہلے سے موجود ہے۔', 409);
       }
-      throw new AppError('USER_EXISTS', `A user with phone ${phone} already exists (${existingUser.full_name}). Use the standard enrollment endpoint with their user ID.`, 'اس فون نمبر کا صارف پہلے سے موجود ہے۔', 409);
     }
   }
 
@@ -190,18 +194,20 @@ async function enrollNewStudent({ user, body }) {
   const password_hash = await require('bcryptjs').hash(tempPassword, 10);
 
   const result = await db.transaction(async (trx) => {
-    // 1. Create the user
+    // 1. Create the student user
+    // Minor students have phone = null; their guardian holds the contact number.
     const [newUser] = await trx('users').insert({
       full_name,
       full_name_ur: full_name_ur || null,
       email:        null,
-      phone:        phone || null,
-      whatsapp:     whatsapp || null,
+      phone:        is_minor ? null : (phone || null),
+      whatsapp:     is_minor ? null : (whatsapp || phone || null),
       date_of_birth: date_of_birth || null,
       gender:       gender || null,
       password_hash,
       preferred_lang: 'ur',
       is_active:    true,
+      is_minor:     is_minor || false,
       metadata:     JSON.stringify({
         profile_picture: profile_picture || null,
         qualification: qualification || null,
@@ -224,7 +230,49 @@ async function enrollNewStudent({ user, body }) {
       center_id: cls.center_id,
     });
 
-    // 3. Create the enrollment
+    // 3. For minor students — create/find the guardian user and link them.
+    if (is_minor && guardian_phone) {
+      let guardianUser = await trx('users').where({ phone: guardian_phone }).first();
+
+      if (!guardianUser) {
+        // Guardian doesn't have an account yet — create one automatically.
+        const gName = guardian_name || 'Guardian';
+        const gPassword = `Qf${require('crypto').randomBytes(4).toString('hex')}`;
+        const gHash = await require('bcryptjs').hash(gPassword, 10);
+
+        const [newGuardian] = await trx('users').insert({
+          full_name: gName,
+          phone: guardian_phone,
+          whatsapp: guardian_phone,
+          password_hash: gHash,
+          preferred_lang: 'ur',
+          is_active: true,
+          is_minor: false,
+        }).returning('*');
+
+        // Assign 'guardian' role scoped to this center
+        const guardianRoleRow = await trx('roles').where({ name: 'guardian' }).first();
+        if (guardianRoleRow) {
+          await trx('user_roles').insert({
+            user_id: newGuardian.id,
+            role_id: guardianRoleRow.id,
+            center_id: cls.center_id,
+          }).onConflict(['user_id', 'role_id', 'center_id']).ignore();
+        }
+
+        guardianUser = newGuardian;
+      }
+
+      // Link student → guardian in the guardians table
+      await trx('guardians').insert({
+        student_user_id: newUser.id,
+        guardian_user_id: guardianUser.id,
+        relation: guardian_relation || null,
+        is_primary: true,
+      }).onConflict(['student_user_id', 'guardian_user_id']).ignore();
+    }
+
+    // 4. Create the enrollment
     const [enrollment] = await trx('enrollments').insert({
       student_user_id: newUser.id,
       class_id,
@@ -256,6 +304,7 @@ async function enrollNewStudent({ user, body }) {
       id:        result.user.id,
       full_name: result.user.full_name,
       phone:     result.user.phone,
+      is_minor:  result.user.is_minor,
       temp_password: result.temp_password,
     },
     enrollment: result.enrollment,
@@ -267,8 +316,8 @@ async function enrollNewStudent({ user, body }) {
     entity_type: 'enrollment',
     entity_id:   result.enrollment.id,
     center_id:   result.enrollment.center_id,
-    summary_en:  `Enrolled student ${result.user.full_name} into ${cls.name}`,
-    metadata:    { student_name: result.user.full_name, class_id },
+    summary_en:  `Enrolled ${is_minor ? 'minor ' : ''}student ${result.user.full_name} into ${cls.name}`,
+    metadata:    { student_name: result.user.full_name, class_id, is_minor: is_minor || false },
   }).catch(() => {});
 
   if (amount_paid != null) {

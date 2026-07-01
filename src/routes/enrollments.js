@@ -31,13 +31,21 @@ const updateEnrollmentSchema = z.object({
 });
 
 // Enroll a NEW student — creates user + role + enrollment in one transaction.
+// For minor students (is_minor: true), phone is omitted — guardian contact fields
+// are provided instead. The backend will create/find the guardian user and link them.
 const enrollNewStudentSchema = z.object({
   full_name:         z.string().min(1, 'full_name is required'),
   full_name_ur:      z.string().optional(),
-  phone:             z.string().min(1, 'phone is required'),
+  // Phone is optional at schema level; the .refine() below enforces it for adults.
+  phone:             z.string().optional(),
   whatsapp:          z.string().optional(),
   date_of_birth:     z.string().date('date_of_birth must be YYYY-MM-DD').optional(),
   gender:            z.enum(['male', 'female', 'other']).optional(),
+  // Minor-specific fields
+  is_minor:          z.union([z.boolean(), z.string().transform(v => v === 'true' || v === 'yes')]).optional().default(false),
+  guardian_name:     z.string().max(255).optional(),
+  guardian_phone:    z.string().optional(),
+  guardian_relation: z.string().max(50).optional(),
   class_id:          z.string().uuid('class_id must be a UUID'),
   class_schedule_id: z.string().uuid('class_schedule_id must be a UUID').optional().nullable(),
   enrolled_on:       z.string().date('enrolled_on must be YYYY-MM-DD').optional(),
@@ -52,7 +60,13 @@ const enrollNewStudentSchema = z.object({
   address:           z.string().optional(),
   center_manager_name: z.string().max(255).optional(),
   center_manager_contact: z.string().max(50).optional(),
-});
+}).refine(
+  (data) => data.is_minor || (!!data.phone && data.phone.trim().length > 0),
+  { message: 'phone is required for adult students', path: ['phone'] },
+).refine(
+  (data) => !data.is_minor || (!!data.guardian_phone && data.guardian_phone.trim().length > 0),
+  { message: 'guardian_phone is required for minor students', path: ['guardian_phone'] },
+);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
