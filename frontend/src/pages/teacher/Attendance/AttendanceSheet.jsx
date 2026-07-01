@@ -59,7 +59,9 @@ function StatusCell({ record, sessionId, classId, onCorrected, editable = true }
 
   async function handleCorrect(newStatus) {
     try {
-      await correct.mutateAsync({ sessionId, recordId: record.id, classId, payload: { status: newStatus } });
+      // records from listSessionsByClass use `record_id` as the DB alias (not `id`)
+      const recordId = record.record_id ?? record.id;
+      await correct.mutateAsync({ sessionId, recordId, classId, payload: { status: newStatus } });
       toast.success('Record corrected.');
       onCorrected?.();
       setEditing(false);
@@ -197,10 +199,13 @@ export default function AttendanceSheet() {
   const students   = (enrollmentsRaw?.data ?? enrollmentsRaw ?? []);
   const sessions   = attendanceRaw?.data ?? attendanceRaw ?? [];
 
-  // Map sessions by date
+  // Map sessions by normalized ISO date (session_date may come back as a full timestamp)
   const sessionMap = useMemo(() => {
     const m = {};
-    (Array.isArray(sessions) ? sessions : []).forEach((s) => { m[s.session_date] = s; });
+    (Array.isArray(sessions) ? sessions : []).forEach((s) => {
+      const key = s.session_date ? String(s.session_date).slice(0, 10) : null;
+      if (key) m[key] = s;
+    });
     return m;
   }, [sessions]);
 
