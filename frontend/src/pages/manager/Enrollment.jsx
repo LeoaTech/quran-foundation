@@ -15,7 +15,6 @@ export default function Enrollment() {
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
   // Pre-fill from query params when navigating from ClassDetail
   const presetClassId = searchParams.get('class_id') ?? '';
   const presetCourseId = searchParams.get('course_id') ?? '';
@@ -36,8 +35,13 @@ export default function Enrollment() {
   const [maritalStatus, setMaritalStatus] = useState('');
   const [isRepeater, setIsRepeater] = useState(false);
   const [address, setAddress] = useState('');
-  const [centerManagerName, setCenterManagerName] = useState('');
-  const [centerManagerContact, setCenterManagerContact] = useState('');
+  const [centerManagerName, setCenterManagerName] = useState(user?.full_name || '');
+  const [centerManagerContact, setCenterManagerContact] = useState(user?.phone || '');
+
+  const [isMinor, setIsMinor] = useState(false);
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+  const [guardianRelation, setGuardianRelation] = useState('');
 
   const [courseId, setCourseId] = useState(presetCourseId);
   const [classId, setClassId] = useState(presetClassId);
@@ -93,6 +97,17 @@ export default function Enrollment() {
     if (preset?.course_id) setCourseId(preset.course_id);
   }, [presetClassId, courseId, centerClasses]);
 
+  // Reset minor-specific fields when toggling isMinor
+  useEffect(() => {
+    if (!isMinor) {
+      setGuardianName('');
+      setGuardianPhone('');
+      setGuardianRelation('');
+    } else {
+      setPhone('');
+    }
+  }, [isMinor]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -139,8 +154,19 @@ export default function Enrollment() {
         }
 
       } else {
-        if (!fullName || !phone) {
-          setErrorMsg('Name and Phone are required.');
+        // ── Validation ──────────────────────────────────────────────────────
+        if (!fullName) {
+          setErrorMsg('Student name is required.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (!isMinor && !phone) {
+          setErrorMsg('Phone is required for adult students.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (isMinor && !guardianPhone) {
+          setErrorMsg('Guardian phone is required for minor students.');
           setIsSubmitting(false);
           return;
         }
@@ -148,9 +174,20 @@ export default function Enrollment() {
         const formData = new FormData();
         formData.append('full_name', fullName);
         if (fullNameUr) formData.append('full_name_ur', fullNameUr);
-        formData.append('phone', phone);
-        // WhatsApp always mirrors phone
-        formData.append('whatsapp', phone);
+        formData.append('is_minor', isMinor ? 'true' : 'false');
+
+        if (isMinor) {
+          // Minor student: no own phone — send guardian contact instead
+          if (guardianName) formData.append('guardian_name', guardianName);
+          formData.append('guardian_phone', guardianPhone);
+          if (guardianRelation) formData.append('guardian_relation', guardianRelation);
+        } else {
+          // Adult student: own phone is their login identifier
+          formData.append('phone', phone);
+          // WhatsApp always mirrors phone
+          formData.append('whatsapp', phone);
+        }
+
         if (fatherName) formData.append('father_name', fatherName);
         if (dob) formData.append('date_of_birth', dob);
         if (gender) formData.append('gender', gender);
@@ -160,7 +197,7 @@ export default function Enrollment() {
         if (notesUr) formData.append('notes_ur', notesUr);
         if (cashReceived) formData.append('amount_paid', Number(cashReceived));
         formData.append('payment_method', 'cash');
-        
+
         if (profilePicture) formData.append('profile_picture', profilePicture);
         if (qualification) formData.append('qualification', qualification);
         if (occupation) formData.append('occupation', occupation);
@@ -172,9 +209,9 @@ export default function Enrollment() {
 
         const res = await enrollNewStudent(formData);
 
-        toast.success(`${res.student.full_name} enrolled! Temp password: ${res.student.temp_password}`);
+        toast.success(`${res.student.full_name} enrolled successfully!`);
 
-        // Reset specific form fields
+        // Reset form fields
         setFullName('');
         setFullNameUr('');
         setFatherName('');
@@ -187,8 +224,12 @@ export default function Enrollment() {
         setMaritalStatus('');
         setIsRepeater(false);
         setAddress('');
-        setCenterManagerName('');
-        setCenterManagerContact('');
+        setCenterManagerName(user?.full_name || '');
+        setCenterManagerContact(user?.phone || '');
+        setIsMinor(false);
+        setGuardianName('');
+        setGuardianPhone('');
+        setGuardianRelation('');
         setClassId(presetClassId);
         setCourseId(presetCourseId);
         setCashReceived('');
@@ -279,6 +320,45 @@ export default function Enrollment() {
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 16, gridTemplateColumns: '1fr 1fr' }}>
+
+                  {/* ── Minor / Adult Toggle ── */}
+                  <div className="field" style={{ gridColumn: 'span 2' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: isMinor ? 'var(--emerald-pale, #ecfdf5)' : 'var(--sand-light)',
+                      border: `1.5px solid ${isMinor ? 'var(--emerald-light)' : 'var(--sand-mid)'}`,
+                      borderRadius: 'var(--radius-md)', padding: '12px 16px', transition: 'all 0.2s',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)', marginBottom: 2 }}>
+                          {isMinor ? ' Minor Student (Under 18)' : ' Adult Student (18+)'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                          {isMinor
+                            ? 'Guardian contact will be used — no phone required for the student.'
+                            : 'Adult Students must have their own phone number for enrollment.'}
+                        </div>
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                        <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Minor</span>
+                        <div
+                          onClick={() => setIsMinor(v => !v)}
+                          style={{
+                            width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                            background: isMinor ? 'var(--emerald)' : 'var(--ink-pale)',
+                            position: 'relative', transition: 'background 0.2s',
+                          }}
+                        >
+                          <div style={{
+                            position: 'absolute', top: 2, left: isMinor ? 22 : 2,
+                            width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s',
+                          }} />
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="field">
                     <label>Full name <span style={{ color: 'var(--red)' }}>*</span></label>
                     <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Hamza Rauf" required />
@@ -287,13 +367,42 @@ export default function Enrollment() {
                     <label>Full name (Urdu)</label>
                     <input type="text" value={fullNameUr} onChange={(e) => setFullNameUr(e.target.value)} placeholder="حمزہ رؤف" dir="rtl" />
                   </div>
-                  <div className="field">
-                    <label>Phone <span style={{ color: 'var(--red)' }}>*</span></label>
-                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" required />
-                    <small style={{ color: 'var(--ink-pale)', fontSize: 11, marginTop: 4, display: 'block' }}>
-                      Enter a number with an active WhatsApp account — same number will be used for WhatsApp.
-                    </small>
-                  </div>
+
+                  {/* ── Phone OR Guardian fields — conditional on isMinor ── */}
+                  {!isMinor ? (
+                    <div className="field">
+                      <label>Phone <span style={{ color: 'var(--red)' }}>*</span></label>
+                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" required />
+                      <small style={{ color: 'var(--ink-pale)', fontSize: 11, marginTop: 4, display: 'block' }}>
+                        Enter a number with an active WhatsApp account — same number will be used for WhatsApp.
+                      </small>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="field">
+                        <label>Guardian Phone <span style={{ color: 'var(--red)' }}>*</span></label>
+                        <input type="tel" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" />
+                        <small style={{ color: 'var(--ink-pale)', fontSize: 11, marginTop: 4, display: 'block' }}>
+                          If guardian already exists in system, their account will be linked automatically.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label>Guardian Name</label>
+                        <input type="text" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} placeholder="e.g. Muhammad Ali" />
+                      </div>
+                      <div className="field">
+                        <label>Relation</label>
+                        <select value={guardianRelation} onChange={(e) => setGuardianRelation(e.target.value)}>
+                          <option value="">— Select —</option>
+                          <option value="father">Father</option>
+                          <option value="mother">Mother</option>
+                          <option value="sibling">Sibling</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
                   <div className="field">
                     <label>Father's Name</label>
                     <input type="text" value={fatherName} onChange={(e) => setFatherName(e.target.value)} placeholder="e.g. Muhammad Ali" />
@@ -314,42 +423,46 @@ export default function Enrollment() {
                     <label>Profile Picture</label>
                     <input type="file" accept="image/*" onChange={(e) => setProfilePicture(e.target.files[0])} />
                   </div>
-                  <div className="field">
-                    <label>Qualification</label>
-                    <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
-                      <option value="">— Select —</option>
-                      <option value="Matric">Matric</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Bachelors">Bachelors</option>
-                      <option value="Masters">Masters</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Occupation</label>
-                    <select value={occupation} onChange={(e) => setOccupation(e.target.value)}>
-                      <option value="">— Select —</option>
-                      <option value="Student">Student</option>
-                      <option value="Employee">Employee</option>
-                      <option value="Business">Business</option>
-                      <option value="Unemployed">Unemployed</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Marital Status</label>
-                    <select value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
-                      <option value="">— Select —</option>
-                      <option value="Single">Single</option>
-                      <option value="Married">Married</option>
-                      <option value="Divorced">Divorced</option>
-                      <option value="Widowed">Widowed</option>
-                    </select>
-                  </div>
-                  <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8, height: '100%', marginTop: 24 }}>
-                    <input type="checkbox" id="repeater" checked={isRepeater} onChange={(e) => setIsRepeater(e.target.checked)} style={{ width: 'auto' }} />
-                    <label htmlFor="repeater" style={{ margin: 0 }}>Are you Repeater?</label>
-                  </div>
+                  {!isMinor && (
+                    <>
+                      <div className="field">
+                        <label>Qualification</label>
+                        <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
+                          <option value="">— Select —</option>
+                          <option value="Matric">Matric</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Bachelors">Bachelors</option>
+                          <option value="Masters">Masters</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Occupation</label>
+                        <select value={occupation} onChange={(e) => setOccupation(e.target.value)}>
+                          <option value="">— Select —</option>
+                          <option value="Student">Student</option>
+                          <option value="Employee">Employee</option>
+                          <option value="Business">Business</option>
+                          <option value="Unemployed">Unemployed</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Marital Status</label>
+                        <select value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
+                          <option value="">— Select —</option>
+                          <option value="Single">Single</option>
+                          <option value="Married">Married</option>
+                          <option value="Divorced">Divorced</option>
+                          <option value="Widowed">Widowed</option>
+                        </select>
+                      </div>
+                      <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8, height: '100%', marginTop: 24 }}>
+                        <input type="checkbox" id="repeater" checked={isRepeater} onChange={(e) => setIsRepeater(e.target.checked)} style={{ width: 'auto' }} />
+                        <label htmlFor="repeater" style={{ margin: 0 }}>Are you Repeater?</label>
+                      </div>
+                    </>
+                  )}
                   <div className="field" style={{ gridColumn: 'span 2' }}>
                     <label>Complete Address</label>
                     <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows="2" placeholder="House #, Street, City..." />
