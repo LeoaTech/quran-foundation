@@ -80,7 +80,6 @@ router.patch(
 router.get(
   '/centers/:center_id/classrooms',
   requireAuth,
-  requirePermission('centers.view'),
   controller.listClassrooms,
 );
 
