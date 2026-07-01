@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import MetricCard from '../../../components/MetricCard';
 import ProgressBar from '../../../components/ProgressBar';
@@ -6,12 +7,15 @@ import Badge from '../../../components/Badge';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import { useStudentProgress } from '../../../hooks/useProgress';
+import { getStudentEnrollments } from '../../../api/enrollments';
+import { getClasses } from '../../../api/classes';
+import { formatTimeShort } from '../../../utils/classSessions';
 
 const GRADE_CHIP = {
-  excellent: { cls: 'chip chip-green', label: 'Excellent'  },
-  good:      { cls: 'chip chip-blue',  label: 'Good'       },
-  average:   { cls: 'chip chip-gold',  label: 'Average'    },
-  revision:  { cls: 'chip chip-red',   label: 'Needs Rev.' },
+  excellent: { cls: 'chip chip-green', label: 'Excellent' },
+  good: { cls: 'chip chip-blue', label: 'Good' },
+  average: { cls: 'chip chip-gold', label: 'Average' },
+  revision: { cls: 'chip chip-red', label: 'Needs Rev.' },
 };
 
 // ── Topic progress section ────────────────────────────────────────────────────
@@ -21,11 +25,11 @@ function TopicProgressBar({ topic, sessions }) {
   // Find all sessions that touched this topic
   const topicSessions = sessions.filter((s) => s.cw_topic_id === topic.id);
   const subtopicsCovered = new Set(topicSessions.map((s) => s.cw_subtopic_id).filter(Boolean));
-  const total     = topic.subtopics?.length ?? 0;
-  const covered   = total > 0 ? subtopicsCovered.size : (topicSessions.length > 0 ? 1 : 0);
+  const total = topic.subtopics?.length ?? 0;
+  const covered = total > 0 ? subtopicsCovered.size : (topicSessions.length > 0 ? 1 : 0);
   const denominator = total > 0 ? total : 1;
-  const pct       = Math.min(Math.round((covered / denominator) * 100), 100);
-  const variant   = pct >= 80 ? 'green' : pct >= 40 ? 'gold' : 'neutral';
+  const pct = Math.min(Math.round((covered / denominator) * 100), 100);
+  const variant = pct >= 80 ? 'green' : pct >= 40 ? 'gold' : 'neutral';
 
   return (
     <div style={{ marginBottom: 12 }}>
@@ -73,9 +77,9 @@ function TopicProgressBar({ topic, sessions }) {
 // ── Session row ───────────────────────────────────────────────────────────────
 function SessionRow({ session, isLast }) {
   const [expanded, setExpanded] = useState(false);
-  const chip   = GRADE_CHIP[session.cw_grade];
+  const chip = GRADE_CHIP[session.cw_grade];
   const scores = session.homework_scores ?? [];
-  const hwPct  = session.homework_pct ?? null;
+  const hwPct = session.homework_pct ?? null;
 
   const tdStyle = { padding: '10px 14px', fontSize: 13, color: 'var(--ink-mid)', borderBottom: isLast && !expanded ? 'none' : '1px solid var(--sand)', verticalAlign: 'middle' };
 
@@ -131,27 +135,132 @@ function SessionRow({ session, isLast }) {
 export default function MyProgress() {
   const { user } = useAuth();
   const from = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
-  const to   = new Date().toISOString().slice(0, 10);
+  const to = new Date().toISOString().slice(0, 10);
 
-  const { data, isLoading } = useStudentProgress(user?.id, {
+  // 1. Check Enrollments
+  const { data: enrollmentsData, isLoading: enrollmentsLoading } = useQuery({
+    queryKey: ['my-enrollments'],
+    queryFn: () => getStudentEnrollments(user.id),
+    enabled: !!user?.id,
+  });
+
+  const enrollments = enrollmentsData?.data ?? enrollmentsData ?? [];
+  const activeEnrollments = enrollments.filter(e => e.status === 'active');
+  const isUnenrolled = !enrollmentsLoading && activeEnrollments.length === 0;
+
+  const enrolledClassIds = new Set(activeEnrollments.map(e => e.class_id));
+
+  // 2. Fetch Center Classes
+  const { data: classesData, isLoading: classesLoading } = useQuery({
+    queryKey: ['center-classes', user?.center_id],
+    queryFn: () => getClasses(user.center_id, { is_active: true }),
+    enabled: !!user?.center_id,
+  });
+
+  // 3. Fetch Progress if enrolled
+  const { data: progressData, isLoading: progressLoading } = useStudentProgress(user?.id, {
     from,
     to,
     include: 'homework_scores',
-  });
+  }, { enabled: !isUnenrolled });
 
-  const summary  = data ?? {};
-  const sessions = summary.sessions ?? summary.data?.sessions ?? [];
-  const topics   = summary.topics_covered ?? summary.data?.topics_covered ?? [];
+  const availableClasses = classesData?.data ?? classesData ?? [];
 
-  const topicsCoveredCount = topics.length;
-  const attendancePct      = summary.attendance_pct ?? null;
-  const hwAvg              = summary.homework_avg_pct ?? null;
+  const renderAvailableClasses = () => (
+    <div style={{ marginTop: isUnenrolled ? 0 : 40 }}>
+      <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', marginBottom: 16 }}>Available Classes at Your Center</h3>
+      {availableClasses.length === 0 ? (
+        <EmptyState icon="🏫" title="No active classes" description="There are currently no active classes at this center." />
+      ) : (
+        <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))' }}>
+          {availableClasses.map(cls => {
+            const isMyClass = enrolledClassIds.has(cls.id);
+            const scheduleDaysArray = cls.schedule_days ? cls.schedule_days.split(',').map(d => d.trim()).filter(Boolean) : [];
+            
+            return (
+              <div key={cls.id} style={{
+                background: isMyClass ? 'var(--emerald-light)' : 'var(--white)',
+                border: isMyClass ? '1px solid var(--emerald)' : '1px solid var(--sand-mid)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 24,
+                boxShadow: 'var(--shadow-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 18, color: 'var(--ink)', marginBottom: 4, lineHeight: 1.3 }}>{cls.course_name}</div>
+                    {cls.course_name_ur && <div style={{ fontSize: 15, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)', direction: 'rtl' }}>{cls.course_name_ur}</div>}
+                  </div>
+                  {isMyClass && <Badge variant="green" style={{ whiteSpace: 'nowrap' }}>Enrolled</Badge>}
+                </div>
 
-  const thStyle = { textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' };
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 14, color: 'var(--ink-mid)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--sand)', paddingBottom: 8 }}>
+                    <span style={{ color: 'var(--ink-soft)' }}>Classroom</span>
+                    <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{cls.name}</span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--sand)', paddingBottom: 8 }}>
+                    <span style={{ color: 'var(--ink-soft)' }}>Course Type</span>
+                    <span style={{ textTransform: 'capitalize', fontWeight: 500 }}>{cls.course_type || '—'}</span>
+                  </div>
 
-  if (isLoading) {
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--sand)', paddingBottom: 8 }}>
+                    <span style={{ color: 'var(--ink-soft)' }}>Schedule</span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                      {scheduleDaysArray.length > 0 ? scheduleDaysArray.map(day => (
+                        <span key={day} style={{ background: 'var(--blue-light)', color: 'var(--blue-deep)', padding: '2px 8px', borderRadius: '4px', fontSize: 12, fontWeight: 600 }}>
+                          {day.substring(0, 3)}
+                        </span>
+                      )) : <span>—</span>}
+                      {cls.start_time && <span style={{ marginLeft: 4, color: 'var(--ink-mid)' }}>at {formatTimeShort(cls.start_time)}</span>}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--ink-soft)' }}>Starting From</span>
+                    <span style={{ fontWeight: 500 }}>{cls.start_date ? new Date(cls.start_date).toDateString() : '—'}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  if (enrollmentsLoading || classesLoading || (!isUnenrolled && progressLoading)) {
     return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><LoadingSpinner size={32} /></div>;
   }
+
+  // ── UNENROLLED VIEW ──
+  if (isUnenrolled) {
+    return (
+      <div style={{ maxWidth: 800, margin: '0 auto', paddingTop: 24 }}>
+        <div style={{ background: 'var(--blue-light)', border: '1px solid var(--blue)', borderRadius: 'var(--radius-lg)', padding: '24px 32px', marginBottom: 32, textAlign: 'center' }}>
+          <h2 style={{ fontSize: 24, color: 'var(--ink)', marginBottom: 12 }}>Welcome to Quran Foundation!</h2>
+          <p style={{ fontSize: 15, color: 'var(--ink-mid)', lineHeight: 1.6, maxWidth: 600, margin: '0 auto' }}>
+            Your account has been created successfully. To complete your enrollment, please visit your local center physically to confirm your details and submit the course fee.
+          </p>
+        </div>
+        {renderAvailableClasses()}
+      </div>
+    );
+  }
+
+  // ── ENROLLED PROGRESS VIEW ──
+  const summary = progressData ?? {};
+  const sessions = summary.sessions ?? summary.data?.sessions ?? [];
+  const topics = summary.topics_covered ?? summary.data?.topics_covered ?? [];
+
+  const topicsCoveredCount = topics.length;
+  const attendancePct = summary.attendance_pct ?? null;
+  const hwAvg = summary.homework_avg_pct ?? null;
+
+  const thStyle = { textAlign: 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 8px', borderBottom: '1px solid var(--sand-mid)' };
 
   return (
     <>
@@ -164,13 +273,12 @@ export default function MyProgress() {
 
       {/* Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-        <MetricCard label="Topics covered" value={topicsCoveredCount}                                                         variant="green"  />
-        <MetricCard label="Attendance"     value={attendancePct != null ? `${attendancePct}%` : '—'} sub="Year to date"       variant="blue"   />
-        <MetricCard label="Homework avg."  value={hwAvg != null ? `${hwAvg}%` : '—'}                sub="Across all sessions" variant={hwAvg != null ? (hwAvg >= 80 ? 'green' : hwAvg >= 60 ? 'gold' : 'red') : 'neutral'} />
+        <MetricCard label="Topics covered" value={topicsCoveredCount} variant="green" />
+        <MetricCard label="Attendance" value={attendancePct != null ? `${attendancePct}%` : '—'} sub="Year to date" variant="blue" />
+        <MetricCard label="Homework avg." value={hwAvg != null ? `${hwAvg}%` : '—'} sub="Across all sessions" variant={hwAvg != null ? (hwAvg >= 80 ? 'green' : hwAvg >= 60 ? 'gold' : 'red') : 'neutral'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20, alignItems: 'start' }}>
-
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20, alignItems: 'start', marginBottom: 20 }}>
         {/* Topic progress */}
         <div style={{ background: 'var(--white)', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>
@@ -212,6 +320,8 @@ export default function MyProgress() {
           )}
         </div>
       </div>
+
+      {renderAvailableClasses()}
     </>
   );
 }
