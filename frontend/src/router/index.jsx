@@ -59,6 +59,9 @@ import MyAttendance from '../pages/student/Attendance/MyAttendance';
 import Schedule from '../pages/student/Schedule';
 import MyAssessments from '../pages/student/Assessments/MyAssessments';
 
+// Guardian
+import GuardianDashboard from '../pages/guardian/Dashboard';
+
 // Shared
 import StudentReport from '../pages/shared/Reports/StudentReport';
 import Students from '../pages/manager/Students';
@@ -69,6 +72,7 @@ export const ROLE_DASHBOARDS = {
   finance_manager: '/finance/dashboard',
   teacher:         '/teacher/dashboard',
   student:         '/student/dashboard',
+  guardian:        '/guardian/dashboard',
 };
 
 function RootRedirect() {
@@ -156,6 +160,11 @@ export default function AppRoutes() {
             <Route path="/student/attendance" element={<MyAttendance />} />
             <Route path="/student/schedule" element={<Schedule />} />
             <Route path="/student/results" element={<MyAssessments />} />
+          </Route>
+
+          {/* ── Guardian ── */}
+          <Route element={<ProtectedRoute roles={['guardian']} />}>
+            <Route path="/guardian/dashboard" element={<GuardianDashboard />} />
           </Route>
 
           {/* ── Finance Manager ── */}
