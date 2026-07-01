@@ -257,7 +257,7 @@ export default function EnrollmentsList() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => navigate(`/students/${en.student_user_id ?? en.student?.id}`)}
+                          onClick={() => navigate(`/reports/students/${en.student_user_id ?? en.student?.id}`)}
                         >
                           View
                         </Button>
