@@ -149,7 +149,7 @@ async function updateStaffProfile(userId, oldCenterId, { userData, roleData, sta
     }
 
     // 3. Update staff details
-    if (Object.keys(staffData).length > 0 || (roleData && roleData.center_id !== oldCenterId)) {
+    if (Object.keys(staffData).length > 0 || (roleData && String(roleData.center_id) !== String(oldCenterId))) {
       const newCenterId = roleData.center_id !== undefined ? roleData.center_id : (isOldCenterOrgWide ? null : oldCenterId);
       
       let existing = null;
