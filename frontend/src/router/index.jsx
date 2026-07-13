@@ -61,6 +61,9 @@ const MyAttendance = lazy(() => import('../pages/student/Attendance/MyAttendance
 const Schedule = lazy(() => import('../pages/student/Schedule'));
 const MyAssessments = lazy(() => import('../pages/student/Assessments/MyAssessments'));
 
+const MyClassroomsList = lazy(() => import('../pages/student/Classrooms/MyClassroomsList'));
+const MyClassroomDetail = lazy(() => import('../pages/student/Classrooms/MyClassroomDetail'));
+
 // Guardian
 const GuardianDashboard = lazy(() => import('../pages/guardian/Dashboard'));
 
@@ -166,6 +169,8 @@ export default function AppRoutes() {
             {/* ── Student ── */}
             <Route element={<ProtectedRoute roles={['student']} />}>
               <Route path="/student/dashboard" element={<MyProgress />} />
+              <Route path="/student/classrooms" element={<MyClassroomsList />} />
+              <Route path="/student/classrooms/:id" element={<MyClassroomDetail />} />
               <Route path="/student/attendance" element={<MyAttendance />} />
               <Route path="/student/schedule" element={<Schedule />} />
               <Route path="/student/results" element={<MyAssessments />} />
