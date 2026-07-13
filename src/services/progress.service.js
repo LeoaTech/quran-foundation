@@ -34,7 +34,7 @@ async function assertWriteAccess(user, session) {
   const cls = await classRepo.getClassById(session.class_id);
 
   if (user.roles.includes('center_manager')) {
-    if (user.center_id !== cls.center_id) throw forbidden();
+    if (String(user.center_id) !== String(cls.center_id)) throw forbidden();
     return;
   }
 
@@ -55,7 +55,7 @@ async function assertReadAccess(user, session) {
   const cls = await classRepo.getClassById(session.class_id);
 
   if (user.roles.includes('center_manager')) {
-    if (user.center_id !== cls.center_id) throw forbidden();
+    if (String(user.center_id) !== String(cls.center_id)) throw forbidden();
     return;
   }
 
