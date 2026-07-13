@@ -136,6 +136,7 @@ const NAV_CONFIG = {
         title: "My Learning",
         items: [
           { to: '/student/dashboard',  label: 'My Progress', icon: '⊞' },
+          { to: '/student/classrooms', label: 'My Classrooms', icon: '◈' },
           { to: '/student/attendance', label: 'Attendance',  icon: '☑', requires: 'attendance.view' },
           { to: '/student/schedule',   label: 'Schedule',    icon: '◉' },
           { to: '/student/results',    label: 'Results',     icon: '▦', requires: 'assessments.view' },
