@@ -9,7 +9,7 @@ async function listCenterActivity(req, res, next) {
 
     // center_manager must be scoped to this center
     if (!req.user.roles.includes('super_admin')) {
-      if (req.user.center_id !== centerId) {
+      if (req.String(user.center_id) !== String(centerId)) {
         throw new AppError(
           'FORBIDDEN',
           'You do not have access to this center.',
