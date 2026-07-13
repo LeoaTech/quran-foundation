@@ -43,7 +43,7 @@ function forbidden() {
 // Throws 403 if a non-super_admin is accessing a center they are not scoped to.
 function assertCenterAccess(user, centerId) {
   if (user.roles.includes('super_admin')) return;
-  if (user.center_id !== centerId) throw forbidden();
+  if (String(user.center_id) !== String(centerId)) throw forbidden();
 }
 
 // Resolves & returns the class, throwing 404 if missing.
@@ -59,7 +59,7 @@ async function assertClassAccess(user, cls) {
   if (user.roles.includes('super_admin')) return;
 
   if (user.roles.includes('center_manager')) {
-    if (user.center_id !== cls.center_id) throw forbidden();
+    if (String(user.center_id) !== String(cls.center_id)) throw forbidden();
     return;
   }
 
