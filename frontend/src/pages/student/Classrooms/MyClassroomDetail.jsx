@@ -164,7 +164,6 @@ export default function MyClassroomDetail() {
         <div style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Recent Homework</h3>
-            <Badge variant="blue">Dummy Data</Badge>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
