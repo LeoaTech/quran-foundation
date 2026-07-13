@@ -198,4 +198,13 @@ router.put(
   controller.upsertSessionPlan,
 );
 
+// ── Student Portal Routes ─────────────────────────────────────────────────────
+
+// Allow a student to view their enrolled class details safely
+router.get(
+  '/student/classes/:class_id',
+  requireAuth,
+  controller.getStudentClassDetail,
+);
+
 module.exports = router;

@@ -2,6 +2,8 @@ const repo      = require('../repositories/classes.repository');
 const centerRepo = require('../repositories/centers.repository');
 const activityLog = require('./activityLog.service');
 const { AppError } = require('../utils/errors');
+const enrollmentsRepo = require('../repositories/enrollments.repository');
+const attendanceRepo = require('../repositories/attendance.repository');
 
 const DAY_ALIASES = {
   sun: 'Sunday', sunday: 'Sunday',
@@ -329,6 +331,68 @@ async function upsertSessionPlan({ user, classId, body }) {
   return repo.upsertSessionPlan(classId, body);
 }
 
+// ── Student Portal ────────────────────────────────────────────────────────────
+
+async function getStudentClassDetail({ user, classId }) {
+  // Check if student is actively enrolled
+  const enrollment = await enrollmentsRepo.getActiveEnrollmentForStudent(classId, user.id);
+  if (!enrollment) {
+    throw forbidden();
+  }
+
+  const cls = await requireClass(classId);
+  const classTeachers = await repo.listTeachers(classId);
+  const topicTeachers = await repo.listAssignedTopicTeachers(cls.center_id, cls.course_id);
+  
+  // Merge teachers (deduplicate by user id)
+  const teachersMap = new Map();
+  classTeachers.forEach(t => teachersMap.set(t.teacher_user_id, { ...t, topics_assigned: [] }));
+  topicTeachers.forEach(t => {
+    if (teachersMap.has(t.teacher_user_id)) {
+      teachersMap.get(t.teacher_user_id).topics_assigned = t.topics_assigned;
+    } else {
+      teachersMap.set(t.teacher_user_id, {
+        class_teacher_id: null,
+        is_primary: false,
+        assigned_from: null,
+        teacher_user_id: t.teacher_user_id,
+        full_name: t.full_name,
+        full_name_ur: t.full_name_ur,
+        phone: t.phone,
+        topics_assigned: t.topics_assigned
+      });
+    }
+  });
+  const teachers = Array.from(teachersMap.values());
+
+  const sessionPlans = await repo.listSessionPlans(classId);
+  const attendanceRecords = await attendanceRepo.getStudentAttendanceRecords(user.id, { classId });
+
+  // Map attendance records by session_date for easy lookup on frontend
+  const attendanceMap = {};
+  attendanceRecords.forEach(r => {
+    attendanceMap[r.session_date] = r;
+  });
+
+  // Attach attendance to session plans
+  const mappedSessionPlans = sessionPlans.map(sp => ({
+    ...sp,
+    attendance: attendanceMap[sp.session_date] || null
+  }));
+
+  return {
+    class: cls,
+    teachers,
+    sessionPlans: mappedSessionPlans,
+    attendanceSummary: {
+      total: attendanceRecords.length,
+      present: attendanceRecords.filter(r => r.status === 'present').length,
+      absent: attendanceRecords.filter(r => r.status === 'absent').length,
+      late: attendanceRecords.filter(r => r.status === 'late').length
+    }
+  };
+}
+
 module.exports = {
   listClasses,
   getClass,
@@ -346,4 +410,5 @@ module.exports = {
   deleteSchedule,
   listSessionPlans,
   upsertSessionPlan,
+  getStudentClassDetail,
 };

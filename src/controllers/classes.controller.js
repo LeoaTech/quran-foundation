@@ -130,6 +130,14 @@ async function upsertSessionPlan(req, res, next) {
   }
 }
 
+async function getStudentClassDetail(req, res, next) {
+  try {
+    res.json(await service.getStudentClassDetail({ user: req.user, classId: req.params.class_id }));
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listClasses,
   getClass,
@@ -147,4 +155,5 @@ module.exports = {
   deleteSchedule,
   listSessionPlans,
   upsertSessionPlan,
+  getStudentClassDetail,
 };

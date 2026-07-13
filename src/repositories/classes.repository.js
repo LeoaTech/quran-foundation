@@ -152,6 +152,26 @@ function listTeachers(classId) {
     .orderBy('ct.assigned_from', 'asc');
 }
 
+function listAssignedTopicTeachers(centerId, courseId) {
+  return db('center_teacher_topics as ctt')
+    .join('users as u', 'u.id', 'ctt.teacher_user_id')
+    .join('topics as t', 't.id', 'ctt.topic_id')
+    .where({
+      'ctt.center_id': centerId,
+      't.course_id': courseId,
+      'ctt.is_active': true
+    })
+    .select(
+      'u.id as teacher_user_id',
+      'u.full_name',
+      'u.full_name_ur',
+      'u.phone',
+      db.raw('ARRAY_AGG(t.title) as topics_assigned')
+    )
+    .groupBy('u.id', 'u.full_name', 'u.full_name_ur', 'u.phone')
+    .orderBy('u.full_name', 'asc');
+}
+
 // Check whether a user is an active teacher of this class.
 function getClassTeacherEntry(classId, teacherUserId) {
   return db('class_teachers')
@@ -326,6 +346,7 @@ module.exports = {
   createClass,
   updateClass,
   listTeachers,
+  listAssignedTopicTeachers,
   getClassTeacherEntry,
   hasTeacherTopicAccess,
   getClassTeacherById,
