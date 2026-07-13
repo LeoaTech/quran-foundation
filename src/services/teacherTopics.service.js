@@ -24,7 +24,7 @@ function notFound(entity = 'Assignment') {
 
 function assertCenterScope(user, targetCenterId) {
   if (user.roles.includes('super_admin')) return;
-  if (!targetCenterId || user.center_id !== targetCenterId) {
+  if (!targetCenterId || String(user.center_id) !== String(targetCenterId)) {
     throw forbidden();
   }
 }
@@ -109,7 +109,7 @@ async function deleteAssignment({ user, centerId, assignmentId }) {
   assertCenterScope(user, centerId);
 
   const assignment = await repo.getAssignmentById(assignmentId);
-  if (!assignment || assignment.center_id !== centerId) {
+  if (!assignment || String(assignment.center_id) !== String(centerId)) {
     throw notFound();
   }
 
@@ -131,7 +131,7 @@ async function updateAssignment({ user, centerId, assignmentId, body }) {
   const { teacher_user_id, topic_id } = body;
 
   const assignment = await repo.getAssignmentById(assignmentId);
-  if (!assignment || assignment.center_id !== centerId) {
+  if (!assignment || String(assignment.center_id) !== String(centerId)) {
     throw notFound();
   }
 
