@@ -64,3 +64,7 @@ export const getClassSessionPlans = (classId) =>
 export const upsertClassSessionPlan = (classId, payload) =>
   client.put(`/classes/${classId}/session-plans`, payload).then((r) => r.data);
 
+// ── Student Portal ────────────────────────────────────────────────────────────
+export const getStudentClassDetail = (classId) =>
+  client.get(`/student/classes/${classId}`).then((r) => r.data);
+
