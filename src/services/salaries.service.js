@@ -9,7 +9,7 @@ function forbidden() {
 
 function assertCenterScope(user, centerId) {
   if (user.roles.includes('super_admin') || user.roles.includes('finance_manager')) return;
-  if (!centerId || user.center_id !== centerId) {
+  if (!centerId || String(user.center_id) !== String(centerId)) {
     throw forbidden();
   }
 }
