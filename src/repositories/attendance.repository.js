@@ -124,6 +124,7 @@ async function updateAttendanceRecord(recordId, data) {
 function getStudentAttendanceRecords(studentUserId, { classId, from, to } = {}) {
   const query = db('attendance_records as r')
     .join('attendance_sessions as s', 's.id', 'r.session_id')
+    .join('classes as c', 'c.id', 's.class_id')
     .where('r.student_user_id', studentUserId)
     .where('r.is_active', true)
     .where('s.is_active', true)
@@ -135,6 +136,7 @@ function getStudentAttendanceRecords(studentUserId, { classId, from, to } = {}) 
       'r.corrected_at',
       's.id as session_id',
       's.class_id',
+      'c.name as class_name',
       's.session_date',
     )
     .orderBy('s.session_date', 'desc');
