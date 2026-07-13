@@ -28,7 +28,7 @@ function forbidden() {
 // Throws 403 if a center_manager tries to act on a user outside their center.
 function assertCenterScope(user, targetCenterId) {
   if (user.roles.includes('super_admin')) return;
-  if (!targetCenterId || user.center_id !== targetCenterId) {
+  if (!targetCenterId || String(user.center_id) !== String(targetCenterId)) {
     throw forbidden();
   }
 }
