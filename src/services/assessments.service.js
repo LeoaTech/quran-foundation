@@ -37,7 +37,7 @@ async function assertWriteAccess(user, classId) {
   const cls = await classRepo.getClassById(classId);
 
   if (user.roles.includes('center_manager')) {
-    if (user.center_id !== cls.center_id) throw forbidden();
+    if (String(user.center_id) !== String(cls.center_id)) throw forbidden();
     return;
   }
 
