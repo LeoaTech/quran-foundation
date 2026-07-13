@@ -7,7 +7,7 @@ const { AppError } = require('../utils/errors');
 // Throw 403 if a non-super_admin user is accessing a center they are not scoped to.
 function assertCenterAccess(user, centerId) {
   if (user.roles.includes('super_admin')) return;
-  if (user.center_id !== centerId) {
+  if (String(user.center_id) !== String(centerId)) {
     throw new AppError(
       'FORBIDDEN',
       'You do not have access to this center.',
