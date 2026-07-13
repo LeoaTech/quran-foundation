@@ -60,7 +60,7 @@ export default function MyClassroomDetail() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
         <Link to="/student/classrooms" style={{ color: 'var(--ink-soft)', textDecoration: 'none', fontSize: 24 }}>←</Link>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--ink)' }}>{cls.name}</h1>
@@ -91,7 +91,7 @@ export default function MyClassroomDetail() {
       </div>
 
       {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
           <div style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Assigned Teachers</h3>
             {teachers.length === 0 ? (
@@ -120,7 +120,7 @@ export default function MyClassroomDetail() {
           
           <div style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Attendance Summary</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 16 }}>
               <div style={{ padding: 16, background: 'var(--sand)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{attendanceSummary.total}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Sessions Completed</div>
@@ -162,7 +162,7 @@ export default function MyClassroomDetail() {
 
       {activeTab === 'homework' && (
         <div style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Recent Homework</h3>
             <Badge variant="blue">Dummy Data</Badge>
           </div>
@@ -173,7 +173,7 @@ export default function MyClassroomDetail() {
               { id: 2, title: 'Tajweed Rules Worksheet', date: '2023-10-20', status: 'Pending Review', score: '-' },
               { id: 3, title: 'Read Page 15-20', date: '2023-10-25', status: 'Not Submitted', score: '0/10' }
             ].map(hw => (
-              <div key={hw.id} style={{ padding: 16, border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={hw.id} style={{ padding: 16, border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: 15, color: 'var(--ink)' }}>{hw.title}</h4>
                   <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Due: {hw.date}</div>

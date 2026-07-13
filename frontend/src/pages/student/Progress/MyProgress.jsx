@@ -228,13 +228,13 @@ export default function MyProgress() {
       </div>
 
       {/* Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
         <MetricCard label="Topics covered" value={topicsCoveredCount} variant="green" />
         <MetricCard label="Attendance" value={attendancePct != null ? `${attendancePct}%` : '—'} sub="Year to date" variant="blue" />
         <MetricCard label="Homework avg." value={'—'} sub="Dummy data" variant={'neutral'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20, alignItems: 'start', marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, alignItems: 'start', marginBottom: 20 }}>
         {/* Topic progress */}
         <div style={{ background: 'var(--white)', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>
