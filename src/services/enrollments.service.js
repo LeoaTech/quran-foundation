@@ -29,7 +29,7 @@ function forbidden() {
 // Throws 403 if a center_manager is not scoped to the given center.
 function assertCenterAccess(user, centerId) {
   if (user.roles.includes('super_admin')) return;
-  if (user.center_id !== centerId) throw forbidden();
+  if (String(user.center_id) !== String(centerId)) throw forbidden();
 }
 
 async function requireClass(classId) {
@@ -341,7 +341,7 @@ async function listEnrollmentsByClass({ user, classId, query = {} }) {
   const cls = await requireClass(classId);
 
   if (!user.roles.includes('super_admin')) {
-    if (user.center_id !== cls.center_id) throw forbidden();
+    if (String(user.center_id) !== String(cls.center_id)) throw forbidden();
   }
 
   const status = query.status; // optional filter: 'active' | 'withdrawn'
