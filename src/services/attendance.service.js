@@ -27,7 +27,7 @@ function forbidden() {
 
 function assertCenterAccess(user, centerId) {
   if (user.roles.includes('super_admin')) return;
-  if (user.center_id !== centerId) throw forbidden();
+  if (String(user.center_id) !== String(centerId)) throw forbidden();
 }
 
 async function requireClass(classId) {
