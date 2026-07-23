@@ -48,4 +48,14 @@ router.put(
 );
 
 
+// PATCH /courses/:course_id/homework-assignments/:assignment_id  (super_admin only)
+router.patch(
+  '/courses/:course_id/homework-assignments/:assignment_id',
+  requireAuth,
+  requirePermission('courses.edit'),
+  validate(assignmentPatchSchema),
+  controller.updateAssignment,
+);
+
+
 module.exports = router;
