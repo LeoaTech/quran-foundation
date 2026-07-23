@@ -138,6 +138,31 @@ async function bulkCreateWords(rows) {
   return db('classwork_content_words').insert(rows).returning('*');
 }
 
+async function updateWord(wordId, data) {
+  const [row] = await db('classwork_content_words')
+    .where({ id: wordId })
+    .update({ ...data, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
+
+async function deactivateWord(wordId) {
+  const [row] = await db('classwork_content_words')
+    .where({ id: wordId })
+    .update({ is_active: false, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
+
+async function replaceWords(contentId, wordRows) {
+  await db('classwork_content_words')
+    .where({ content_id: contentId })
+    .delete();
+  if (!wordRows.length) return [];
+  return db('classwork_content_words').insert(wordRows).returning('*');
+}
+
+
 module.exports = {
   listCriteriaForTopics,
   listContent,
@@ -149,4 +174,7 @@ module.exports = {
   getWordById,
   createWord,
   bulkCreateWords,
+   updateWord,
+  deactivateWord,
+  replaceWords
 };
