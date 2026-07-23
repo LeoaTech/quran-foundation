@@ -45,10 +45,19 @@ async function getAssignmentContent(req, res) {
   } catch (e) { err(res, e); }
 }
 
+// PUT /courses/:course_id/homework-assignments/:assignment_id/content
+async function linkContentToAssignment(req, res) {
+  try {
+    const { content_ids = [] } = req.body;
+    const data = await service.linkContentToAssignment(req.params.assignment_id, content_ids);
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
 
 module.exports = {
   getSchedule,
   saveSchedule,
   updateAssignment,
-  getAssignmentContent
+  getAssignmentContent,
+  linkContentToAssignment,
 };
