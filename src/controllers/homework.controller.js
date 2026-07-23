@@ -37,10 +37,18 @@ async function updateAssignment(req, res) {
   } catch (e) { err(res, e); }
 }
 
+// GET /courses/:course_id/homework-assignments/:assignment_id/content
+async function getAssignmentContent(req, res) {
+  try {
+    const data = await service.getAssignmentContent(req.params.assignment_id);
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
 
 
 module.exports = {
   getSchedule,
   saveSchedule,
-  updateAssignment
+  updateAssignment,
+  getAssignmentContent
 };
