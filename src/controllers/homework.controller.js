@@ -29,8 +29,18 @@ async function saveSchedule(req, res) {
   } catch (e) { err(res, e); }
 }
 
+// PATCH /courses/:course_id/homework-assignments/:assignment_id
+async function updateAssignment(req, res) {
+  try {
+    const data = await service.updateAssignment(req.params.assignment_id, req.body, req.user.id);
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
+
+
 
 module.exports = {
   getSchedule,
-  saveSchedule
+  saveSchedule,
+  updateAssignment
 };
