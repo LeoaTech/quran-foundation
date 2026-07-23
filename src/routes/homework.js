@@ -57,5 +57,21 @@ router.patch(
   controller.updateAssignment,
 );
 
+// GET /courses/:course_id/homework-assignments/:assignment_id/content
+router.get(
+  '/courses/:course_id/homework-assignments/:assignment_id/content',
+  requireAuth,
+  controller.getAssignmentContent,
+);
+
+// PUT /courses/:course_id/homework-assignments/:assignment_id/content  (super_admin only)
+router.put(
+  '/courses/:course_id/homework-assignments/:assignment_id/content',
+  requireAuth,
+  requirePermission('courses.edit'),
+  validate(linkContentSchema),
+  controller.linkContentToAssignment,
+);
+
 
 module.exports = router;

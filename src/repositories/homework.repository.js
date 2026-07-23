@@ -71,8 +71,45 @@ async function updateSchedule(scheduleId, patch) {
   return row;
 }
 
+// ── Assignments ───────────────────────────────────────────────────────────────
+
+async function listAssignmentsBySchedule(scheduleId) {
+  return db("homework_assignments as a")
+    .leftJoin("homework_assignment_content as hac", "hac.assignment_id", "a.id")
+    .where({ "a.schedule_id": scheduleId, "a.is_active": true })
+    .groupBy("a.id")
+    .orderBy("a.assignment_number")
+    .select(
+      "a.*",
+      db.raw("COUNT(hac.content_id)::int as linked_content_count"),
+    );
+}
+
+async function listAssignmentsByCourse(courseId) {
+  return db("homework_assignments as a")
+    .join("homework_schedules as s", "s.id", "a.schedule_id")
+    .leftJoin("homework_assignment_content as hac", "hac.assignment_id", "a.id")
+    .where("a.course_id", courseId)
+    .where("a.is_active", true)
+    .groupBy("a.id", "s.id")
+    .orderBy("a.assignment_number")
+    .select(
+      "a.*",
+      "s.frequency",
+      "s.total_assignments",
+      db.raw("COUNT(hac.content_id)::int as linked_content_count"),
+    );
+}
+
+async function getAssignmentById(id) {
+  return db("homework_assignments").where({ id }).first();
+}
+
 module.exports = {
   getScheduleByCourse,
   createSchedule,
   updateSchedule,
+  listAssignmentsBySchedule,
+  listAssignmentsByCourse,
+  getAssignmentById,
 };
