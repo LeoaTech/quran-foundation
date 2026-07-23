@@ -117,6 +117,26 @@ async function deactivateContent(contentId) {
   return row;
 }
 
+// ── classwork_content_words ───────────────────────────────────────────────────
+
+function listWordsByContent(contentId) {
+  return db('classwork_content_words')
+    .where({ content_id: contentId, is_active: true })
+    .orderBy('sequence_order', 'asc');
+}
+
+function getWordById(wordId) {
+  return db('classwork_content_words').where({ id: wordId }).first();
+}
+
+async function createWord(data) {
+  const [row] = await db('classwork_content_words').insert(data).returning('*');
+  return row;
+}
+
+async function bulkCreateWords(rows) {
+  return db('classwork_content_words').insert(rows).returning('*');
+}
 
 module.exports = {
   listCriteriaForTopics,
@@ -124,5 +144,9 @@ module.exports = {
   getContentById,
   createContent,
   updateContent,
-  deactivateContent
+  deactivateContent,
+  listWordsByContent,
+  getWordById,
+  createWord,
+  bulkCreateWords,
 };
