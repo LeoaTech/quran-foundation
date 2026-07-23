@@ -101,12 +101,28 @@ async function createContent(data) {
   return row;
 }
 
+async function updateContent(contentId, data) {
+  const [row] = await db('classwork_content')
+    .where({ id: contentId })
+    .update({ ...data, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
 
+async function deactivateContent(contentId) {
+  const [row] = await db('classwork_content')
+    .where({ id: contentId })
+    .update({ is_active: false, updated_at: db.fn.now() })
+    .returning('*');
+  return row;
+}
 
 
 module.exports = {
   listCriteriaForTopics,
   listContent,
   getContentById,
-  createContent
+  createContent,
+  updateContent,
+  deactivateContent
 };
