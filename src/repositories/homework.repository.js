@@ -179,7 +179,6 @@ async function getAssignmentContent(assignmentId) {
 }
 
 /**
- * (Re-)generate assignment rows for a schedule.
  * Deletes all existing rows then inserts fresh ones with recomputed due dates.
  */
 async function regenerateAssignments({ scheduleId, courseId, orgId, frequency, totalAssignments, firstDueDate, createdBy }) {
