@@ -71,10 +71,22 @@ async function updateWord(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function deleteWord(req, res, next) {
+  try {
+    res.json(await service.deleteWord({
+      courseId:  req.params.course_id,
+      contentId: req.params.content_id,
+      wordId:    req.params.word_id,
+    }));
+  } catch (err) { next(err); }
+}
+
+
 module.exports = {
   listContent,
   createContent,
   updateContent,
   deleteContent,
-  updateWord
+  updateWord,
+  deleteWord
 };
