@@ -72,7 +72,14 @@ async function saveSchedule({ courseId, orgId, frequency, totalAssignments, firs
   return { schedule, assignments };
 }
 
+async function getScheduleWithAssignments(courseId) {
+  const schedule = await repo.getScheduleByCourse(courseId);
+  if (!schedule) return null;
+  const assignments = await repo.listAssignmentsBySchedule(schedule.id);
+  return { schedule, assignments };
+}
+
 module.exports = {
   saveSchedule,
-
+  getScheduleWithAssignments
 };
