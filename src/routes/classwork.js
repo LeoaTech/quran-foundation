@@ -37,6 +37,27 @@ const createContentSchema = z.object({
   words: z.array(wordSchema).optional().default([]),
 });
 
+const updateContentSchema = z.object({
+  course_level_id: z.string().uuid().optional().nullable(),
+  topic_id:        z.string().uuid().optional().nullable(),
+  surah_number:    z.number().int().min(1).max(114).optional().nullable(),
+  ayah_number:     z.number().int().min(1).optional().nullable(),
+  arabic_text:     z.string().min(1).optional(),
+  label:           z.string().max(255).optional().nullable(),
+  rule_marks:      z.record(z.string(), z.number()).optional(),
+  words:           z.array(wordSchema).optional(),
+}).refine((b) => Object.keys(b).length > 0, {
+  message: 'Request body must contain at least one field to update.',
+});
+
+const updateWordSchema = z.object({
+  word_text:      z.string().min(1).optional(),
+  sequence_order: z.number().int().min(1).optional(),
+  topic_ids:      z.array(z.string().uuid()).optional(),
+}).refine((b) => Object.keys(b).length > 0, {
+  message: 'Request body must contain at least one field to update.',
+});
+
 // ── Content Routes ─────────────────────────────────────────────────────────────
 // GET  /courses/:course_id/classwork-content
 // POST /courses/:course_id/classwork-content
