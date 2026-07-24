@@ -45,4 +45,21 @@ router.post(
   validate(createContentSchema),
   controller.createContent,
 );
+
+
+
+router.patch(
+  '/courses/:course_id/classwork-content/:content_id',
+  requireAuth,
+  requirePermission('courses.edit'),
+  validate(updateContentSchema),
+  controller.updateContent,
+);
+
+router.delete(
+  '/courses/:course_id/classwork-content/:content_id',
+  requireAuth,
+  requirePermission('courses.edit'),
+  controller.deleteContent,
+);
 module.exports = router;
