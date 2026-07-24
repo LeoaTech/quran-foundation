@@ -79,7 +79,17 @@ async function getScheduleWithAssignments(courseId) {
   return { schedule, assignments };
 }
 
+// ── Individual Assignment ─────────────────────────────────────────────────────
+
+async function updateAssignment(id, patch, userId) {
+  const existing = await repo.getAssignmentById(id);
+  if (!existing) throw notFound('Homework Assignment');
+  return repo.updateAssignment(id, patch);
+}
+
+
 module.exports = {
   saveSchedule,
-  getScheduleWithAssignments
+  getScheduleWithAssignments,
+  updateAssignment
 };
