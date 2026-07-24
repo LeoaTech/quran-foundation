@@ -32,6 +32,12 @@ const createContentSchema = z.object({
   words:           z.array(wordSchema).optional().default([]),
 });
 
+router.get(
+  '/courses/:course_id/classwork-content',
+  requireAuth,
+  controller.listContent,
+);
+
 router.post(
   '/courses/:course_id/classwork-content',
   requireAuth,
