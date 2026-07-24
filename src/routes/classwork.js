@@ -1,65 +1,85 @@
-const { Router } = require('express');
-const { z }       = require('zod');
-const requireAuth = require('../middleware/auth');
-const { requirePermission } = require('../middleware/rbac');
-const validate    = require('../middleware/validate');
-const controller  = require('../controllers/classwork.controller');
+const { Router } = require("express");
+const { z } = require("zod");
+const requireAuth = require("../middleware/auth");
+const { requirePermission } = require("../middleware/rbac");
+const validate = require("../middleware/validate");
+const controller = require("../controllers/classwork.controller");
 
 const router = Router();
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const wordSchema = z.object({
-  word_text:      z.string().min(1, 'word_text is required'),
+  word_text: z.string().min(1, "word_text is required"),
   sequence_order: z.number().int().min(1).optional(),
-  topic_ids:      z.array(z.string().uuid()).optional().default([]),
-  rule_details:   z.array(z.object({
-    subtopic_id:      z.string().uuid(),
-    marks_per_rule:   z.number().int().min(0).optional().default(1),
-    occurrence_count: z.number().int().min(1).optional().default(1),
-  })).optional().default([]),
-  note:           z.string().max(2000).optional().nullable(),
+  topic_ids: z.array(z.string().uuid()).optional().default([]),
+  rule_details: z
+    .array(
+      z.object({
+        subtopic_id: z.string().uuid(),
+        marks_per_rule: z.number().int().min(0).optional().default(1),
+        occurrence_count: z.number().int().min(1).optional().default(1),
+      }),
+    )
+    .optional()
+    .default([]),
+  note: z.string().max(2000).optional().nullable(),
 });
 
 const createContentSchema = z.object({
   course_level_id: z.string().uuid().optional().nullable(),
-  topic_id:        z.string().uuid().optional().nullable(),
-  surah_number:    z.number().int().min(1).max(114).optional().nullable(),
-  ayah_number:     z.number().int().min(1).optional().nullable(),
-  arabic_text:     z.string().min(1, 'arabic_text is required'),
-  label:           z.string().max(255).optional().nullable(),
-  rule_marks:      z.record(z.string(), z.number()).optional().default({}),
-  words:           z.array(wordSchema).optional().default([]),
+  topic_id: z.string().uuid().optional().nullable(),
+  surah_number: z.number().int().min(1).max(114).optional().nullable(),
+  ayah_number: z.number().int().min(1).optional().nullable(),
+  arabic_text: z.string().min(1, "arabic_text is required"),
+  label: z.string().max(255).optional().nullable(),
+  rule_marks: z.record(z.string(), z.number()).optional().default({}),
+  words: z.array(wordSchema).optional().default([]),
 });
 
+// ── Content Routes ─────────────────────────────────────────────────────────────
+// GET  /courses/:course_id/classwork-content
+// POST /courses/:course_id/classwork-content
+// PATCH /courses/:course_id/classwork-content/:content_id
+// DELETE /courses/:course_id/classwork-content/:content_id
+
 router.get(
-  '/courses/:course_id/classwork-content',
+  "/courses/:course_id/classwork-content",
   requireAuth,
   controller.listContent,
 );
 
 router.post(
-  '/courses/:course_id/classwork-content',
+  "/courses/:course_id/classwork-content",
   requireAuth,
-  requirePermission('courses.edit'),
+  requirePermission("courses.edit"),
   validate(createContentSchema),
   controller.createContent,
 );
 
-
-
 router.patch(
-  '/courses/:course_id/classwork-content/:content_id',
+  "/courses/:course_id/classwork-content/:content_id",
   requireAuth,
-  requirePermission('courses.edit'),
+  requirePermission("courses.edit"),
   validate(updateContentSchema),
   controller.updateContent,
 );
 
 router.delete(
-  '/courses/:course_id/classwork-content/:content_id',
+  "/courses/:course_id/classwork-content/:content_id",
   requireAuth,
-  requirePermission('courses.edit'),
+  requirePermission("courses.edit"),
   controller.deleteContent,
+);
+
+// ── Word Routes ────────────────────────────────────────────────────────────────
+// PATCH  /courses/:course_id/classwork-content/:content_id/words/:word_id
+
+router.patch(
+  "/courses/:course_id/classwork-content/:content_id/words/:word_id",
+  requireAuth,
+  requirePermission("courses.edit"),
+  validate(updateWordSchema),
+  controller.updateWord,
 );
 module.exports = router;
