@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { z }      = require('zod');
 const requireAuth  = require('../middleware/auth');
-const { requirePermission } = require('../middleware/rbac');
+const { requirePermission, requireAnyPermission } = require('../middleware/rbac');
 const validate     = require('../middleware/validate');
 const controller   = require('../controllers/attendance.controller');
 
@@ -40,14 +40,14 @@ router.post(
 router.get(
   '/classes/:class_id/attendance',
   requireAuth,
-  requirePermission('attendance.view'),
+  requireAnyPermission('attendance.view', 'attendance.mark'),
   controller.listSessionsByClass,
 );
 
 router.get(
   '/attendance/sessions/:session_id/records',
   requireAuth,
-  requirePermission('attendance.view'),
+  requireAnyPermission('attendance.view', 'attendance.mark'),
   controller.getSessionRecords,
 );
 
