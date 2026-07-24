@@ -26,13 +26,12 @@ app.use(
 
 
 // CORS
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     const allowed = (process.env.CORS_ORIGIN || 'http://localhost:3001').split(',').map(s => s.trim());
-    const isAllowed = allowed.includes(origin) || origin.endsWith('.vercel.app');
-    
-    console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
+    // console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
     
     if (isAllowed) {
       callback(null, true);
@@ -88,6 +87,7 @@ app.use('/api/v1/donations', require('./routes/donations'));
 app.use('/api/v1', require('./routes/salaries'));
 app.use('/api/v1',                   require('./routes/rbac'));
 app.use('/api/v1', require('./routes/teacherTopics'));
+app.use('/api/v1', require('./routes/classwork'));
 
 // 404 handler
 app.use((_req, res) => {
