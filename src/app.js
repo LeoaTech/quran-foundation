@@ -88,6 +88,7 @@ app.use('/api/v1', require('./routes/salaries'));
 app.use('/api/v1',                   require('./routes/rbac'));
 app.use('/api/v1', require('./routes/teacherTopics'));
 app.use('/api/v1', require('./routes/classwork'));
+app.use('/api/v1', require('./routes/homework'));
 
 // 404 handler
 app.use((_req, res) => {
