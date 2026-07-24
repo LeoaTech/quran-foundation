@@ -74,6 +74,7 @@ router.delete(
 
 // ── Word Routes ────────────────────────────────────────────────────────────────
 // PATCH  /courses/:course_id/classwork-content/:content_id/words/:word_id
+// DELETE /courses/:course_id/classwork-content/:content_id/words/:word_id
 
 router.patch(
   "/courses/:course_id/classwork-content/:content_id/words/:word_id",
@@ -82,4 +83,11 @@ router.patch(
   validate(updateWordSchema),
   controller.updateWord,
 );
+router.delete(
+  '/courses/:course_id/classwork-content/:content_id/words/:word_id',
+  requireAuth,
+  requirePermission('courses.edit'),
+  controller.deleteWord,
+);
+
 module.exports = router;
