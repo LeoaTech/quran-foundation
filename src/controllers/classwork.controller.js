@@ -58,9 +58,23 @@ async function deleteContent(req, res, next) {
   }
 }
 
+// ── Words ─────────────────────────────────────────────────────────────────────
+
+async function updateWord(req, res, next) {
+  try {
+    res.json(await service.updateWord({
+      courseId:  req.params.course_id,
+      contentId: req.params.content_id,
+      wordId:    req.params.word_id,
+      body:      req.body,
+    }));
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   listContent,
   createContent,
   updateContent,
   deleteContent,
+  updateWord
 };
