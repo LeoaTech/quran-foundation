@@ -44,8 +44,23 @@ async function updateContent(req, res, next) {
   }
 }
 
+async function deleteContent(req, res, next) {
+  try {
+    res.json(
+      await service.deleteContent({
+        user: req.user,
+        courseId: req.params.course_id,
+        contentId: req.params.content_id,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listContent,
   createContent,
-  updateContent
+  updateContent,
+  deleteContent,
 };
