@@ -10,6 +10,8 @@ import EmptyState from '../../../components/EmptyState';
 import Badge from '../../../components/Badge';
 import { useToast } from '../../../hooks/useToast';
 import TopicManager from './TopicManager';
+import AssignmentContentManager from './AssignmentContentManager';
+import HomeworkAssignmentsManager from './HomeworkAssignmentsManager';
 import { getCourses } from '../../../api/courses';
 
 const TYPE_CHIP = {
@@ -73,8 +75,10 @@ function ClassesTab({ courseId }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'topics', label: 'Topics' },
-  { id: 'classes', label: 'Classes' },
+  { id: 'topics',    label: 'Topics' },
+  { id: 'content',   label: 'Manage Content' },
+  { id: 'homework',  label: 'Homework Assignments' },
+  { id: 'classes',   label: 'Classes' },
 ];
 
 export default function CourseDetail() {
@@ -150,8 +154,10 @@ export default function CourseDetail() {
 
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === 'topics' && <TopicManager courseId={courseId} />}
-      {tab === 'classes' && <ClassesTab courseId={courseId} />}
+      {tab === 'topics'    && <TopicManager courseId={courseId} />}
+      {tab === 'content'   && <AssignmentContentManager courseId={courseId} />}
+      {tab === 'homework'  && <HomeworkAssignmentsManager courseId={courseId} course={course} />}
+      {tab === 'classes'   && <ClassesTab courseId={courseId} />}
     </>
   );
 }
