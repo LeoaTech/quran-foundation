@@ -43,6 +43,7 @@ import {
 } from '../../../utils/classSessions';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import MarkHomeworkModal from './MarkHomeworkModal';
+import TeacherClassworkModal from './TeacherClassworkModal';
 
 // We will build MyTopicsTab directly in this file or another file, omitting CenterLevelTopicAssignment.
 const TYPE_CHIP = {
@@ -358,6 +359,7 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [attendanceModal, setAttendanceModal] = useState(null);
   const [sessionModal, setSessionModal] = useState(null);
+  const [classworkModal, setClassworkModal] = useState(null);
 
   const { data: schedulesRaw = [], isLoading: schedLoading } = useQuery({
     queryKey: ['class-schedules', classId],
@@ -435,6 +437,7 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
     combined.push({
       ...proj,
       session_id: actual?.session_id || null,
+      plan_id: plan?.id || null,
       marked_at: actual?.marked_at || null,
       cnt_present: actual?.cnt_present || 0,
       cnt_absent: actual?.cnt_absent || 0,
@@ -664,7 +667,7 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
               <thead>
                 <tr style={{ background: 'var(--sand-light)' }}>
-                  {['#', 'Date', 'Slot', 'Topic Name', 'Attendance', 'Status', ''].map((h, i) => (
+                  {['#', 'Date', 'Slot', 'Topic Name', 'Classwork', 'Attendance', 'Status', ''].map((h, i) => (
                     <th key={i} style={{ textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -685,9 +688,7 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
                   const isMyTopic = !sess.plan_topic_id || myTopics.some(t => t.topic_id === sess.plan_topic_id);
                   const canEditSession = canEditBase && isMyTopic;
                   
-                  // If we only want to show the teacher's own topics
-                  if (!isMyTopic) return null;
-
+                  // Teachers see all sessions in their class; isMyTopic just controls Edit access
                   return (
                     <tr
                       key={`${sess.date}-${sess.schedule_id}-${i}`}
@@ -718,6 +719,15 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
                           </span>
                         )}
                       </td>
+                      <td style={{ padding: '12px 14px', fontSize: 13, whiteSpace: 'nowrap' }}>
+                        {sess.display_topic_title && !isUpcoming ? (
+                          <Button size="sm" variant="outline" onClick={() => setClassworkModal(sess)}>
+                            Open
+                          </Button>
+                        ) : (
+                          <span style={{ color: 'var(--ink-pale)' }}>—</span>
+                        )}
+                      </td>
                       <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', color: hasAttendance ? 'var(--emerald)' : 'var(--ink-pale)' }}>
                         {attendanceText}
                       </td>
@@ -734,11 +744,11 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
                         {isUpcoming ? null : hasAttendance ? (
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                             <Button size="sm" variant="outline" onClick={() => openAttendanceModal(sess, 'view')}>View</Button>
-                            {canEditSession && (
+                            {canEditBase && (
                               <Button size="sm" variant="primary" onClick={() => openAttendanceModal(sess, 'mark')}>Edit</Button>
                             )}
                           </div>
-                        ) : canEditSession && (isToday || !isUpcoming) ? (
+                        ) : canEditBase && (isToday || !isUpcoming) ? (
                           <Button size="sm" variant="primary" onClick={() => openAttendanceModal(sess, 'mark')}>Mark</Button>
                         ) : null}
                       </td>
@@ -775,6 +785,15 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
         startTime={attendanceModal?.startTime}
         endTime={attendanceModal?.endTime}
         mode={attendanceModal?.mode ?? 'view'}
+      />
+
+      <TeacherClassworkModal
+        open={!!classworkModal}
+        onClose={() => setClassworkModal(null)}
+        classId={classId}
+        session={classworkModal}
+        enrolledStudents={(enrollmentsRaw?.data ?? enrollmentsRaw ?? []).filter(e => e.status === 'active')}
+        courseId={cls?.course_id}
       />
     </div>
   );
@@ -850,7 +869,22 @@ export default function TeacherClassDetail() {
     enabled: !!centerId,
   });
   const assignments = assignmentsRaw?.data ?? assignmentsRaw ?? [];
-  const myTopics = assignments.filter(a => String(a.teacher_user_id) === String(user.id));
+
+  // Fetch course topics to filter "My Topics" to only those in this class's course
+  const { data: courseTopicsRaw = [] } = useQuery({
+    queryKey: ['topics', cls?.course_id],
+    queryFn: () => getTopics(cls?.course_id),
+    staleTime: 5 * 60_000,
+    enabled: !!cls?.course_id,
+  });
+  const courseTopics = courseTopicsRaw?.data ?? courseTopicsRaw ?? [];
+  const courseTopicIds = new Set(courseTopics.map(t => t.id).filter(Boolean));
+
+  const allMyTopics = assignments.filter(a => String(a.teacher_user_id) === String(user.id));
+  // Restrict to topics that belong to this class's course; fallback to all if not loaded yet
+  const myTopics = courseTopicIds.size > 0
+    ? allMyTopics.filter(a => courseTopicIds.has(a.topic_id))
+    : allMyTopics;
 
   const courseType = cls?.course_type ?? cls?.course?.type;
   const chip = courseType ? (TYPE_CHIP[courseType] ?? { label: courseType, cls: 'chip chip-sand' }) : null;
