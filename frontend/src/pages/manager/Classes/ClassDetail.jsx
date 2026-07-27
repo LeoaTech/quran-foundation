@@ -42,7 +42,7 @@ import {
   sessionPlanKey,
 } from '../../../utils/classSessions';
 import TopicAssignmentTab from './CenterLevelTopicAssignment/TopicAssignmentTab';
-import HomeworkCriteriaTab from './ClassSessionHomeWork/HomeworkCriteriaTab';
+import TeacherClassworkModal from '../../teacher/Classes/TeacherClassworkModal';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 const TYPE_CHIP = {
   hifz: { label: 'Hifz', cls: 'chip chip-green' },
@@ -356,6 +356,7 @@ function ClassSchedulesTab({ cls, classId }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [attendanceModal, setAttendanceModal] = useState(null);
   const [sessionModal, setSessionModal] = useState(null);
+  const [classworkModal, setClassworkModal] = useState(null);
 
   const { data: schedulesRaw = [], isLoading: schedLoading } = useQuery({
     queryKey: ['class-schedules', classId],
@@ -433,6 +434,7 @@ function ClassSchedulesTab({ cls, classId }) {
     combined.push({
       ...proj,
       session_id: actual?.session_id || null,
+      plan_id: plan?.id || null,
       marked_at: actual?.marked_at || null,
       cnt_present: actual?.cnt_present || 0,
       cnt_absent: actual?.cnt_absent || 0,
@@ -662,7 +664,7 @@ function ClassSchedulesTab({ cls, classId }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
               <thead>
                 <tr style={{ background: 'var(--sand-light)' }}>
-                  {['#', 'Date', 'Slot', 'Topic Name', 'Attendance', 'Status', ''].map((h, i) => (
+                  {['#', 'Date', 'Slot', 'Topic Name', 'Classwork', 'Attendance', 'Status', ''].map((h, i) => (
                     <th key={i} style={{ textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px 10px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -712,6 +714,16 @@ function ClassSchedulesTab({ cls, classId }) {
                           <span style={{ color: 'var(--ink-pale)', fontStyle: 'italic' }}>
                             {canEdit && !isUpcoming ? 'Click to set topic…' : '—'}
                           </span>
+                        )}
+                      </td>
+                      {/* Classwork column — read-only view for manager */}
+                      <td style={{ padding: '12px 14px', fontSize: 13, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                        {sess.display_topic_title && !isUpcoming ? (
+                          <Button size="sm" variant="ghost" onClick={() => setClassworkModal(sess)}>
+                            View
+                          </Button>
+                        ) : (
+                          <span style={{ color: 'var(--ink-pale)' }}>—</span>
                         )}
                       </td>
                       <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', color: hasAttendance ? 'var(--emerald)' : 'var(--ink-pale)' }}>
@@ -771,6 +783,17 @@ function ClassSchedulesTab({ cls, classId }) {
         startTime={attendanceModal?.startTime}
         endTime={attendanceModal?.endTime}
         mode={attendanceModal?.mode ?? 'view'}
+      />
+
+      {/* Classwork sheet — read-only for center manager */}
+      <TeacherClassworkModal
+        open={!!classworkModal}
+        onClose={() => setClassworkModal(null)}
+        classId={classId}
+        session={classworkModal}
+        enrolledStudents={(enrollmentsRaw?.data ?? enrollmentsRaw ?? []).filter(e => e.status === 'active')}
+        courseId={cls?.course_id}
+        readOnly
       />
     </div>
   );
@@ -1052,7 +1075,6 @@ const TABS = [
   { id: 'teachers', label: 'Teachers' },
   { id: 'schedules', label: 'Class' },
   { id: 'topic-assignment', label: 'Topic Assignment' },
-  { id: 'criteria', label: 'Homework Criteria' },
   { id: 'settings', label: 'Edit Classroom' },
 ];
 
@@ -1134,7 +1156,6 @@ export default function ClassDetail() {
       {tab === 'teachers' && <TeachersTab classId={classId} centerId={cls.center_id} courseId={cls.course_id} />}
       {tab === 'schedules' && <ClassSchedulesTab cls={cls} classId={classId} />}
       {tab === 'topic-assignment' && <TopicAssignmentTab cls={cls} />}
-      {tab === 'criteria' && <HomeworkCriteriaTab classId={classId} courseId={cls.course_id} />}
       {tab === 'settings' && <SettingsTab cls={cls} classId={classId} />}
     </>
   );
