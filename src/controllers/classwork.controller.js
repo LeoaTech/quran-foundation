@@ -62,45 +62,120 @@ async function deleteContent(req, res, next) {
 
 async function updateWord(req, res, next) {
   try {
-    res.json(await service.updateWord({
-      courseId:  req.params.course_id,
-      contentId: req.params.content_id,
-      wordId:    req.params.word_id,
-      body:      req.body,
-    }));
-  } catch (err) { next(err); }
+    res.json(
+      await service.updateWord({
+        courseId: req.params.course_id,
+        contentId: req.params.content_id,
+        wordId: req.params.word_id,
+        body: req.body,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function deleteWord(req, res, next) {
   try {
-    res.json(await service.deleteWord({
-      courseId:  req.params.course_id,
-      contentId: req.params.content_id,
-      wordId:    req.params.word_id,
-    }));
-  } catch (err) { next(err); }
+    res.json(
+      await service.deleteWord({
+        courseId: req.params.course_id,
+        contentId: req.params.content_id,
+        wordId: req.params.word_id,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
 }
-
 
 //  ── ClassWork Assignments ───────────────────────────────────────────────────────────────
 
 async function getSessionClassworkContext(req, res, next) {
   try {
-    res.json(await service.getSessionClassworkContext({ sessionId: req.params.session_id }));
-  } catch (err) { next(err); }
+    res.json(
+      await service.getSessionClassworkContext({
+        sessionId: req.params.session_id,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
 }
-
 
 async function saveClassworkSheet(req, res, next) {
   try {
-    res.json(await service.saveClassworkSheet({
-      user:      req.user,
-      sessionId: req.params.session_id,
-      body:      req.body,
-    }));
-  } catch (err) { next(err); }
+    res.json(
+      await service.saveClassworkSheet({
+        user: req.user,
+        sessionId: req.params.session_id,
+        body: req.body,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
 }
 
+// ── Assignments ───────────────────────────────────────────────────────────────
+
+async function previewAssignment(req, res, next) {
+  try {
+    res.json(
+      await service.previewAssignment({ sessionId: req.params.session_id }),
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createOrUpdateAssignment(req, res, next) {
+  try {
+    res.json(
+      await service.createOrUpdateAssignment({
+        user: req.user,
+        sessionId: req.params.session_id,
+        body: req.body,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function publishAssignment(req, res, next) {
+  try {
+    res.json(
+      await service.publishAssignment({ sessionId: req.params.session_id }),
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getAssignmentDetail(req, res, next) {
+  try {
+    res.json(
+      await service.getAssignmentDetail({ sessionId: req.params.session_id }),
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function saveClassworkMarks(req, res, next) {
+  try {
+    res.json(
+      await service.saveClassworkMarks({
+        user: req.user,
+        sessionId: req.params.session_id,
+        body: req.body,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
+}
 
 module.exports = {
   listContent,
@@ -110,6 +185,10 @@ module.exports = {
   updateWord,
   deleteWord,
   getSessionClassworkContext,
-  saveClassworkSheet
+  saveClassworkSheet,
+  previewAssignment,
+  createOrUpdateAssignment,
+  publishAssignment,
+  getAssignmentDetail,
+  saveClassworkMarks,
 };
-
