@@ -28,3 +28,13 @@ export const linkAssignmentContent = (courseId, assignmentId, contentIds) =>
       content_ids: contentIds,
     })
     .then((r) => r.data);
+
+
+    // GET /homework-assignments/:assignmentId/grid
+export const getHomeworkGridSheet = (assignmentId, classId) =>
+  client
+    .get(`/homework-assignments/${assignmentId}/grid`, {
+      params: { class_id: classId },
+    })
+    .then((r) => r.data?.data);
+
