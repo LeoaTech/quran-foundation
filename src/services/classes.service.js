@@ -319,6 +319,19 @@ async function deleteSchedule({ user, classId, scheduleId }) {
 async function listSessionPlans({ user, classId }) {
   const cls = await requireClass(classId);
   await assertClassAccess(user, cls);
+
+  if (user.roles.includes('super_admin') || user.roles.includes('center_manager')) {
+    return repo.listSessionPlans(classId);
+  }
+
+  if (user.roles.includes('teacher')) {
+    const isClassTeacher = await repo.getClassTeacherEntry(classId, user.id);
+    if (isClassTeacher) {
+      return repo.listSessionPlans(classId);
+    }
+    return repo.listSessionPlansForTopicTeacher(classId, user.id, cls.center_id);
+  }
+
   return repo.listSessionPlans(classId);
 }
 
