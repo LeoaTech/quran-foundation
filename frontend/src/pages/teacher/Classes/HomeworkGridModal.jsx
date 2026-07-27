@@ -167,7 +167,6 @@ export default function HomeworkGridModal({
     });
     return rows;
   }, [contents]);
-  console.log(contents, "Rows");
   
   // Sync saved marks into state
   useEffect(() => {
