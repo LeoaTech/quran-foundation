@@ -74,4 +74,13 @@ router.put(
 );
 
 
+// GET /homework-assignments/:assignment_id/grid
+router.get(
+  '/homework-assignments/:assignment_id/grid',
+  requireAuth,
+  controller.getHomeworkGridSheet,
+);
+
+
 module.exports = router;
+
