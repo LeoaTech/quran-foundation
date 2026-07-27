@@ -16,6 +16,11 @@ export const updateHomeworkAssignment = (courseId, assignmentId, patch) =>
     .patch(`/courses/${courseId}/homework-assignments/${assignmentId}`, patch)
     .then((r) => r.data);
 
+// GET /courses/:courseId/homework-assignments/:assignmentId/content
+export const getAssignmentContent = (courseId, assignmentId) =>
+  client.get(`/courses/${courseId}/homework-assignments/${assignmentId}/content`).then((r) => r.data);
+
+
 // PUT /courses/:courseId/homework-assignments/:assignmentId/content
 export const linkAssignmentContent = (courseId, assignmentId, contentIds) =>
   client
