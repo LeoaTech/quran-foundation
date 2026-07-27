@@ -54,10 +54,23 @@ async function linkContentToAssignment(req, res) {
   } catch (e) { err(res, e); }
 }
 
+// GET /homework-assignments/:assignment_id/grid
+async function getHomeworkGridSheet(req, res) {
+  try {
+    const { assignment_id } = req.params;
+    const { class_id } = req.query;
+    const data = await service.getHomeworkGridSheet({ assignmentId: assignment_id, classId: class_id });
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
+
+
 module.exports = {
   getSchedule,
   saveSchedule,
   updateAssignment,
   getAssignmentContent,
   linkContentToAssignment,
+  getHomeworkGridSheet
 };
+
