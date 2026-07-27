@@ -112,4 +112,43 @@ router.delete(
   controller.deleteWord,
 );
 
+// ── Classwork Sheet Routes (Add Manual Classwork Sheet) ─────────────────
+// GET  /class-sessions/:session_id/classwork-sheet
+// POST /class-sessions/:session_id/classwork-sheet
+
+const sheetSchema = z.object({
+  topic_id: z.string().uuid().optional().nullable(),
+  subtopic_id: z.string().uuid().optional().nullable(),
+  description: z.string().max(3000).optional().nullable(),
+  entries: z
+    .array(
+      z.object({
+        student_id: z.string().uuid(),
+        topic_id: z.string().uuid().optional().nullable(),
+        subtopic_id: z.string().uuid().optional().nullable(),
+        grade: z.union([z.string(), z.number()]).optional().nullable(),
+        comments: z.string().max(3000).optional().nullable(),
+      })
+    )
+    .optional()
+    .default([]),
+});
+
+
+//Save Classwork Sheet Route
+router.post(
+  '/class-sessions/:session_id/classwork-sheet',
+  requireAuth,
+  validate(sheetSchema),
+  controller.saveClassworkSheet,
+);
+
+// Get Context(Topic lists) for current class session's classework
+
+router.get(
+  '/class-sessions/:session_id/classwork-sheet',
+  requireAuth,
+  controller.getSessionClassworkContext,
+);
+
 module.exports = router;
