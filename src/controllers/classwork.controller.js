@@ -82,11 +82,23 @@ async function deleteWord(req, res, next) {
 }
 
 
+//  ── ClassWork Assignments ───────────────────────────────────────────────────────────────
+
+async function getSessionClassworkContext(req, res, next) {
+  try {
+    res.json(await service.getSessionClassworkContext({ sessionId: req.params.session_id }));
+  } catch (err) { next(err); }
+}
+
+
+
 module.exports = {
   listContent,
   createContent,
   updateContent,
   deleteContent,
   updateWord,
-  deleteWord
+  deleteWord,
+  getSessionClassworkContext
 };
+
