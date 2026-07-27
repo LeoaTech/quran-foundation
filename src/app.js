@@ -42,7 +42,7 @@ app.use(
         "http://localhost:5173" ||
         origin.endsWith(".vercel.app");
 
-      // console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
+      console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
 
       if (isAllowed) {
         callback(null, true);
