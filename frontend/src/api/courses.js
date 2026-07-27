@@ -68,3 +68,10 @@ export const getHomeworkContent = (courseId, params = {}) =>
 
 export const createHomeworkContent = (courseId, payload) =>
   client.post(`/courses/${courseId}/homework-content`, payload).then((r) => r.data);
+
+export const updateHomeworkContent = (courseId, contentId, payload) =>
+  client.patch(`/courses/${courseId}/homework-content/${contentId}`, payload).then((r) => r.data);
+
+export const deleteHomeworkContent = (courseId, contentId) =>
+  client.delete(`/courses/${courseId}/homework-content/${contentId}`).then((r) => r.data);
+
