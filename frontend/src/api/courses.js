@@ -60,3 +60,11 @@ export const upsertLevelFee = (courseId, levelId, payload) =>
 
 export const deleteLevelFee = (courseId, levelId) =>
   client.delete(`/courses/${courseId}/levels/${levelId}/fee`).then((r) => r.data);
+
+
+// ── Homework assignments Content (Verses + Words) ───────────────────────────────────────
+export const getHomeworkContent = (courseId, params = {}) =>
+  client.get(`/courses/${courseId}/homework-content`, { params }).then((r) => r.data);
+
+export const createHomeworkContent = (courseId, payload) =>
+  client.post(`/courses/${courseId}/homework-content`, payload).then((r) => r.data);
