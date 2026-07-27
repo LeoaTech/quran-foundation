@@ -23,7 +23,7 @@ async function requireCourse(courseId) {
 async function requireContent(contentId, courseId) {
   const content = await repo.getContentById(contentId);
   if (!content || content.course_id !== courseId)
-    throw notFound("Classwork Content");
+    throw notFound("homework content");
   return content;
 }
 
@@ -35,6 +35,26 @@ async function requireWord(wordId, contentId) {
 
 // ── Content ────────────────────────────────────────────────────────────────────
 
+/**
+ * Compute grand total marks from word-level rule_details.
+ *
+ * words_List.rule_details = [{ subtopic_id, marks_per_rule, occurrence_count }]
+ *
+ * Total = Σ over all words and their rule_details entries:
+ *           marks_per_rule × occurrence_count_of_rule_in_a_word
+ */
+function computeTotalMarks(words = []) {
+  let total = 0;
+  for (const w of words) {
+    for (const rd of (w.rule_details ?? [])) {
+      const marks = rd.marks_per_rule ?? 0;
+      const occurrences = rd.occurrence_count ?? 1;
+      total += marks * occurrences;
+    }
+  }
+  return total;
+}
+
 async function listContent({ courseId, query = {} }) {
   await requireCourse(courseId);
   return repo.listContent({
@@ -44,6 +64,104 @@ async function listContent({ courseId, query = {} }) {
   });
 }
 
+async function listContent({ courseId, query = {} }) {
+  await requireCourse(courseId);
+  return repo.listContent({
+    courseId,
+    courseLevelId: query.level_id,
+    topicId:       query.topic_id,
+  });
+}
+
+async function createContent({ user, courseId, body }) {
+  const course = await requireCourse(courseId);
+
+  const { words = [], rule_marks, ...contentData } = body;
+
+  // Compute total_marks from word-level marks_per_rule × occurrence_count
+  const totalMarks = computeTotalMarks(words);
+
+  const content = await repo.createContent({
+    ...contentData,
+    course_id:   courseId,
+    rule_marks:  JSON.stringify(rule_marks ?? {}),
+    total_marks: totalMarks,
+    created_by:  user.id,
+  });
+
+  // Bulk-insert all words in one go
+  if (words.length > 0) {
+    const wordRows = words.map((w, idx) => ({
+      content_id:     content.id,
+      word_text:      w.word_text,
+      sequence_order: w.sequence_order ?? idx + 1,
+      topic_ids:      JSON.stringify(w.topic_ids ?? []),
+      rule_details:   JSON.stringify(w.rule_details ?? []),
+      note:           w.note ?? null,
+    }));
+    await repo.bulkCreateWords(wordRows);
+  }
+
+  activityLog.log({
+    actor:       user,
+    action:      'homework_content.create',
+    entity_type: 'homework_content',
+    entity_id:   content.id,
+    org_id:      course.org_id,
+    summary_en:  `Added homework content for course "${course.name}"`,
+    metadata:    { course_name: course.name, surah: contentData.surah_number, ayah: contentData.ayah_number, total_marks: totalMarks },
+  }).catch(() => {});
+
+  // Return with words attached
+  const contentWithWords = await repo.listContent({ courseId });
+  return contentWithWords.find((c) => c.id === content.id) ?? content;
+}
+
+async function updateContent({ user, courseId, contentId, body }) {
+  const course = await requireCourse(courseId);
+  await requireContent(contentId, courseId);
+
+  const { words, rule_marks, ...contentData } = body;
+
+  // Compute total_marks from word-level rule_details
+  const patchData = { ...contentData };
+  if (rule_marks !== undefined) {
+    patchData.rule_marks = JSON.stringify(rule_marks);
+  }
+  if (Array.isArray(words)) {
+    patchData.total_marks = computeTotalMarks(words);
+  }
+
+  const updated = await repo.updateContent(contentId, patchData);
+
+  // If words are included, replace all words for this content
+  if (Array.isArray(words)) {
+    const wordRows = words.map((w, idx) => ({
+      content_id:     contentId,
+      word_text:      w.word_text,
+      sequence_order: w.sequence_order ?? idx + 1,
+      topic_ids:      JSON.stringify(w.topic_ids ?? []),
+      rule_details:   JSON.stringify(w.rule_details ?? []),
+      note:           w.note ?? null,
+    }));
+    await repo.replaceWords(contentId, wordRows);
+  }
+
+  activityLog.log({
+    actor:       user,
+    action:      'homework_content.update',
+    entity_type: 'homework_content',
+    entity_id:   contentId,
+    org_id:      course.org_id,
+    summary_en:  `Updated homework content`,
+    metadata:    { content_id: contentId },
+  }).catch(() => {});
+
+  const list = await repo.listContent({ courseId });
+  return list.find((c) => c.id === contentId) ?? updated;
+}
+
+
 async function deleteContent({ user, courseId, contentId }) {
   const course = await requireCourse(courseId);
   await requireContent(contentId, courseId);
@@ -51,11 +169,11 @@ async function deleteContent({ user, courseId, contentId }) {
   activityLog
     .log({
       actor: user,
-      action: "classwork_content.delete",
-      entity_type: "classwork_content",
+      action: "homework_content.delete",
+      entity_type: "homework_content",
       entity_id: contentId,
       org_id: course.org_id,
-      summary_en: `Removed classwork content`,
+      summary_en: `Removed homework content`,
       metadata: { content_id: contentId },
     })
     .catch(() => {});
