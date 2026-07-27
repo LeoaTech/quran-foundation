@@ -249,4 +249,8 @@ module.exports = {
   deleteContent,
   getSessionClassworkContext,
   saveClassworkSheet,
+  createContent,
+  updateContent,
+  updateWord,
+  deleteWord
 };
