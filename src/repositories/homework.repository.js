@@ -166,8 +166,36 @@ async function getAssignmentContent(assignmentId) {
     .where('is_active', true)
     .orderBy('sequence_order', 'asc');
 
+  const subtopicIds = new Set();
+  for (const w of words) {
+    if (Array.isArray(w.rule_details)) {
+      for (const r of w.rule_details) {
+        if (r.subtopic_id) {
+          subtopicIds.add(r.subtopic_id);
+        }
+      }
+    }
+  }
+
+  const subtopicMap = {};
+  if (subtopicIds.size > 0) {
+    const subtopics = await db('topic_subtopics')
+      .whereIn('id', Array.from(subtopicIds))
+      .select('id', 'title');
+    for (const st of subtopics) {
+      subtopicMap[st.id] = st.title;
+    }
+  }
+
   const wordsByContent = {};
   for (const w of words) {
+    if (Array.isArray(w.rule_details)) {
+      w.rule_details = w.rule_details.map(r => ({
+        ...r,
+        rule_name: subtopicMap[r.subtopic_id] || r.rule_name || null
+      }));
+    }
+
     if (!wordsByContent[w.content_id]) wordsByContent[w.content_id] = [];
     wordsByContent[w.content_id].push(w);
   }
@@ -213,6 +241,62 @@ async function updateAssignment(id, patch) {
     .returning('*');
   return row;
 }
+
+
+async function getHomeworkGridSheet({ assignmentId, classId }) {
+  const assignment = await db('homework_assignments').where({ id: assignmentId }).first();
+  if (!assignment) return null;
+
+  const contents = await getAssignmentContent(assignmentId);
+
+  // Compute total max marks based on per-word rules
+  let calculatedMaxMarks = 0;
+  for (const c of contents) {
+    for (const w of c.words || []) {
+      const rules = Array.isArray(w.rule_details) ? w.rule_details : [];
+      if (rules.length > 0) {
+        for (const r of rules) {
+          const marks = (r.marks_per_rule ?? 1) * (r.occurrence_count ?? 1);
+          calculatedMaxMarks += marks;
+        }
+      } else {
+        // Fallback default 1 mark per word if no specific rules assigned
+        calculatedMaxMarks += 1;
+      }
+    }
+  }
+
+  let students = [];
+  let marks = [];
+  let submissions = [];
+
+  if (classId) {
+    students = await db('class_enrollments as e')
+      .join('users as u', 'u.id', 'e.student_user_id')
+      .where({ 'e.class_id': classId, 'e.status': 'active' })
+      .select('u.id as student_id', 'u.full_name', 'u.full_name_ur')
+      .orderBy('u.full_name', 'asc');
+
+    marks = await db('homework_marks')
+      .where({ assignment_id: assignmentId, class_id: classId, is_active: true });
+
+    submissions = await db('homework_submissions')
+      .where({ assignment_id: assignmentId, class_id: classId, is_active: true });
+  }
+
+  return {
+    assignment: {
+      ...assignment,
+      total_marks: calculatedMaxMarks || assignment.total_marks || 0,
+    },
+    contents,
+    students,
+    marks,
+    submissions,
+    calculated_max_marks: calculatedMaxMarks,
+  };
+}
+
 module.exports = {
   getScheduleByCourse,
   createSchedule,
@@ -224,5 +308,7 @@ module.exports = {
   getAssignmentContent,
   computeAssignmentTotalMarks,
   regenerateAssignments,
-  updateAssignment
+  updateAssignment,
+  getHomeworkGridSheet
 };
+
