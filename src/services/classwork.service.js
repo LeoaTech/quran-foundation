@@ -29,7 +29,7 @@ async function requireContent(contentId, courseId) {
 
 async function requireWord(wordId, contentId) {
   const word = await repo.getWordById(wordId);
-  if (!word || word.content_id !== contentId) throw notFound("Classwork Word");
+  if (!word || word.content_id !== contentId) throw notFound("Content Word");
   return word;
 }
 
@@ -178,6 +178,27 @@ async function deleteContent({ user, courseId, contentId }) {
     })
     .catch(() => {});
   return result;
+}
+
+
+// ── Words (individual word updates) ───────────────────────────────────────────
+
+async function updateWord({ courseId, contentId, wordId, body }) {
+  await requireCourse(courseId);
+  await requireContent(contentId, courseId);
+  await requireWord(wordId, contentId);
+  return repo.updateWord(wordId, {
+    word_text:      body.word_text,
+    sequence_order: body.sequence_order,
+    topic_ids:      body.topic_ids !== undefined ? JSON.stringify(body.topic_ids) : undefined,
+  });
+}
+
+async function deleteWord({ courseId, contentId, wordId }) {
+  await requireCourse(courseId);
+  await requireContent(contentId, courseId);
+  await requireWord(wordId, contentId);
+  return repo.deactivateWord(wordId);
 }
 
 //  --------------Classwork Assignments -----------------------------
