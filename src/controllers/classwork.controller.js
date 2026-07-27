@@ -91,6 +91,16 @@ async function getSessionClassworkContext(req, res, next) {
 }
 
 
+async function saveClassworkSheet(req, res, next) {
+  try {
+    res.json(await service.saveClassworkSheet({
+      user:      req.user,
+      sessionId: req.params.session_id,
+      body:      req.body,
+    }));
+  } catch (err) { next(err); }
+}
+
 
 module.exports = {
   listContent,
@@ -99,6 +109,7 @@ module.exports = {
   deleteContent,
   updateWord,
   deleteWord,
-  getSessionClassworkContext
+  getSessionClassworkContext,
+  saveClassworkSheet
 };
 
