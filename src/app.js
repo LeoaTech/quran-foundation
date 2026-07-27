@@ -1,10 +1,10 @@
-require('dotenv').config();
+require("dotenv").config();
 
-const path = require('path');
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const path = require("path");
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 
@@ -16,43 +16,55 @@ app.use(
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         "script-src": ["'self'", "'unsafe-inline'"],
         "script-src-attr": ["'unsafe-inline'"],
-        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com",
+        ],
         "font-src": ["'self'", "https://fonts.gstatic.com"],
       },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
+  }),
 );
-
 
 // CORS
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    const allowed = (process.env.CORS_ORIGIN || 'http://localhost:3001').split(',').map(s => s.trim());
-    // console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(null, false);
-    }
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const allowed = (process.env.CORS_ORIGIN || "http://localhost:3001")
+        .split(",")
+        .map((s) => s.trim());
+      const isAllowed =
+        allowed.includes(origin) ||
+        "http://localhost:5173" ||
+        origin.endsWith(".vercel.app");
+
+      // console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  }),
+);
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
-  max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10),
+  max: parseInt(process.env.RATE_LIMIT_MAX || "100", 10),
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many requests, please try again later.',
-      message_ur: 'بہت زیادہ درخواستیں، براہ کرم بعد میں دوبارہ کوشش کریں۔',
+      code: "RATE_LIMIT_EXCEEDED",
+      message: "Too many requests, please try again later.",
+      message_ur: "بہت زیادہ درخواستیں، براہ کرم بعد میں دوبارہ کوشش کریں۔",
       status: 429,
     },
   },
@@ -64,39 +76,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Static frontend
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 // Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Routes
-app.use('/api/v1/auth', require('./routes/auth'));
-app.use('/api/v1', require('./routes/centers'));
-app.use('/api/v1', require('./routes/users'));
-app.use('/api/v1', require('./routes/courses'));
-app.use('/api/v1', require('./routes/classes'));
-app.use('/api/v1', require('./routes/enrollments'));
-app.use('/api/v1', require('./routes/attendance'));
-app.use('/api/v1', require('./routes/progress'));
-app.use('/api/v1', require('./routes/assessments'));
-app.use('/api/v1', require('./routes/reports'));
-app.use('/api/v1', require('./routes/activityLog'));
-app.use('/api/v1/donations', require('./routes/donations'));
-app.use('/api/v1', require('./routes/salaries'));
-app.use('/api/v1',                   require('./routes/rbac'));
-app.use('/api/v1', require('./routes/teacherTopics'));
-app.use('/api/v1', require('./routes/classwork'));
-app.use('/api/v1', require('./routes/homework'));
+app.use("/api/v1/auth", require("./routes/auth"));
+app.use("/api/v1", require("./routes/centers"));
+app.use("/api/v1", require("./routes/users"));
+app.use("/api/v1", require("./routes/courses"));
+app.use("/api/v1", require("./routes/classes"));
+app.use("/api/v1", require("./routes/enrollments"));
+app.use("/api/v1", require("./routes/attendance"));
+app.use("/api/v1", require("./routes/progress"));
+app.use("/api/v1", require("./routes/assessments"));
+app.use("/api/v1", require("./routes/reports"));
+app.use("/api/v1", require("./routes/activityLog"));
+app.use("/api/v1/donations", require("./routes/donations"));
+app.use("/api/v1", require("./routes/salaries"));
+app.use("/api/v1", require("./routes/rbac"));
+app.use("/api/v1", require("./routes/teacherTopics"));
+app.use("/api/v1", require("./routes/classwork"));
+app.use("/api/v1", require("./routes/homework"));
 
 // 404 handler
 app.use((_req, res) => {
   res.status(404).json({
     error: {
-      code: 'NOT_FOUND',
-      message: 'The requested resource was not found.',
-      message_ur: 'مطلوبہ وسیلہ نہیں ملا۔',
+      code: "NOT_FOUND",
+      message: "The requested resource was not found.",
+      message_ur: "مطلوبہ وسیلہ نہیں ملا۔",
       status: 404,
     },
   });
@@ -109,9 +121,9 @@ app.use((err, _req, res, _next) => {
   const status = err.status || 500;
   res.status(status).json({
     error: {
-      code: err.code || 'INTERNAL_SERVER_ERROR',
-      message: err.message || 'An unexpected error occurred.',
-      message_ur: err.message_ur || 'ایک غیر متوقع خرابی پیش آئی۔',
+      code: err.code || "INTERNAL_SERVER_ERROR",
+      message: err.message || "An unexpected error occurred.",
+      message_ur: err.message_ur || "ایک غیر متوقع خرابی پیش آئی۔",
       status,
     },
   });
