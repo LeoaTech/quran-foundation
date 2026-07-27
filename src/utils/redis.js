@@ -8,13 +8,19 @@ const isUrl = redisHost.startsWith('redis://') || redisHost.startsWith('rediss:/
 const redisUrl = process.env.REDIS_URL || (isUrl ? redisHost : null);
 
 const client = redisUrl
-  ? createClient({ url: redisUrl })
+  ? createClient({ 
+      url: redisUrl,
+      pingInterval: 10000, // Send a PING every 10s to prevent idle timeout
+      socket: { keepAlive: 5000 } // Enable TCP Keep-Alive
+    })
   : createClient({
       password: process.env.REDIS_PASSWORD || undefined,
+      pingInterval: 10000,
       socket: {
         host: redisHost,
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
         tls: isTLS,
+        keepAlive: 5000,
       },
     });
 
