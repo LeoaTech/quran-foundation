@@ -58,20 +58,21 @@ const updateWordSchema = z.object({
   message: 'Request body must contain at least one field to update.',
 });
 
+
 // ── Content Routes ─────────────────────────────────────────────────────────────
-// GET  /courses/:course_id/classwork-content
-// POST /courses/:course_id/classwork-content
-// PATCH /courses/:course_id/classwork-content/:content_id
-// DELETE /courses/:course_id/classwork-content/:content_id
+// GET  /courses/:course_id/homework-content
+// POST /courses/:course_id/homework-content
+// PATCH /courses/:course_id/homework-content/:content_id
+// DELETE /courses/:course_id/homework-content/:content_id
 
 router.get(
-  "/courses/:course_id/classwork-content",
+  "/courses/:course_id/homework-content",
   requireAuth,
   controller.listContent,
 );
 
 router.post(
-  "/courses/:course_id/classwork-content",
+  "/courses/:course_id/homework-content",
   requireAuth,
   requirePermission("courses.edit"),
   validate(createContentSchema),
@@ -79,7 +80,7 @@ router.post(
 );
 
 router.patch(
-  "/courses/:course_id/classwork-content/:content_id",
+  "/courses/:course_id/homework-content/:content_id",
   requireAuth,
   requirePermission("courses.edit"),
   validate(updateContentSchema),
@@ -87,25 +88,25 @@ router.patch(
 );
 
 router.delete(
-  "/courses/:course_id/classwork-content/:content_id",
+  "/courses/:course_id/homework-content/:content_id",
   requireAuth,
   requirePermission("courses.edit"),
   controller.deleteContent,
 );
 
 // ── Word Routes ────────────────────────────────────────────────────────────────
-// PATCH  /courses/:course_id/classwork-content/:content_id/words/:word_id
-// DELETE /courses/:course_id/classwork-content/:content_id/words/:word_id
+// PATCH  /courses/:course_id/homework-content/:content_id/words/:word_id
+// DELETE /courses/:course_id/homework-content/:content_id/words/:word_id
 
 router.patch(
-  "/courses/:course_id/classwork-content/:content_id/words/:word_id",
+  "/courses/:course_id/homework-content/:content_id/words/:word_id",
   requireAuth,
   requirePermission("courses.edit"),
   validate(updateWordSchema),
   controller.updateWord,
 );
 router.delete(
-  '/courses/:course_id/classwork-content/:content_id/words/:word_id',
+  '/courses/:course_id/homework-content/:content_id/words/:word_id',
   requireAuth,
   requirePermission('courses.edit'),
   controller.deleteWord,
