@@ -303,6 +303,26 @@ function listSessionPlans(classId) {
     .orderBy('p.session_date', 'asc');
 }
 
+function listSessionPlansForTopicTeacher(classId, teacherUserId, centerId) {
+  return db('class_session_plans as p')
+    .leftJoin('topics as t', 't.id', 'p.topic_id')
+    .where({ 'p.class_id': classId, 'p.is_active': true })
+    .whereExists(function() {
+      this.select(db.raw('1'))
+        .from('center_teacher_topics as ctt')
+        .whereRaw('ctt.topic_id = p.topic_id')
+        .where('ctt.teacher_user_id', teacherUserId)
+        .where('ctt.center_id', centerId)
+        .where('ctt.is_active', true);
+    })
+    .select(
+      'p.*',
+      't.title as syllabus_topic_title',
+      't.title_ur as syllabus_topic_title_ur',
+    )
+    .orderBy('p.session_date', 'asc');
+}
+
 async function upsertSessionPlan(classId, data) {
   const existing = await db('class_session_plans')
     .where({
@@ -362,5 +382,6 @@ module.exports = {
   createSchedule,
   deactivateSchedule,
   listSessionPlans,
+  listSessionPlansForTopicTeacher,
   upsertSessionPlan,
 };
