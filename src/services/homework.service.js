@@ -129,10 +129,19 @@ async function linkContentToAssignment(assignmentId, contentIds) {
   return repo.linkContentToAssignment(assignmentId, contentIds);
 }
 
+async function getHomeworkGridSheet({ assignmentId, classId }) {
+  const existing = await repo.getAssignmentById(assignmentId);
+  if (!existing) throw notFound("Homework Assignment");
+  return repo.getHomeworkGridSheet({ assignmentId, classId });
+}
+
+
 module.exports = {
   saveSchedule,
   getScheduleWithAssignments,
   updateAssignment,
   getAssignmentContent,
   linkContentToAssignment,
+  getHomeworkGridSheet
 };
+
