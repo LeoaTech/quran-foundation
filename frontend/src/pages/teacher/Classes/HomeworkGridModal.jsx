@@ -6,7 +6,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import Badge from '../../../components/Badge';
 import { useToast } from '../../../hooks/useToast';
-import { getHomeworkGridSheet, saveHomeworkGridMarks } from '../../../api/homework';
+import { getHomeworkGridSheet } from '../../../api/homework';
 
 const S = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 16, height: '100%' },
@@ -206,35 +206,35 @@ export default function HomeworkGridModal({
   }, [students, flattenedRows, marksState]);
 
   // Save Mutation
-  const saveMut = useMutation({
-    mutationFn: () => {
-      const marksPayload = [];
-      students.forEach((s) => {
-        flattenedRows.forEach((r) => {
-          const subId = r.rules?.[0]?.subtopic_id || null;
-          const key = `${s.student_id}_${r.wordId}_${subId || 'default'}`;
-          const awarded = marksState.get(key);
-          if (awarded !== undefined && awarded !== null) {
-            marksPayload.push({
-              student_id: s.student_id,
-              word_id: r.wordId,
-              subtopic_id: subId,
-              marks_awarded: awarded,
-            });
-          }
-        });
-      });
-      return saveHomeworkGridMarks(assignmentId, classId, marksPayload);
-    },
-    onSuccess: () => {
-      toast.success('Homework marks saved successfully!');
-      queryClient.invalidateQueries(['homework-grid', assignmentId, classId]);
-      refetch();
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Failed to save homework marks.');
-    },
-  });
+  // const saveMut = useMutation({
+  //   mutationFn: () => {
+  //     const marksPayload = [];
+  //     students.forEach((s) => {
+  //       flattenedRows.forEach((r) => {
+  //         const subId = r.rules?.[0]?.subtopic_id || null;
+  //         const key = `${s.student_id}_${r.wordId}_${subId || 'default'}`;
+  //         const awarded = marksState.get(key);
+  //         if (awarded !== undefined && awarded !== null) {
+  //           marksPayload.push({
+  //             student_id: s.student_id,
+  //             word_id: r.wordId,
+  //             subtopic_id: subId,
+  //             marks_awarded: awarded,
+  //           });
+  //         }
+  //       });
+  //     });
+  //     return saveHomeworkGridMarks(assignmentId, classId, marksPayload);
+  //   },
+  //   onSuccess: () => {
+  //     toast.success('Homework marks saved successfully!');
+  //     queryClient.invalidateQueries(['homework-grid', assignmentId, classId]);
+  //     refetch();
+  //   },
+  //   onError: (err) => {
+  //     toast.error(err?.response?.data?.message || 'Failed to save homework marks.');
+  //   },
+  // });
 
   if (!open) return null;
 
@@ -340,7 +340,7 @@ export default function HomeworkGridModal({
                         {row.maxMarks}
                       </td>
 
-                      {/* Student Evaluation Cells */}
+                      {/* Student Evaluation Cells
                       {!isPreviewMode &&
                         students.map((stu) => {
                           const key = `${stu.student_id}_${row.wordId}_${subId || 'default'}`;
@@ -381,7 +381,9 @@ export default function HomeworkGridModal({
                               </div>
                             </td>
                           );
-                        })}
+                        })} 
+                         
+                         */}
                     </tr>
                   );
                 })}
@@ -398,10 +400,12 @@ export default function HomeworkGridModal({
               : `Evaluated for ${students.length} enrolled students.`}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Button variant="outline" onClick={onClose} disabled={saveMut.isPending}>
+            <Button variant="outline" onClick={onClose} 
+            // disabled={saveMut.isPending}
+            >
               Close
             </Button>
-            {!isPreviewMode && !readOnly && (
+          {/*   {!isPreviewMode && !readOnly && (
               <Button
                 variant="primary"
                 onClick={() => saveMut.mutate()}
@@ -409,7 +413,7 @@ export default function HomeworkGridModal({
               >
                  Save Homework Marks
               </Button>
-            )}
+            )} */}
           </div>
         </div>
       </div>
