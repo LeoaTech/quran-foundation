@@ -130,7 +130,7 @@ export default function HomeworkGridModal({
   const flattenedRows = useMemo(() => {
     const rows = [];
     contents.forEach((content) => {
-      
+
       const words = content.words || [];
       if (words.length === 0) {
         rows.push({
@@ -160,6 +160,7 @@ export default function HomeworkGridModal({
             wordText: w.word_ar || w.word_text || '—',
             translation: w.translation || '',
             rules,
+            comments: w.note,
             maxMarks: wordMax,
           });
         });
@@ -167,7 +168,8 @@ export default function HomeworkGridModal({
     });
     return rows;
   }, [contents]);
-  
+
+
   // Sync saved marks into state
   useEffect(() => {
     if (!gridData?.marks) return;
@@ -284,6 +286,8 @@ export default function HomeworkGridModal({
                   <th style={{ ...S.th, width: 60 }}>#</th>
                   <th style={S.th}>Content / Verse Word</th>
                   <th style={S.th}>Assessed Rule</th>
+                  <th style={S.th}>Notes</th>
+
                   <th style={{ ...S.th, textAlign: 'center', width: 90 }}>Max Marks</th>
 
                   {/* Student Columns if live evaluation mode */}
@@ -302,7 +306,7 @@ export default function HomeworkGridModal({
                 {flattenedRows.map((row, idx) => {
                   const firstRule = row.rules?.[0];
                   const subId = firstRule?.subtopic_id || null;
-                  
+
                   return (
                     <tr key={`${row.wordId}-${idx}`}>
                       <td style={{ ...S.td, color: 'var(--ink-pale)', fontSize: 12 }}>{idx + 1}</td>
@@ -323,7 +327,7 @@ export default function HomeworkGridModal({
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                             {row.rules.map((r, rIdx) => (
                               <span key={rIdx} style={S.ruleBadge}>
-                                {r.rule_name || r.subtopic_name || 'Rule'} ({r.marks_per_rule || 1}m)
+                                {r.rule_name || r.subtopic_name || 'Rule'} ({r.marks_per_rule || 1} mk)
                               </span>
                             ))}
                           </div>
@@ -333,7 +337,9 @@ export default function HomeworkGridModal({
                           </span>
                         )}
                       </td>
-
+                      <td style={{ ...S.td, textAlign: 'center', fontWeight: 700, color: 'var(--ink)' }}>
+                        {row.comments}
+                      </td>
                       {/* Max Marks */}
                       <td style={{ ...S.td, textAlign: 'center', fontWeight: 700, color: 'var(--ink)' }}>
                         {row.maxMarks}
@@ -399,12 +405,12 @@ export default function HomeworkGridModal({
               : `Evaluated for ${students.length} enrolled students.`}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Button variant="outline" onClick={onClose} 
+            <Button variant="outline" onClick={onClose}
             // disabled={saveMut.isPending}
             >
               Close
             </Button>
-          {/*   {!isPreviewMode && !readOnly && (
+            {/*   {!isPreviewMode && !readOnly && (
               <Button
                 variant="primary"
                 onClick={() => saveMut.mutate()}
