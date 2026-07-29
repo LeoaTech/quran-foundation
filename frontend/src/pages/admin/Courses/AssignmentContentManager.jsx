@@ -110,7 +110,21 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
       boxShadow: '0 2px 5px rgba(0,0,0,0.02)',
     }}>
       {/* ── Row 1: Word + Notes (Adjacent) ─────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: "row-reverse", alignItems: 'center', gap: 10 }}>
+        {/* Remove Button */}
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={disabled}
+          title="Remove word"
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            border: 'none', background: 'var(--fill-danger, #fee2e2)',
+            color: 'var(--red, #dc2626)', cursor: 'pointer',
+            fontSize: 16, lineHeight: 1, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}
+        >×</button>
         {/* Index */}
         <span style={{
           width: 26, height: 26, borderRadius: '50%', display: 'flex',
@@ -161,20 +175,7 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
           </span>
         )}
 
-        {/* Remove Button */}
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabled}
-          title="Remove word"
-          style={{
-            width: 28, height: 28, borderRadius: '50%',
-            border: 'none', background: 'var(--fill-danger, #fee2e2)',
-            color: 'var(--red, #dc2626)', cursor: 'pointer',
-            fontSize: 16, lineHeight: 1, display: 'flex',
-            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}
-        >×</button>
+
       </div>
 
       {/* ── Row 2: Selected Rule Tags & Marks Breakdown ─────────────────────── */}
@@ -296,13 +297,14 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
       <div
         onClick={() => setExpanded(!expanded)}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', flexDirection: "row-reverse", alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 18px', cursor: 'pointer',
           background: 'var(--surface-0, #fafafa)',
           borderBottom: expanded ? '1px solid var(--border, #e5e7eb)' : 'none',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+
           {/* Arabic text */}
           <span style={{
             fontFamily: 'var(--font-arabic, serif)',
@@ -310,12 +312,14 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
             color: 'var(--ink, #111)',
           }}>
             {content.arabic_text}
+            <span style={{ marginRight: "10px", color: 'var(--ink-pale)', fontSize: 17 }}>{expanded ? '➤' : '▼'}</span>
+
           </span>
           {/* Meta */}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             {(content.surah_number || content.ayah_number) && (
               <span style={{ fontSize: 12, color: 'var(--ink-soft, #6b7280)' }}>
-                📖 {surahLabel(content.surah_number)}
+                {surahLabel(content.surah_number)}
                 {content.ayah_number ? `, Ayah ${content.ayah_number}` : ''}
               </span>
             )}
@@ -362,7 +366,6 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
               >Delete</button>
             </>
           )}
-          <span style={{ color: 'var(--ink-pale)', fontSize: 14 }}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
 
@@ -389,7 +392,7 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
                     borderRadius: 8, border: '1px solid var(--border, #e5e7eb)',
                   }}>
                     {/* Row 1: Index + Word + Notes (Adjacent) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: "row-reverse", alignItems: 'center', gap: 10 }}>
                       <span style={{
                         width: 22, height: 22, borderRadius: '50%',
                         background: 'var(--emerald, #1a9b6c)', color: '#fff',
@@ -410,7 +413,7 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
                           textAlign: 'right', fontFamily: 'var(--font-display)', background: '#f8fafc',
                           padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0',
                         }}>
-                          📝 {w.note}
+                          {w.note}
                         </span>
                       )}
 
@@ -419,14 +422,14 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
                           fontSize: 11, fontWeight: 700, color: 'var(--emerald)',
                           background: '#d1fae5', padding: '2px 8px', borderRadius: 12, flexShrink: 0,
                         }}>
-                          📐 {wordTotal} mark{wordTotal !== 1 ? 's' : ''}
+                          {wordTotal} mark{wordTotal !== 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
 
                     {/* Row 2: Subtopics & Rule Marks */}
                     {(w.topic_ids?.length > 0 || ruleDetails.length > 0) && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', fontSize: 11, paddingTop: 2 }}>
+                      <div style={{ display: 'flex', flexDirection: "row-reverse", flexWrap: 'wrap', gap: 6, alignItems: 'center', fontSize: 11, paddingTop: 2 }}>
                         {(Array.isArray(w.topic_ids) ? w.topic_ids : []).map((sid) => (
                           <SubtopicBadge key={sid} subtopicId={sid} topics={topics} />
                         ))}
@@ -459,27 +462,44 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
 }
 
 // ── Content Form (create / edit) ──────────────────────────────────────────────
-function ContentForm({ courseId, topics, initialData, onSave, onCancel }) {
+export function ContentForm({ courseId, topics, initialData, onSave, onCancel }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   const [surahNumber, setSurahNumber] = useState(initialData?.surah_number ?? '');
-  const [ayahNumber, setAyahNumber]   = useState(initialData?.ayah_number ?? '');
-  const [arabicText, setArabicText]   = useState(initialData?.arabic_text ?? '');
-  const [label, setLabel]             = useState(initialData?.label ?? '');
-  const [topicId, setTopicId]         = useState(initialData?.topic_id ?? '');
-  const [words, setWords]             = useState(
+  const [ayahNumber, setAyahNumber] = useState(initialData?.ayah_number ?? '');
+  const [arabicText, setArabicText] = useState(initialData?.arabic_text ?? '');
+  const [label, setLabel] = useState(initialData?.label ?? '');
+  const [topicIds, setTopicIds] = useState(() => {
+    if (initialData?.topic_ids && initialData.topic_ids.length > 0) return initialData.topic_ids;
+    if (initialData?.topic_id) return [initialData.topic_id];
+    return [];
+  });
+  const [words, setWords] = useState(
     initialData?.words?.map((w) => ({
       ...w,
-      topic_ids:    Array.isArray(w.topic_ids) ? w.topic_ids : JSON.parse(w.topic_ids ?? '[]'),
+      topic_ids: Array.isArray(w.topic_ids) ? w.topic_ids : JSON.parse(w.topic_ids ?? '[]'),
       rule_details: Array.isArray(w.rule_details) ? w.rule_details : JSON.parse(w.rule_details ?? '[]'),
-      note:         w.note ?? '',
+      note: w.note ?? '',
     })) ?? []
   );
 
-  // Subtopics of the selected primary topic — used as rule tags on individual words
-  const activeSubtopics = topics.find((t) => t.id === topicId)?.subtopics ?? [];
-
+  // Subtopics of the selected primary topics — used as rule tags on individual words
+  const activeSubtopics = (() => {
+    let subs = [];
+    topicIds.forEach(id => {
+      const t = topics.find(t => t.id === id);
+      if (t) {
+        if (t.subtopics && t.subtopics.length > 0) {
+          subs.push(...t.subtopics);
+        } else {
+          // Rule Tag Fallback: if no subtopics, include the primary topic itself
+          subs.push(t);
+        }
+      }
+    });
+    return subs;
+  })();
   // Compute grand total marks dynamically (from word-level marks_per_rule × occurrence_count)
   let grandTotal = 0;
   for (const w of words) {
@@ -528,17 +548,18 @@ function ContentForm({ courseId, topics, initialData, onSave, onCancel }) {
     }
 
     const payload = {
-      surah_number:    surahNumber ? Number(surahNumber) : null,
-      ayah_number:     ayahNumber ? Number(ayahNumber) : null,
-      arabic_text:     arabicText.trim(),
-      label:           label.trim() || null,
-      topic_id:        topicId || null,
-      words:           words.map((w, i) => ({
-        word_text:      w.word_text.trim(),
+      surah_number: surahNumber ? Number(surahNumber) : null,
+      ayah_number: ayahNumber ? Number(ayahNumber) : null,
+      arabic_text: arabicText.trim(),
+      label: label.trim() || null,
+      topic_id: topicIds.length > 0 ? topicIds[0] : null, // legacy compatibility
+      topic_ids: topicIds,
+      words: words.map((w, i) => ({
+        word_text: w.word_text.trim(),
         sequence_order: i + 1,
-        topic_ids:      w.topic_ids ?? [],
-        rule_details:   w.rule_details ?? [],
-        note:           w.note || null,
+        topic_ids: w.topic_ids ?? [],
+        rule_details: w.rule_details ?? [],
+        note: w.note || null,
       })),
     };
 
@@ -568,6 +589,22 @@ function ContentForm({ courseId, topics, initialData, onSave, onCancel }) {
       <h3 style={{ margin: '0 0 18px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
         {initialData?.id ? 'Edit Content' : 'Add New Content (Verse / Dua / Namaz)'}
       </h3>
+
+      {/* Label - Single line above */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--ink-soft)' }}>
+          Label (Optional)
+        </label>
+        <input
+          id="cw-label"
+          className="f-input"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="e.g. Bismillah"
+          disabled={busy}
+          style={{ width: '100%' }}
+        />
+      </div>
 
       {/* Row 1: Surah / Ayah */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -603,40 +640,34 @@ function ContentForm({ courseId, topics, initialData, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Row 2: Topic + Label */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--ink-soft)' }}>
-            Primary Topic / Module
-            <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--ink-pale)', fontSize: 11 }}>(word tags will use its subtopics)</span>
-          </label>
-          <select
-            id="cw-topic-id"
-            className="f-input"
-            value={topicId}
-            onChange={(e) => setTopicId(e.target.value)}
-            disabled={busy}
-            style={{ width: '100%' }}
-          >
-            <option value="">— None —</option>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>{t.title}{t.title_ur ? ` / ${t.title_ur}` : ''}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--ink-soft)' }}>
-            Label (Optional)
-          </label>
-          <input
-            id="cw-label"
-            className="f-input"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g. Bismillah"
-            disabled={busy}
-            style={{ width: '100%' }}
-          />
+      {/* Topics - Single Row */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--ink-soft)' }}>
+          Primary Topics / Modules
+          <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--ink-pale)', fontSize: 11 }}>(word tags will use their subtopics)</span>
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, padding: '8px 12px', background: '#fafafa', border: '1px solid var(--border)', borderRadius: 8, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+          {topics.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-pale)' }}>No topics available</span>}
+          {topics.map((t) => {
+            const isActive = topicIds.includes(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTopicIds(prev => isActive ? prev.filter(id => id !== t.id) : [...prev, t.id])}
+                disabled={busy}
+                style={{
+                  padding: '4px 12px', fontSize: 12, fontWeight: 500, borderRadius: 16, cursor: 'pointer', border: '1.5px solid',
+                  background: isActive ? 'var(--emerald, #1a9b6c)' : '#fff',
+                  color: isActive ? '#fff' : 'var(--ink)',
+                  borderColor: isActive ? 'var(--emerald, #1a9b6c)' : 'var(--border-strong)',
+                  flexShrink: 0
+                }}
+              >
+                {t.title}{t.title_ur ? ` / ${t.title_ur}` : ''}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -748,13 +779,13 @@ function ContentForm({ courseId, topics, initialData, onSave, onCancel }) {
 
 // ── Main Manager ─────────────────────────────────────────────────────────────
 export default function AssignmentContentManager({ courseId }) {
-  const qc   = useQueryClient();
+  const qc = useQueryClient();
   const toast = useToast();
 
-  const [filterTopicId, setFilterTopicId]   = useState('');
-  const [showForm, setShowForm]             = useState(false);
+  const [filterTopicId, setFilterTopicId] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const [editingContent, setEditingContent] = useState(null);
-  const [deletingId, setDeletingId]         = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const { data: topics = [], isLoading: loadingTopics } = useQuery({
     queryKey: ['topics', courseId],
@@ -817,17 +848,16 @@ export default function AssignmentContentManager({ courseId }) {
   return (
     <div>
       {/* ── Stats row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
           { label: 'Topics', value: topics.length },
           { label: 'Verses added', value: contentList.length },
           { label: 'Words tagged', value: contentList.reduce((s, c) => s + (c.words?.length ?? 0), 0) },
-          { label: 'Total Marks', value: contentList.reduce((s, c) => s + (c.total_marks ?? 0), 0) },
         ].map(({ label, value }) => (
           <div key={label} style={{
-            background: 'var(--surface-1, #f3f4f5)', borderRadius: 8,
+            background: 'var(--surface-1, #e3ede6)', borderRadius: 8,
             padding: '14px 16px', textAlign: 'center',
-            border: '1px solid var(--border, #e5e7eb)',
+            border: '1px solid var(--border, #bbcbbf)',
           }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--emerald, #1a9b6c)' }}>{value}</div>
@@ -837,8 +867,8 @@ export default function AssignmentContentManager({ courseId }) {
 
       {/* ── Toolbar ── */}
       {!showForm && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-          <select
+        <div style={{ display: 'flex', justifyContent: 'right', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+          {/* <select
             id="cw-filter-topic"
             className="f-input"
             value={filterTopicId}
@@ -849,7 +879,7 @@ export default function AssignmentContentManager({ courseId }) {
             {topics.map((t) => (
               <option key={t.id} value={t.id}>{t.title}{t.title_ur ? ` / ${t.title_ur}` : ''}</option>
             ))}
-          </select>
+          </select> */}
 
           <Can permission="courses.edit">
             <button

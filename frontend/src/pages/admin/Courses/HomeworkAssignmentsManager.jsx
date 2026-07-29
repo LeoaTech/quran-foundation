@@ -5,7 +5,8 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import Badge from '../../../components/Badge';
 import { useToast } from '../../../hooks/useToast';
-import { getHomeworkContent } from '../../../api/courses';
+import { getHomeworkContent, getTopics } from '../../../api/courses';
+import { ContentForm } from './AssignmentContentManager';
 import {
   getHomeworkSchedule,
   saveHomeworkSchedule,
@@ -60,7 +61,15 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
   });
 
   const linkedContent = linkedData?.data ?? linkedData ?? [];
+  const { data: topics = [] } = useQuery({
+    queryKey: ['topics', courseId],
+    queryFn: () => getTopics(courseId),
+    staleTime: 3 * 60_000,
+  });
+
   const [selectedIds, setSelectedIds] = useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
     if (Array.isArray(linkedContent) && selectedIds === null) {
@@ -117,15 +126,33 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
               Select verses/phrases from course content repository to link to this assignment slot.
             </span>
           </div>
-          <button
-            onClick={onClose}
-            style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-soft)' }}
-          >×</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+
+            <button
+              onClick={onClose}
+              style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-soft)' }}
+            >×</button>
+          </div>
         </div>
 
         {/* Content list */}
         <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
-          {isLoading ? (
+          {showCreateForm || editingItem ? (
+            <ContentForm
+              courseId={courseId}
+              topics={topics}
+              initialData={editingItem}
+              onSave={() => {
+                setShowCreateForm(false);
+                setEditingItem(null);
+                qc.invalidateQueries({ queryKey: ['classworkContent', courseId] });
+              }}
+              onCancel={() => {
+                setShowCreateForm(false);
+                setEditingItem(null);
+              }}
+            />
+          ) : isLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
               <LoadingSpinner size={24} />
             </div>
@@ -135,43 +162,68 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {!showCreateForm && !editingItem && (
+                <Button size="md" variant="primary" onClick={() => setShowCreateForm(true)}>
+                  + Create Content
+                </Button>
+              )}
               {allContent.map((item) => {
                 const isChecked = activeSelected.includes(item.id);
                 return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleToggle(item.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                      borderRadius: 8, border: '1px solid',
-                      borderColor: isChecked ? 'var(--emerald, #1a9b6c)' : 'var(--border, #e5e7eb)',
-                      background: isChecked ? '#f0fdf4' : '#fff',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => { }}
-                      style={{ cursor: 'pointer', width: 16, height: 16 }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontFamily: 'var(--font-arabic, serif)', fontSize: 18,
-                        direction: 'rtl', textAlign: 'right', color: 'var(--ink)',
-                      }}>
-                        {item.arabic_text}
-                      </div>
-                      <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
-                        {item.surah_number && (
-                          <span>Surah {item.surah_number}{item.ayah_number ? `:${item.ayah_number}` : ''}</span>
-                        )}
-                        {item.total_marks > 0 && (
-                          <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>📐 {item.total_marks} marks</span>
-                        )}
-                        <span>({item.words?.length ?? 0} words)</span>
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div
+                      onClick={() => handleToggle(item.id)}
+                      style={{
+                        flex: 1, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                        borderRadius: 8, border: '1px solid',
+                        borderColor: isChecked ? 'var(--emerald, #1a9b6c)' : 'var(--border, #e5e7eb)',
+                        background: isChecked ? '#f0fdf4' : '#fff',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => { }}
+                        style={{ cursor: 'pointer', width: 16, height: 16 }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontFamily: 'var(--font-arabic, serif)', fontSize: 18,
+                          direction: 'rtl', textAlign: 'right', color: 'var(--ink)',
+                        }}>
+                          {item.arabic_text}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
+                          {item.surah_number && (
+                            <span>Surah {item.surah_number}{item.ayah_number ? `:${item.ayah_number}` : ''}</span>
+                          )}
+                          {item.total_marks > 0 && (
+                            <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>📐 {item.total_marks} marks</span>
+                          )}
+                          <span>({item.words?.length ?? 0} words)</span>
+                        </div>
                       </div>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingItem(item);
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface-0, #fafafa)',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--ink-soft)'
+                      }}
+                      title="Edit Content"
+                    >
+                      Edit
+                    </button>
                   </div>
                 );
               })}
@@ -180,21 +232,23 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '14px 20px', borderTop: '1px solid var(--border, #e5e7eb)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: 'var(--surface-0, #fafafa)',
-        }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)' }}>
-            {activeSelected.length} content item{activeSelected.length !== 1 ? 's' : ''} selected
-          </span>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button size="sm" variant="primary" onClick={() => saveMut.mutate()} isLoading={saveMut.isPending}>
-              Save Content Links
-            </Button>
+        {!showCreateForm && !editingItem && (
+          <div style={{
+            padding: '14px 20px', borderTop: '1px solid var(--border, #e5e7eb)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: 'var(--surface-0, #fafafa)',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)' }}>
+              {activeSelected.length} content item{activeSelected.length !== 1 ? 's' : ''} selected
+            </span>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button size="sm" variant="primary" onClick={() => saveMut.mutate()} isLoading={saveMut.isPending}>
+                Save Content Links
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -396,8 +450,8 @@ function AssignmentRow({ assignment, courseId }) {
               <span style={{ color: 'var(--emerald)', fontWeight: 700, background: '#d1fae5', padding: '1px 6px', borderRadius: 10 }}>📐 {totalMarks} total marks</span>
             )}
             {assignment.due_date && (isVisible
-              ? <span style={{ color: 'var(--emerald)' }}>✅ Visible to students</span>
-              : <span style={{ color: 'var(--ink-pale)' }}>🔒 Not yet visible</span>)}
+              ? <span style={{ color: 'var(--emerald)' }}>Visible to students</span>
+              : <span style={{ color: 'var(--ink-pale)' }}>Not yet visible</span>)}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
@@ -408,7 +462,7 @@ function AssignmentRow({ assignment, courseId }) {
             🔗 Assign Content
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowGridModal(true)}>
-            📊 Preview Grid Sheet
+            Preview Grid Sheet
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setEditing((v) => !v)}>
             {editing ? 'Cancel' : 'Edit'}
