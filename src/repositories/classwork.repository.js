@@ -25,6 +25,7 @@ async function listContent({ courseId, courseLevelId, topicId } = {}) {
       "c.ayah_number",
       "c.arabic_text",
       "c.label",
+      "c.topic_ids",
       "c.rule_marks",
       "c.total_marks",
       "c.created_by",
@@ -54,6 +55,10 @@ async function listContent({ courseId, courseLevelId, topicId } = {}) {
 
   return contentRows.map((c) => ({
     ...c,
+    topic_ids:
+      typeof c.topic_ids === "string"
+        ? JSON.parse(c.topic_ids)
+        : (c.topic_ids ?? []),
     rule_marks:
       typeof c.rule_marks === "string"
         ? JSON.parse(c.rule_marks)
@@ -378,6 +383,7 @@ async function upsertSheet({
   });
 }
 
+
 module.exports = {
   listContent,
   getContentById,
@@ -394,5 +400,5 @@ module.exports = {
   getTopicsUpToSession,
   getPresentStudentsBySession,
   getSheetBySession,
-  upsertSheet,
+  upsertSheet
 };
