@@ -265,6 +265,33 @@ async function updateAssignment(id, patch) {
   return row;
 }
 
+/**
+ * Bulk-update the due_date on every assignment row for a schedule,
+ * computed from firstDueDate + (i * gapDays).
+ */
+async function applyDueDatesFromFirst({ scheduleId, firstDueDate, frequency, total }) {
+  const assignments = await db('homework_assignments')
+    .where({ schedule_id: scheduleId, is_active: true })
+    .orderBy('assignment_number', 'asc');
+
+  const dueDates = computeDueDates(firstDueDate, frequency, assignments.length);
+
+  return db.transaction(async (trx) => {
+    const updated = [];
+    for (let i = 0; i < assignments.length; i++) {
+      const a = assignments[i];
+      const dueDate = dueDates[i] ?? null;
+      const [row] = await trx('homework_assignments')
+        .where({ id: a.id })
+        .update({ due_date: dueDate, updated_at: trx.fn.now() })
+        .returning('*');
+      updated.push(row);
+    }
+    return updated;
+  });
+}
+
+
 async function getHomeworkGridSheet({ assignmentId, classId }) {
   const assignment = await db('homework_assignments').where({ id: assignmentId }).first();
   if (!assignment) return null;
@@ -331,6 +358,7 @@ module.exports = {
   computeAssignmentTotalMarks,
   regenerateAssignments,
   updateAssignment,
+  applyDueDatesFromFirst,
   getHomeworkGridSheet
 };
 
