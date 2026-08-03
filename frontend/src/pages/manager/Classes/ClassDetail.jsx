@@ -43,6 +43,7 @@ import {
 } from '../../../utils/classSessions';
 import TopicAssignmentTab from './CenterLevelTopicAssignment/TopicAssignmentTab';
 import TeacherClassworkModal from '../../teacher/Classes/TeacherClassworkModal';
+import ClassHomeworkTab from '../../teacher/Classes/ClassHomeworkTab';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 const TYPE_CHIP = {
   hifz: { label: 'Hifz', cls: 'chip chip-green' },
@@ -1075,6 +1076,7 @@ const TABS = [
   { id: 'teachers', label: 'Teachers' },
   { id: 'schedules', label: 'Class' },
   { id: 'topic-assignment', label: 'Topic Assignment' },
+  { id: 'homework', label: 'Homework' },
   { id: 'settings', label: 'Edit Classroom' },
 ];
 
@@ -1156,6 +1158,7 @@ export default function ClassDetail() {
       {tab === 'teachers' && <TeachersTab classId={classId} centerId={cls.center_id} courseId={cls.course_id} />}
       {tab === 'schedules' && <ClassSchedulesTab cls={cls} classId={classId} />}
       {tab === 'topic-assignment' && <TopicAssignmentTab cls={cls} />}
+      {tab === 'homework' && <ClassHomeworkTab classId={classId} courseId={cls.course_id} cls={cls} />}
       {tab === 'settings' && <SettingsTab cls={cls} classId={classId} />}
     </>
   );
