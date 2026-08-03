@@ -45,6 +45,20 @@ function Field({ label, children, hint }) {
   );
 }
 
+function safeParseDate(dateStr) {
+  if (!dateStr || dateStr === 'null' || dateStr === 'undefined') return null;
+  try {
+    const cleanDate = String(dateStr).split('T')[0];
+    const d = new Date(cleanDate + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  } catch (e) { return null; }
+}
+
+function fmtDate(dateStr) {
+  const d = safeParseDate(dateStr);
+  return d ? d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}
+
 // ── Content Picker Modal ───────────────────────────────────────────────────────
 function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
   const toast = useToast();
@@ -72,10 +86,10 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
   const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
-    if (Array.isArray(linkedContent) && selectedIds === null) {
+    if (!loadingLinked && Array.isArray(linkedContent) && selectedIds === null) {
       setSelectedIds(linkedContent.map((c) => c.id));
     }
-  }, [linkedContent, selectedIds]);
+  }, [linkedContent, loadingLinked, selectedIds]);
 
   const activeSelected = selectedIds ?? [];
 
@@ -414,7 +428,8 @@ function AssignmentRow({ assignment, courseId }) {
     onError: (e) => toast.error(e?.response?.data?.message || 'Failed to update.'),
   });
 
-  const isVisible = assignment.due_date ? new Date(assignment.due_date + 'T00:00:00') <= new Date() : false;
+  const dueObj = safeParseDate(assignment.due_date);
+  const isVisible = dueObj ? dueObj <= new Date() : false;
   const linkedCount = assignment.linked_content_count ?? 0;
   const totalMarks = assignment.total_marks ?? 0;
 
@@ -440,7 +455,7 @@ function AssignmentRow({ assignment, courseId }) {
             {assignment.title}
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 4, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span>📅 Due: {assignment.due_date ? new Date(assignment.due_date + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Set per class cohort'}</span>
+            <span>📅 Due: {assignment.due_date ? fmtDate(assignment.due_date) : 'Set per class cohort'}</span>
             {linkedCount > 0 ? (
               <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>📖 {linkedCount} content item{linkedCount !== 1 ? 's' : ''}</span>
             ) : (
@@ -572,7 +587,7 @@ export default function HomeworkAssignmentsManager({ courseId, course }) {
             <div style={{ fontSize: 12, color: 'var(--ink-pale)', marginTop: 4, display: 'flex', gap: 16 }}>
               <span><strong>{scheduleData.schedule.total_assignments}</strong> assignments</span>
               {scheduleData.schedule.first_due_date && (
-                <span>First due: <strong>{new Date(scheduleData.schedule.first_due_date + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                <span>First due: <strong>{fmtDate(scheduleData.schedule.first_due_date)}</strong></span>
               )}
             </div>
           </div>
