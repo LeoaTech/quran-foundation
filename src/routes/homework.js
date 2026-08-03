@@ -93,6 +93,11 @@ router.get(
   controller.getHomeworkGridSheet,
 );
 
-
+// POST /homework-assignments/:assignment_id/grid-marks
+router.post(
+  '/homework-assignments/:assignment_id/grid-marks',
+  requireAuth,
+  controller.saveHomeworkGridMarks,
+);
 module.exports = router;
 
