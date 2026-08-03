@@ -336,8 +336,7 @@ function ScheduleForm({ courseId, course, existing, onSaved, onClose }) {
         📅 Homework Schedule Setup
       </h3>
       <div style={infoBox('#2563eb')}>
-        ℹ️ This schedule applies to <strong>all centers</strong> teaching this course. Assignments will
-        automatically appear to enrolled students on each due date.
+        ℹ️ Configure the expected number of assignments and frequency for this course. Assignments due dates will be configured per center cohort by center managers.
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -455,7 +454,7 @@ function AssignmentRow({ assignment, courseId }) {
             {assignment.title}
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 4, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span>📅 Due: {assignment.due_date ? fmtDate(assignment.due_date) : 'Set per class cohort'}</span>
+            <span>📅 Due date: Configured per classroom cohort</span>
             {linkedCount > 0 ? (
               <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>📖 {linkedCount} content item{linkedCount !== 1 ? 's' : ''}</span>
             ) : (
@@ -464,9 +463,6 @@ function AssignmentRow({ assignment, courseId }) {
             {totalMarks > 0 && (
               <span style={{ color: 'var(--emerald)', fontWeight: 700, background: '#d1fae5', padding: '1px 6px', borderRadius: 10 }}>📐 {totalMarks} total marks</span>
             )}
-            {assignment.due_date && (isVisible
-              ? <span style={{ color: 'var(--emerald)' }}>Visible to students</span>
-              : <span style={{ color: 'var(--ink-pale)' }}>Not yet visible</span>)}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
@@ -585,10 +581,7 @@ export default function HomeworkAssignmentsManager({ courseId, course }) {
               📅 {getFrequencyLabel(scheduleData.schedule.frequency)} Schedule
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-pale)', marginTop: 4, display: 'flex', gap: 16 }}>
-              <span><strong>{scheduleData.schedule.total_assignments}</strong> assignments</span>
-              {scheduleData.schedule.first_due_date && (
-                <span>First due: <strong>{fmtDate(scheduleData.schedule.first_due_date)}</strong></span>
-              )}
+              <span><strong>{scheduleData.schedule.total_assignments}</strong> expected assignments</span>
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
