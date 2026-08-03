@@ -15,7 +15,7 @@ export const updateHomeworkAssignment = (courseId, assignmentId, patch) =>
   client
     .patch(`/courses/${courseId}/homework-assignments/${assignmentId}`, patch)
     .then((r) => r.data);
-    
+
     // POST /courses/:courseId/homework-schedule/apply-dates  (center manager bulk reschedule)
 export const applyHomeworkDates = (courseId, firstDueDate) =>
   client
@@ -44,3 +44,11 @@ export const getHomeworkGridSheet = (assignmentId, classId) =>
     })
     .then((r) => r.data?.data);
 
+
+    // POST /homework-assignments/:assignmentId/grid-marks
+export const saveHomeworkGridMarks = (assignmentId, classId, marks, studentNotes = {}) =>
+  client
+    .post(`/homework-assignments/${assignmentId}/grid-marks`, { marks, studentNotes }, {
+      params: { class_id: classId },
+    })
+    .then((r) => r.data?.data);
