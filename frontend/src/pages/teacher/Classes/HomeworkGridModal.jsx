@@ -175,8 +175,10 @@ export function HomeworkGridSheetView({
     if (gridData?.marks) {
       const map = new Map();
       gridData.marks.forEach((m) => {
-        const key = `${m.student_id}_${m.word_id}_${m.subtopic_id || 'default'}`;
-        map.set(key, m.marks_awarded);
+        const keyWithSub = `${m.student_id}_${m.word_id}_${m.subtopic_id || 'default'}`;
+        const keyWordOnly = `${m.student_id}_${m.word_id}`;
+        map.set(keyWithSub, m.marks_awarded);
+        map.set(keyWordOnly, m.marks_awarded);
       });
       setMarksState(map);
     }
@@ -194,10 +196,13 @@ export function HomeworkGridSheetView({
 
   // Handle cell score input
   const handleScoreChange = (studentId, wordId, subtopicId, newScore) => {
-    const key = `${studentId}_${wordId}_${subtopicId || 'default'}`;
+    const keyWithSub = `${studentId}_${wordId}_${subtopicId || 'default'}`;
+    const keyWordOnly = `${studentId}_${wordId}`;
     setMarksState((prev) => {
       const next = new Map(prev);
-      next.set(key, Math.max(0, newScore));
+      const score = Math.max(0, newScore);
+      next.set(keyWithSub, score);
+      next.set(keyWordOnly, score);
       return next;
     });
   };
@@ -209,8 +214,10 @@ export function HomeworkGridSheetView({
       let sum = 0;
       flattenedRows.forEach((r) => {
         const subId = r.rules?.[0]?.subtopic_id || null;
-        const key = `${s.student_id}_${r.wordId}_${subId || 'default'}`;
-        sum += Number(marksState.get(key) || 0);
+        const keyWithSub = `${s.student_id}_${r.wordId}_${subId || 'default'}`;
+        const keyWordOnly = `${s.student_id}_${r.wordId}`;
+        const val = marksState.get(keyWithSub) ?? marksState.get(keyWordOnly);
+        sum += Number(val || 0);
       });
       totals.set(s.student_id, sum);
     });
@@ -224,9 +231,10 @@ export function HomeworkGridSheetView({
       students.forEach((s) => {
         flattenedRows.forEach((r) => {
           const subId = r.rules?.[0]?.subtopic_id || null;
-          const key = `${s.student_id}_${r.wordId}_${subId || 'default'}`;
-          const awarded = marksState.get(key);
-          if (awarded !== undefined && awarded !== null) {
+          const keyWithSub = `${s.student_id}_${r.wordId}_${subId || 'default'}`;
+          const keyWordOnly = `${s.student_id}_${r.wordId}`;
+          const awarded = marksState.get(keyWithSub) ?? marksState.get(keyWordOnly);
+          if (awarded !== undefined && awarded !== null && awarded !== '') {
             marksPayload.push({
               student_id: s.student_id,
               word_id: r.wordId,
@@ -382,8 +390,9 @@ export function HomeworkGridSheetView({
                     {/* Student Evaluation Cells - Simple Number Input */}
                     {!isPreviewMode &&
                       students.map((stu) => {
-                        const key = `${stu.student_id}_${row.wordId}_${subId || 'default'}`;
-                        const currentVal = marksState.get(key) ?? '';
+                        const keyWithSub = `${stu.student_id}_${row.wordId}_${subId || 'default'}`;
+                        const keyWordOnly = `${stu.student_id}_${row.wordId}`;
+                        const currentVal = marksState.get(keyWithSub) ?? marksState.get(keyWordOnly) ?? '';
 
                         if (readOnly) {
                           return (
