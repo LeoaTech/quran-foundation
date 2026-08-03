@@ -15,8 +15,14 @@ export const updateHomeworkAssignment = (courseId, assignmentId, patch) =>
   client
     .patch(`/courses/${courseId}/homework-assignments/${assignmentId}`, patch)
     .then((r) => r.data);
+    
+    // POST /courses/:courseId/homework-schedule/apply-dates  (center manager bulk reschedule)
+export const applyHomeworkDates = (courseId, firstDueDate) =>
+  client
+    .post(`/courses/${courseId}/homework-schedule/apply-dates`, { first_due_date: firstDueDate })
+    .then((r) => r.data);
 
-// GET /courses/:courseId/homework-assignments/:assignmentId/content
+    // GET /courses/:courseId/homework-assignments/:assignmentId/content
 export const getAssignmentContent = (courseId, assignmentId) =>
   client.get(`/courses/${courseId}/homework-assignments/${assignmentId}/content`).then((r) => r.data);
 
