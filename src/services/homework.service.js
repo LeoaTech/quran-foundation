@@ -100,10 +100,13 @@ async function saveSchedule({
   return { schedule, assignments };
 }
 
-async function getScheduleWithAssignments(courseId) {
+async function getScheduleWithAssignments(courseId, classId) {
   const schedule = await repo.getScheduleByCourse(courseId);
   if (!schedule) return null;
-  const assignments = await repo.listAssignmentsBySchedule(schedule.id);
+  const assignments = await repo.listAssignmentsBySchedule(
+    schedule.id,
+    classId,
+  );
   return { schedule, assignments };
 }
 
@@ -112,7 +115,21 @@ async function getScheduleWithAssignments(courseId) {
 async function updateAssignment(id, patch, userId) {
   const existing = await repo.getAssignmentById(id);
   if (!existing) throw notFound("Homework Assignment");
-  return repo.updateAssignment(id, patch);
+  // Allow center managers to patch individual due_date
+  const allowedPatch = {};
+  const allowedFields = [
+    "title",
+    "title_ur",
+    "instructions",
+    "topic_ids",
+    "criteria_ids",
+    "is_published",
+    "due_date",
+  ];
+  for (const key of allowedFields) {
+    if (key in patch) allowedPatch[key] = patch[key];
+  }
+  return repo.updateAssignment(id, allowedPatch);
 }
 
 // ── Content Linking ────────────────────────────────────────────────────────────
@@ -135,7 +152,6 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
   return repo.getHomeworkGridSheet({ assignmentId, classId });
 }
 
-
 module.exports = {
   saveSchedule,
   getScheduleWithAssignments,
@@ -144,4 +160,3 @@ module.exports = {
   linkContentToAssignment,
   getHomeworkGridSheet
 };
-
