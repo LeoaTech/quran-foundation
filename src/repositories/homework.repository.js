@@ -396,11 +396,31 @@ async function upsertSubmission({ assignmentId, classId, studentId, status, mark
 
 async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], studentNotes = {}, userId }) {
   return db.transaction(async (trx) => {
+    // 1. Gather candidate subtopic_ids from payload
+    const candidateSubtopicIds = Array.from(
+      new Set(
+        marks
+          .map((m) => m.subtopic_id)
+          .filter((id) => id && id !== 'default' && id !== 'null' && typeof id === 'string')
+      )
+    );
+
+    // 2. Query subtopic_ids that actually exist in topic_subtopics table
+    const validSubtopicIds = new Set();
+    if (candidateSubtopicIds.length > 0) {
+      const existingRows = await trx('topic_subtopics')
+        .whereIn('id', candidateSubtopicIds)
+        .select('id');
+      existingRows.forEach((r) => validSubtopicIds.add(r.id));
+    }
+
     const studentScores = new Map();
 
     for (const item of marks) {
       const { student_id, word_id, subtopic_id, marks_awarded = 0, error_type, teacher_note } = item;
-      if (!student_id || !word_id) continue;
+      if (!student_id || !word_id || String(word_id).startsWith('content-')) continue;
+
+      const safeSubtopicId = (subtopic_id && validSubtopicIds.has(subtopic_id)) ? subtopic_id : null;
 
       await trx.raw(
         `INSERT INTO homework_marks
@@ -419,7 +439,7 @@ async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], stud
           classId || null,
           student_id,
           word_id,
-          subtopic_id || null,
+          safeSubtopicId,
           marks_awarded,
           error_type || null,
           teacher_note || null,
