@@ -346,6 +346,120 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
   };
 }
 
+
+
+
+// ── Submissions ───────────────────────────────────────────────────────────────
+
+async function listSubmissionsForAssignment(assignmentId, classId) {
+  return db('homework_submissions')
+    .where({ assignment_id: assignmentId, class_id: classId, is_active: true });
+}
+
+async function upsertSubmission({ assignmentId, classId, studentId, status, marksAwarded, maxMarks, teacherNote, markedBy }) {
+  const existing = await db('homework_submissions')
+    .where({ assignment_id: assignmentId, class_id: classId, student_id: studentId })
+    .first();
+
+  if (existing) {
+    const [row] = await db('homework_submissions')
+      .where({ id: existing.id })
+      .update({
+        status:        status ?? existing.status,
+        marks_awarded: marksAwarded ?? existing.marks_awarded,
+        max_marks:     maxMarks ?? existing.max_marks,
+        teacher_note:  teacherNote ?? existing.teacher_note,
+        marked_by:     markedBy ?? existing.marked_by,
+        marked_at:     markedBy ? db.fn.now() : existing.marked_at,
+        updated_at:    db.fn.now(),
+      })
+      .returning('*');
+    return row;
+  }
+
+  const [row] = await db('homework_submissions')
+    .insert({
+      assignment_id: assignmentId,
+      class_id:      classId,
+      student_id:    studentId,
+      status:        status ?? 'pending',
+      marks_awarded: marksAwarded ?? null,
+      max_marks:     maxMarks ?? null,
+      teacher_note:  teacherNote ?? null,
+      marked_by:     markedBy ?? null,
+      marked_at:     markedBy ? db.fn.now() : null,
+    })
+    .returning('*');
+  return row;
+}
+
+
+async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], studentNotes = {}, userId }) {
+  return db.transaction(async (trx) => {
+    const studentScores = new Map();
+
+    for (const item of marks) {
+      const { student_id, word_id, subtopic_id, marks_awarded = 0, error_type, teacher_note } = item;
+      if (!student_id || !word_id) continue;
+
+      await trx.raw(
+        `INSERT INTO homework_marks
+          (assignment_id, class_id, student_id, word_id, subtopic_id, marks_awarded, error_type, teacher_note, marked_by, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+         ON CONFLICT ON CONSTRAINT idx_unique_homework_mark
+         DO UPDATE SET
+          marks_awarded = EXCLUDED.marks_awarded,
+          error_type    = EXCLUDED.error_type,
+          teacher_note  = EXCLUDED.teacher_note,
+          marked_by     = EXCLUDED.marked_by,
+          updated_at    = NOW(),
+          is_active     = true`,
+        [
+          assignmentId,
+          classId || null,
+          student_id,
+          word_id,
+          subtopic_id || null,
+          marks_awarded,
+          error_type || null,
+          teacher_note || null,
+          userId,
+        ]
+      );
+
+      const currentScore = studentScores.get(student_id) || 0;
+      studentScores.set(student_id, currentScore + Number(marks_awarded || 0));
+    }
+
+    const gridData = await getHomeworkGridSheet({ assignmentId, classId });
+    const maxMarks = gridData?.calculated_max_marks || 0;
+
+    const allStudentIds = new Set([...studentScores.keys(), ...Object.keys(studentNotes || {})].filter(id => id && id !== 'NaN' && id !== 'undefined'));
+
+    // Update submissions for each student
+    for (const student_id of allStudentIds) {
+      if (!student_id || student_id === 'NaN') continue;
+      const totalAwarded = studentScores.get(student_id) ?? 0;
+      const note = studentNotes[student_id] ?? 'Evaluated via Homework Grid Sheet';
+
+      await upsertSubmission({
+        assignmentId,
+        classId,
+        studentId: student_id,
+        status: 'evaluated',
+        marksAwarded: totalAwarded,
+        maxMarks,
+        teacherNote: note,
+        markedBy: userId,
+      });
+    }
+
+    return getHomeworkGridSheet({ assignmentId, classId });
+  });
+}
+
+
+
 module.exports = {
   getScheduleByCourse,
   createSchedule,
@@ -359,6 +473,9 @@ module.exports = {
   regenerateAssignments,
   updateAssignment,
   applyDueDatesFromFirst,
-  getHomeworkGridSheet
+  getHomeworkGridSheet,
+  bulkUpsertHomeworkMarks,
+  listSubmissionsForAssignment,
+  upsertSubmission
 };
 
