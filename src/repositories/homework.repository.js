@@ -73,8 +73,8 @@ async function updateSchedule(scheduleId, patch) {
 
 // ── Assignments ───────────────────────────────────────────────────────────────
 
-async function listAssignmentsBySchedule(scheduleId) {
-  return db("homework_assignments as a")
+async function listAssignmentsBySchedule(scheduleId, classId) {
+  const assignments = await db("homework_assignments as a")
     .leftJoin("homework_assignment_content as hac", "hac.assignment_id", "a.id")
     .where({ "a.schedule_id": scheduleId, "a.is_active": true })
     .groupBy("a.id")
@@ -83,6 +83,29 @@ async function listAssignmentsBySchedule(scheduleId) {
       "a.*",
       db.raw("COUNT(hac.content_id)::int as linked_content_count"),
     );
+
+  if (classId && assignments.length > 0) {
+    const [{ count: studentCount }] = await db("enrollments")
+      .where({ class_id: classId, status: "active", is_active: true })
+      .count("* as count");
+    const enrolledCount = Number(studentCount || 0);
+
+    const submissionCounts = await db("homework_submissions")
+      .where({ class_id: classId, status: "evaluated", is_active: true })
+      .whereIn("assignment_id", assignments.map(a => a.id))
+      .groupBy("assignment_id")
+      .select("assignment_id", db.raw("COUNT(DISTINCT student_id)::int as marked_count"));
+
+    const countMap = new Map(submissionCounts.map(r => [r.assignment_id, Number(r.marked_count)]));
+    assignments.forEach(a => {
+      const marked = countMap.get(a.id) || 0;
+      a.enrolled_count = enrolledCount;
+      a.marked_count = marked;
+      a.is_fully_marked = enrolledCount > 0 && marked >= enrolledCount;
+    });
+  }
+
+  return assignments;
 }
 
 async function listAssignmentsByCourse(courseId) {
@@ -242,7 +265,6 @@ async function updateAssignment(id, patch) {
   return row;
 }
 
-
 async function getHomeworkGridSheet({ assignmentId, classId }) {
   const assignment = await db('homework_assignments').where({ id: assignmentId }).first();
   if (!assignment) return null;
@@ -271,9 +293,9 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
   let submissions = [];
 
   if (classId) {
-    students = await db('class_enrollments as e')
+    students = await db('enrollments as e')
       .join('users as u', 'u.id', 'e.student_user_id')
-      .where({ 'e.class_id': classId, 'e.status': 'active' })
+      .where({ 'e.class_id': classId, 'e.status': 'active', 'e.is_active': true })
       .select('u.id as student_id', 'u.full_name', 'u.full_name_ur')
       .orderBy('u.full_name', 'asc');
 
