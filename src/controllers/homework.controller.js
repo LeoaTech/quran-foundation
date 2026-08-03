@@ -76,6 +76,20 @@ async function getHomeworkGridSheet(req, res) {
   } catch (e) { err(res, e); }
 }
 
+// POST /homework-assignments/:assignment_id/grid-marks
+async function saveHomeworkGridMarks(req, res) {
+  try {
+    const { assignment_id } = req.params;
+    const { class_id } = req.query;
+    const data = await service.saveHomeworkGridMarks({
+      user: req.user,
+      assignmentId: assignment_id,
+      classId: class_id,
+      body: req.body,
+    });
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
 
 
 module.exports = {
@@ -85,6 +99,7 @@ module.exports = {
   updateAssignment,
   getAssignmentContent,
   linkContentToAssignment,
-  getHomeworkGridSheet
+  getHomeworkGridSheet,
+  saveHomeworkGridMarks
 };
 
