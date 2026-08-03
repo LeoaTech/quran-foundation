@@ -29,6 +29,18 @@ async function saveSchedule(req, res) {
   } catch (e) { err(res, e); }
 }
 
+// POST /courses/:course_id/homework-schedule/apply-dates
+async function applyScheduleDates(req, res) {
+  try {
+    const { first_due_date } = req.body;
+    const data = await service.applyScheduleDates({
+      courseId: req.params.course_id,
+      firstDueDate: first_due_date,
+    });
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
+
 // PATCH /courses/:course_id/homework-assignments/:assignment_id
 async function updateAssignment(req, res) {
   try {
@@ -69,6 +81,7 @@ async function getHomeworkGridSheet(req, res) {
 module.exports = {
   getSchedule,
   saveSchedule,
+  applyScheduleDates,
   updateAssignment,
   getAssignmentContent,
   linkContentToAssignment,
