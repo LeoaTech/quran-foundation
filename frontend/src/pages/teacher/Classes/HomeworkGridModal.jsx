@@ -523,7 +523,7 @@ export function HomeworkGridSheetView({
     <Modal
       open={open}
       onClose={onClose}
-      title={`Homework Grid Sheet ${isPreviewMode ? '(Preview Mode)' : '(Evaluation)'}`}
+      title={`Homework Grid Sheet ${isPreviewMode ? '(Preview)' : '(Evaluation)'}`}
       size="xl"
     >
       {bodyContent}

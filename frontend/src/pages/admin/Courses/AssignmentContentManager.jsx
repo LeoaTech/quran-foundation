@@ -312,7 +312,7 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
             color: 'var(--ink, #111)',
           }}>
             {content.arabic_text}
-            <span style={{ marginRight: "10px", color: 'var(--ink-pale)', fontSize: 17 }}>{expanded ? '➤' : '▼'}</span>
+            <span style={{ marginRight: "10px", color: 'var(--ink-pale)', fontSize: 17 }}>{expanded ? '▼':'➤'}</span>
 
           </span>
           {/* Meta */}
