@@ -259,10 +259,11 @@ async function getPresentStudentsBySession(sessionId) {
     return records;
   }
 
-  const enrollments = await db("class_enrollments as e")
+  const enrollments = await db("enrollments as e")
     .join("users as u", "u.id", "e.student_user_id")
     .where("e.class_id", session.class_id)
     .where("e.status", "active")
+    .where("e.is_active", true)
     .select(
       "u.id as student_id",
       "u.full_name",
