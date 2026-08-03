@@ -96,12 +96,22 @@ async function listAssignmentsBySchedule(scheduleId, classId) {
       .groupBy("assignment_id")
       .select("assignment_id", db.raw("COUNT(DISTINCT student_id)::int as marked_count"));
 
+    const inProgressCounts = await db("homework_submissions")
+      .where({ class_id: classId, is_active: true })
+      .whereIn("status", ["evaluated", "in_progress"])
+      .whereIn("assignment_id", assignments.map(a => a.id))
+      .groupBy("assignment_id")
+      .select("assignment_id", db.raw("COUNT(DISTINCT student_id)::int as any_marked_count"));
+
     const countMap = new Map(submissionCounts.map(r => [r.assignment_id, Number(r.marked_count)]));
+    const inProgressMap = new Map(inProgressCounts.map(r => [r.assignment_id, Number(r.any_marked_count)]));
     assignments.forEach(a => {
-      const marked = countMap.get(a.id) || 0;
+      const fullyMarked = countMap.get(a.id) || 0;
+      const anyMarked = inProgressMap.get(a.id) || 0;
       a.enrolled_count = enrolledCount;
-      a.marked_count = marked;
-      a.is_fully_marked = enrolledCount > 0 && marked >= enrolledCount;
+      a.marked_count = fullyMarked;
+      a.is_fully_marked = enrolledCount > 0 && fullyMarked >= enrolledCount;
+      a.has_any_marks = anyMarked > 0;
     });
   }
 
@@ -454,6 +464,13 @@ async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], stud
     const gridData = await getHomeworkGridSheet({ assignmentId, classId });
     const maxMarks = gridData?.calculated_max_marks || 0;
 
+    // Count total expected word entries from the assignment content
+    let totalExpectedWords = 0;
+    for (const c of (gridData?.contents || [])) {
+      const words = c.words || [];
+      totalExpectedWords += words.length > 0 ? words.length : 1; // at least 1 per content item
+    }
+
     const allStudentIds = new Set([...studentScores.keys(), ...Object.keys(studentNotes || {})].filter(id => id && id !== 'NaN' && id !== 'undefined'));
 
     // Update submissions for each student
@@ -462,11 +479,23 @@ async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], stud
       const totalAwarded = studentScores.get(student_id) ?? 0;
       const note = studentNotes[student_id] ?? 'Evaluated via Homework Grid Sheet';
 
+      // Count how many word-level marks this student actually has saved
+      const studentMarksCount = await trx('homework_marks')
+        .where({ assignment_id: assignmentId, class_id: classId, student_id, is_active: true })
+        .count('* as cnt')
+        .first();
+      const markedWords = Number(studentMarksCount?.cnt || 0);
+
+      // Only set 'evaluated' when ALL words are graded; otherwise 'in_progress'
+      const submissionStatus = (totalExpectedWords > 0 && markedWords >= totalExpectedWords)
+        ? 'evaluated'
+        : 'in_progress';
+
       await upsertSubmission({
         assignmentId,
         classId,
         studentId: student_id,
-        status: 'evaluated',
+        status: submissionStatus,
         marksAwarded: totalAwarded,
         maxMarks,
         teacherNote: note,
