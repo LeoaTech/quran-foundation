@@ -6,7 +6,7 @@ const err = (res, e)                  => res.status(e.status || 500).json({ succ
 // GET /courses/:course_id/homework-schedule
 async function getSchedule(req, res) {
   try {
-    const data = await service.getScheduleWithAssignments(req.params.course_id);
+    const data = await service.getScheduleWithAssignments(req.params.course_id, req.query.class_id);
     ok(res, data);
   } catch (e) { err(res, e); }
 }
@@ -63,6 +63,7 @@ async function getHomeworkGridSheet(req, res) {
     ok(res, data);
   } catch (e) { err(res, e); }
 }
+
 
 
 module.exports = {
