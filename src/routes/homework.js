@@ -23,7 +23,9 @@ const assignmentPatchSchema = z.object({
   topic_ids:    z.array(z.string().uuid()).optional(),
   criteria_ids: z.array(z.string().uuid()).optional(),
   is_published: z.boolean().optional(),
+  due_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().nullable(),
 }).refine((b) => Object.keys(b).length > 0, { message: 'At least one field required.' });
+
 
 const linkContentSchema = z.object({
   content_ids: z.array(z.string().uuid()),
@@ -48,14 +50,14 @@ router.put(
 );
 
 
-// PATCH /courses/:course_id/homework-assignments/:assignment_id  (super_admin only)
+// PATCH /courses/:course_id/homework-assignments/:assignment_id (super_admin + center_manager)
 router.patch(
   '/courses/:course_id/homework-assignments/:assignment_id',
   requireAuth,
-  requirePermission('courses.edit'),
   validate(assignmentPatchSchema),
   controller.updateAssignment,
 );
+
 
 // GET /courses/:course_id/homework-assignments/:assignment_id/content
 router.get(
