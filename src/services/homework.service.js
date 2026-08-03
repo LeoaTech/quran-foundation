@@ -124,6 +124,7 @@ async function updateAssignment(id, patch, userId) {
 /**
  * Center manager applies a first-assignment due date and auto-calculates
  * all subsequent due dates using the admin's configured frequency.
+ * Does NOT wipe or recreate assignments — only updates due_date fields.
  */
 async function applyScheduleDates({ courseId, firstDueDate }) {
   const schedule = await repo.getScheduleByCourse(courseId);
@@ -157,6 +158,13 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
   return repo.getHomeworkGridSheet({ assignmentId, classId });
 }
 
+async function saveHomeworkGridMarks({ user, assignmentId, classId, body }) {
+  const existing = await repo.getAssignmentById(assignmentId);
+  if (!existing) throw notFound("Homework Assignment");
+  const marks = Array.isArray(body?.marks) ? body.marks : [];
+  const studentNotes = body?.studentNotes || {};
+  return repo.bulkUpsertHomeworkMarks({ assignmentId, classId, marks, studentNotes, userId: user.id });
+}
 
 module.exports = {
   saveSchedule,
@@ -165,5 +173,7 @@ module.exports = {
   applyScheduleDates,
   getAssignmentContent,
   linkContentToAssignment,
-  getHomeworkGridSheet};
+  getHomeworkGridSheet,
+  saveHomeworkGridMarks,
+};
 
