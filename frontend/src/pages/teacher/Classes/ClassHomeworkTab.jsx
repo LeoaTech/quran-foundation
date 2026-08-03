@@ -438,9 +438,13 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
       <div>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>
           Scheduled Assignments
-          {canManage && (
+          {canManage ? (
             <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-pale)', marginLeft: 10 }}>
               Click a due date to edit it • Click a row to view assignment
+            </span>
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-pale)', marginLeft: 10 }}>
+              Click a row to view and evaluate assignment
             </span>
           )}
         </h3>
