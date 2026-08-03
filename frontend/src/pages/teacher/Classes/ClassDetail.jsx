@@ -44,6 +44,7 @@ import {
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import MarkHomeworkModal from './MarkHomeworkModal';
 import TeacherClassworkModal from './TeacherClassworkModal';
+import ClassHomeworkTab from './ClassHomeworkTab';
 
 // We will build MyTopicsTab directly in this file or another file, omitting CenterLevelTopicAssignment.
 const TYPE_CHIP = {
@@ -846,6 +847,7 @@ function MyTopicsTab({ cls, classId, myTopics, isLoading }) {
 const TABS = [
   { id: 'schedules', label: 'Sessions' },
   { id: 'my-topics', label: 'My Topics' },
+  { id: 'homework', label: 'Homework' },
   { id: 'students', label: 'Students' },
 ];
 
@@ -951,6 +953,7 @@ export default function TeacherClassDetail() {
 
       {tab === 'schedules' && <ClassSchedulesTab cls={cls} classId={classId} myTopics={myTopics} />}
       {tab === 'my-topics' && <MyTopicsTab cls={cls} classId={classId} myTopics={myTopics} isLoading={loadingTopics} />}
+      {tab === 'homework' && <ClassHomeworkTab classId={classId} courseId={cls.course_id} cls={cls} />}
       {tab === 'students' && <StudentsTab classId={classId} cls={cls} isMobile={isMobile} />}
     </>
   );
