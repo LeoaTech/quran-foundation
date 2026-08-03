@@ -55,25 +55,27 @@ function fmtDate(dateStr) {
   });
 }
 /**
- * Status logic based on due date vs today.
- * - No due date → Upcoming
- * - due_date < today → Completed
- * - due_date within next 7 days → In Progress
- * - due_date > 7 days away → Upcoming
+ * Status logic:
+ * - is_fully_marked → all students fully graded → 'marked'
+ * - has_any_marks   → some students have marks  → 'in_progress'
+ * - due_date < today → overdue and no marks      → 'pending'
+ * - otherwise        → upcoming
  */
-function getAssignmentStatus(dueDateStr, isFullyMarked) {
+function getAssignmentStatus(dueDateStr, isFullyMarked, hasAnyMarks) {
   if (isFullyMarked) return 'marked';
+  if (hasAnyMarks) return 'in_progress';
   if (!dueDateStr) return 'upcoming';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(dueDateStr + 'T00:00:00');
   if (due < today) return 'pending';
-  return 'pending';
+  return 'upcoming';
 }
 
 function StatusBadge({ status }) {
-  if (status === 'marked' || status === 'completed') return <Badge variant="blue">Marked</Badge>;
-  if (status === 'pending' || status === 'in_progress') return <Badge variant="gold">Pending</Badge>;
+  if (status === 'marked') return <Badge variant="blue">Marked</Badge>;
+  if (status === 'in_progress') return <Badge variant="gold">In Progress</Badge>;
+  if (status === 'pending') return <Badge variant="red">Pending</Badge>;
   return <Badge variant="sand">Upcoming</Badge>;
 }
 
@@ -481,7 +483,7 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
               <tbody>
 
                 {assignments.map((a, idx) => {
-                  const status = getAssignmentStatus(a.resolved_due_date, a.is_fully_marked);
+                  const status = getAssignmentStatus(a.resolved_due_date, a.is_fully_marked, a.has_any_marks);
                   const isLast = idx === assignments.length - 1;
                   const canOpen = Boolean(a.is_published);
                   const isClickable = canOpen;
