@@ -26,6 +26,9 @@ const assignmentPatchSchema = z.object({
   due_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().nullable(),
 }).refine((b) => Object.keys(b).length > 0, { message: 'At least one field required.' });
 
+const applyDatesSchema = z.object({
+  first_due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
+});
 
 const linkContentSchema = z.object({
   content_ids: z.array(z.string().uuid()),
@@ -58,6 +61,13 @@ router.patch(
   controller.updateAssignment,
 );
 
+// POST /courses/:course_id/homework-schedule/apply-dates (center_manager + super_admin)
+router.post(
+  '/courses/:course_id/homework-schedule/apply-dates',
+  requireAuth,
+  validate(applyDatesSchema),
+  controller.applyScheduleDates,
+);
 
 // GET /courses/:course_id/homework-assignments/:assignment_id/content
 router.get(
