@@ -90,11 +90,12 @@ async function listAssignmentsBySchedule(scheduleId, classId) {
       .count("* as count");
     const enrolledCount = Number(studentCount || 0);
 
-    const submissionCounts = await db("homework_submissions")
-      .where({ class_id: classId, status: "evaluated", is_active: true })
-      .whereIn("assignment_id", assignments.map(a => a.id))
-      .groupBy("assignment_id")
-      .select("assignment_id", db.raw("COUNT(DISTINCT student_id)::int as marked_count"));
+    const submissionCounts = await db("homework_submissions as hs")
+      .leftJoin("users as u", "u.id", "hs.marked_by")
+      .where({ "hs.class_id": classId, "hs.status": "evaluated", "hs.is_active": true })
+      .whereIn("hs.assignment_id", assignments.map(a => a.id))
+      .groupBy("hs.assignment_id", "hs.marked_by", "u.full_name", "u.full_name_ur")
+      .select("hs.assignment_id", "hs.marked_by", "u.full_name as marked_by_name", "u.full_name_ur as marked_by_name_ur", db.raw("COUNT(DISTINCT hs.student_id)::int as marked_count"));
 
     const inProgressCounts = await db("homework_submissions")
       .where({ class_id: classId, is_active: true })
@@ -103,15 +104,27 @@ async function listAssignmentsBySchedule(scheduleId, classId) {
       .groupBy("assignment_id")
       .select("assignment_id", db.raw("COUNT(DISTINCT student_id)::int as any_marked_count"));
 
-    const countMap = new Map(submissionCounts.map(r => [r.assignment_id, Number(r.marked_count)]));
+    const countMap = new Map();
+    const teacherMap = new Map();
+    submissionCounts.forEach(r => {
+      countMap.set(r.assignment_id, (countMap.get(r.assignment_id) || 0) + Number(r.marked_count));
+      if (r.marked_by_name) {
+        teacherMap.set(r.assignment_id, { id: r.marked_by, name: r.marked_by_name, name_ur: r.marked_by_name_ur });
+      }
+    });
+
     const inProgressMap = new Map(inProgressCounts.map(r => [r.assignment_id, Number(r.any_marked_count)]));
     assignments.forEach(a => {
       const fullyMarked = countMap.get(a.id) || 0;
       const anyMarked = inProgressMap.get(a.id) || 0;
+      const teacherInfo = teacherMap.get(a.id);
       a.enrolled_count = enrolledCount;
       a.marked_count = fullyMarked;
       a.is_fully_marked = enrolledCount > 0 && fullyMarked >= enrolledCount;
       a.has_any_marks = anyMarked > 0;
+      a.marked_by_teacher_id = teacherInfo?.id || null;
+      a.marked_by_teacher_name = teacherInfo?.name || null;
+      a.marked_by_teacher_name_ur = teacherInfo?.name_ur || null;
     });
   }
 
@@ -339,9 +352,15 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
     marks = await db('homework_marks')
       .where({ assignment_id: assignmentId, class_id: classId, is_active: true });
 
-    submissions = await db('homework_submissions')
-      .where({ assignment_id: assignmentId, class_id: classId, is_active: true });
+    submissions = await db('homework_submissions as hs')
+      .leftJoin('users as u', 'u.id', 'hs.marked_by')
+      .where({ 'hs.assignment_id': assignmentId, 'hs.class_id': classId, 'hs.is_active': true })
+      .select('hs.*', 'u.full_name as marked_by_name', 'u.full_name_ur as marked_by_name_ur');
   }
+
+  const evaluatedSubmissions = submissions.filter(s => s.status === 'evaluated');
+  const isFullyMarked = students.length > 0 && evaluatedSubmissions.length >= students.length;
+  const evaluatorSub = submissions.find(s => s.marked_by && s.marked_by_name);
 
   return {
     assignment: {
@@ -353,6 +372,10 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
     marks,
     submissions,
     calculated_max_marks: calculatedMaxMarks,
+    is_fully_marked: isFullyMarked,
+    evaluator_teacher_id: evaluatorSub?.marked_by || null,
+    evaluator_teacher_name: evaluatorSub?.marked_by_name || null,
+    evaluator_teacher_name_ur: evaluatorSub?.marked_by_name_ur || null,
   };
 }
 
@@ -367,8 +390,10 @@ async function listSubmissionsForAssignment(assignmentId, classId) {
 }
 
 async function listSubmissionsForStudentInClass(classId, studentId) {
-  return db('homework_submissions')
-    .where({ class_id: classId, student_id: studentId, is_active: true });
+  return db('homework_submissions as hs')
+    .leftJoin('users as u', 'u.id', 'hs.marked_by')
+    .where({ 'hs.class_id': classId, 'hs.student_id': studentId, 'hs.is_active': true })
+    .select('hs.*', 'u.full_name as marked_by_name', 'u.full_name_ur as marked_by_name_ur');
 }
 
 async function upsertSubmission({ assignmentId, classId, studentId, status, marksAwarded, maxMarks, teacherNote, markedBy }) {
