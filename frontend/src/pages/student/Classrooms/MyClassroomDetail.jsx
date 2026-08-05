@@ -258,19 +258,41 @@ export default function MyClassroomDetail() {
                       </div>
                     </div>
 
-                    {/* Teacher Remarks snippet if available */}
-                    {hw.teacher_note && hw.teacher_note !== 'Evaluated via Homework Sheet' && (
+                    {/* Evaluated By (Teacher) & Remarks */}
+                    {(hw.marked_by_teacher_name || (hw.teacher_note && hw.teacher_note !== 'Evaluated via Homework Sheet')) && (
                       <div
                         style={{
                           background: '#f8fafc',
-                          borderLeft: '3px solid var(--emerald, #059669)',
-                          padding: '10px 14px',
-                          borderRadius: '0 6px 6px 0',
+                          borderLeft: '4px solid var(--emerald, #059669)',
+                          padding: '12px 16px',
+                          borderRadius: '0 8px 8px 0',
                           fontSize: 13,
                           color: 'var(--ink)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
                         }}
                       >
-                        <strong style={{ color: 'var(--emerald, #059669)' }}>Teacher Remarks:</strong> {hw.teacher_note}
+                        {hw.marked_by_teacher_name && (
+                          <div>
+                            <strong style={{ color: 'var(--ink-soft, #64748b)', display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>
+                              Evaluated By (Teacher)
+                            </strong>
+                            <div style={{ fontWeight: 600, color: 'var(--emerald, #059669)', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--emerald-light, #ecfdf5)', padding: '4px 10px', borderRadius: 'var(--radius-md)' }}>
+                              <span>👤 {hw.marked_by_teacher_name}</span>
+                              {hw.marked_by_teacher_name_ur && <span style={{ fontFamily: 'var(--font-display)', color: 'var(--ink-soft)', fontWeight: 400 }}>({hw.marked_by_teacher_name_ur})</span>}
+                            </div>
+                          </div>
+                        )}
+
+                        {hw.teacher_note && hw.teacher_note !== 'Evaluated via Homework Sheet' && (
+                          <div>
+                            <strong style={{ color: 'var(--ink-soft, #64748b)', display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                              Teacher Remarks
+                            </strong>
+                            <div style={{ lineHeight: 1.5, color: '#334155' }}>{hw.teacher_note}</div>
+                          </div>
+                        )}
                       </div>
                     )}
 
