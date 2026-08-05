@@ -272,7 +272,7 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
       <HomeworkGridSheetView
         assignment={selectedAssignment}
         classId={classId}
-        readOnly={role !== 'teacher'}
+        readOnly={false}
         onBack={() => {
           setSelectedAssignment(null);
           qc.invalidateQueries({ queryKey: ['homework-schedule', courseId, classId] });
@@ -549,6 +549,11 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
                       {/* Status */}
                       <td style={{ padding: '12px 16px' }}>
                         <StatusBadge status={status} />
+                        {a.marked_by_teacher_name && (
+                          <div style={{ fontSize: 11, color: 'var(--emerald, #059669)', marginTop: 4, fontWeight: 500 }}>
+                            👤 {a.marked_by_teacher_name}
+                          </div>
+                        )}
                       </td>
 
                       {/* Action */}
