@@ -10,7 +10,11 @@ function getEnrollmentById(enrollmentId) {
 // this student+class combination, regardless of is_active.
 function getActiveEnrollmentForStudent(classId, studentUserId) {
   return db('enrollments')
-    .where({ class_id: classId, student_user_id: studentUserId, status: 'active' })
+    .where({ class_id: classId, student_user_id: studentUserId })
+    .where(function() {
+      this.where('status', 'active')
+          .orWhere('is_active', true);
+    })
     .first();
 }
 
