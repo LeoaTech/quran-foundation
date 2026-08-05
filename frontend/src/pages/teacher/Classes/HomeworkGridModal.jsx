@@ -315,7 +315,7 @@ export function HomeworkGridSheetView({
         }}>
           <span style={{ fontSize: 16 }}>ℹ️</span>
           <div>
-            <strong>Read-Only View:</strong> Center Managers can view student marks and manage due dates, but grid sheet marking is restricted to classroom teachers.
+            <strong>Read-Only View:</strong> Center Managers can view student marks and manage due dates, but marking is restricted to classroom teachers.
           </div>
         </div>
       )}
@@ -333,7 +333,6 @@ export function HomeworkGridSheetView({
           alignItems: 'center',
           gap: 10,
         }}>
-          <span style={{ fontSize: 16 }}>🔒</span>
           <div>
             <strong>Fully Evaluated:</strong> This assignment was completed by Teacher <strong>{evaluatorName || 'another teacher'}</strong>. Editing is restricted to <strong>{evaluatorName || 'the evaluator'}</strong>.
           </div>
