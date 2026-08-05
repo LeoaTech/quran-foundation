@@ -63,6 +63,7 @@ const MyAssessments = lazy(() => import('../pages/student/Assessments/MyAssessme
 
 const MyClassroomsList = lazy(() => import('../pages/student/Classrooms/MyClassroomsList'));
 const MyClassroomDetail = lazy(() => import('../pages/student/Classrooms/MyClassroomDetail'));
+const StudentAssignmentGridPage = lazy(() => import('../pages/student/Classrooms/StudentAssignmentGridPage'));
 
 // Guardian
 const GuardianDashboard = lazy(() => import('../pages/guardian/Dashboard'));
@@ -171,6 +172,7 @@ export default function AppRoutes() {
               <Route path="/student/dashboard" element={<MyProgress />} />
               <Route path="/student/classrooms" element={<MyClassroomsList />} />
               <Route path="/student/classrooms/:id" element={<MyClassroomDetail />} />
+              <Route path="/student/classrooms/:id/assignments/:assignmentId" element={<StudentAssignmentGridPage />} />
               <Route path="/student/attendance" element={<MyAttendance />} />
               <Route path="/student/schedule" element={<Schedule />} />
               <Route path="/student/results" element={<MyAssessments />} />
