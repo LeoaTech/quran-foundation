@@ -42,7 +42,6 @@ import {
   sessionPlanKey,
 } from '../../../utils/classSessions';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-import MarkHomeworkModal from './MarkHomeworkModal';
 import TeacherClassworkModal from './TeacherClassworkModal';
 import ClassHomeworkTab from './ClassHomeworkTab';
 
@@ -491,9 +490,14 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
     (a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b),
   );
 
+  const myTopicIds = new Set((myTopics || []).map((t) => t.topic_id).filter(Boolean));
+
   const filteredSessions = sessionsWithMeta.filter((sess) => {
     if (slotFilter !== 'all' && sess.day_of_week !== slotFilter) return false;
     if (statusFilter !== 'all' && sess.status !== statusFilter) return false;
+    if (myTopicIds.size > 0) {
+      return sess.plan_topic_id && myTopicIds.has(sess.plan_topic_id);
+    }
     return true;
   });
 
@@ -802,16 +806,13 @@ function ClassSchedulesTab({ cls, classId, myTopics }) {
 
 // ── My Topics tab ─────────────────────────────────────────────────────────────
 function MyTopicsTab({ cls, classId, myTopics, isLoading }) {
-  const [hwModalOpen, setHwModalOpen] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState(null);
-
   if (isLoading) return <div style={{ padding: 40, textAlign: 'center' }}><LoadingSpinner size={32} /></div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ borderRadius: 'var(--radius-md)', padding: '11px 16px', fontSize: 13, lineHeight: 1.6, marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--amber-light, #fef3c7)', border: '1px solid #fcd34d', color: 'var(--amber-d, #92400e)' }}>
         <span>📌</span>
-        <div>Topics shown here are assigned to you by the Center Manager. <strong>Homework marking is your responsibility</strong> — after completing a topic across its sessions, mark homework for all students using the cumulative criteria sheet.</div>
+        <div>Topics shown here are assigned to you by the Center Manager for this class syllabus.</div>
       </div>
 
       {myTopics.length === 0 ? (
@@ -826,19 +827,9 @@ function MyTopicsTab({ cls, classId, myTopics, isLoading }) {
                 <span>📅 Class: {cls.name}</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
-              <Button size="sm" variant="outline" onClick={() => { setSelectedTopic(assignment); setHwModalOpen(true); }}>Mark Homework</Button>
-            </div>
           </div>
         ))
       )}
-
-      <MarkHomeworkModal
-        open={hwModalOpen}
-        onClose={() => { setHwModalOpen(false); setSelectedTopic(null); }}
-        classId={classId}
-        topic={selectedTopic}
-      />
     </div>
   );
 }
