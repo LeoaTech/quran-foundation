@@ -4,6 +4,7 @@ const activityLog = require('./activityLog.service');
 const { AppError } = require('../utils/errors');
 const enrollmentsRepo = require('../repositories/enrollments.repository');
 const attendanceRepo = require('../repositories/attendance.repository');
+const homeworkRepo = require('../repositories/homework.repository');
 
 const DAY_ALIASES = {
   sun: 'Sunday', sunday: 'Sunday',
@@ -344,13 +345,137 @@ async function upsertSessionPlan({ user, classId, body }) {
   return repo.upsertSessionPlan(classId, body);
 }
 
+// ── Student Portal Helper ──────────────────────────────────────────────────────
+
+function safeISOFormatDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    return val.toISOString().split('T')[0];
+  }
+  const str = String(val).trim();
+  if (str.includes('T')) {
+    return str.split('T')[0];
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  const parsed = new Date(str);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split('T')[0];
+}
+
+function addDaysStr(dateStr, days) {
+  const clean = safeISOFormatDate(dateStr);
+  if (!clean) return null;
+  const d = new Date(clean + "T00:00:00Z");
+  if (isNaN(d.getTime())) return clean;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+function getFrequencyGapDays(frequency) {
+  switch (frequency) {
+    case 'daily': return 1;
+    case 'after_2_days': return 2;
+    case 'weekly': return 7;
+    case 'biweekly': return 14;
+    case 'monthly': return 30;
+    default: return 7;
+  }
+}
+
+function computeStudentHomeworkAssignments(assignments, schedule, submissions, todayStr) {
+  const gapDays = getFrequencyGapDays(schedule?.frequency);
+  const subMap = new Map((submissions || []).map(s => [s.assignment_id, s]));
+
+  //  Calculate status for all assignments sequentially
+  const processed = (assignments || []).map((a, i) => {
+    const dueDate = safeISOFormatDate(a.due_date);
+    let status = 'Upcoming';
+
+    if (dueDate) {
+      let startDate;
+      const prevDueDate = i > 0 ? safeISOFormatDate(assignments[i - 1]?.due_date) : null;
+      if (prevDueDate) {
+        startDate = addDaysStr(prevDueDate, 1);
+      } else {
+        startDate = addDaysStr(dueDate, -(gapDays - 1));
+      }
+      const endDate = dueDate;
+
+      if (todayStr > endDate) {
+        status = 'Past';
+      } else if (todayStr >= startDate && todayStr <= endDate) {
+        status = 'Active';
+      } else {
+        status = 'Upcoming';
+      }
+    }
+
+    const sub = subMap.get(a.id);
+    let grading_status = 'Not marked';
+    let marks_awarded = null;
+    let max_marks = a.total_marks || 0;
+    let teacher_note = null;
+
+    if (sub) {
+      if (sub.status === 'evaluated') {
+        grading_status = 'Marked';
+      } else if (sub.status === 'in_progress') {
+        grading_status = 'In-progress';
+      } else {
+        grading_status = 'Not marked';
+      }
+      marks_awarded = sub.marks_awarded !== undefined && sub.marks_awarded !== null ? Number(sub.marks_awarded) : null;
+      if (sub.max_marks) max_marks = Number(sub.max_marks);
+      teacher_note = sub.teacher_note || null;
+    }
+
+    return {
+      ...a,
+      status,
+      grading_status,
+      marks_awarded,
+      max_marks,
+      teacher_note,
+      is_accessible: status === 'Active' || status === 'Past'
+    };
+  });
+
+  //  Filter out unpublished & upcoming assignments for students
+  const visibleToStudent = processed.filter(a => {
+    const isPublished = a.is_published === true || a.is_published === 1;
+    const isAccessible = a.status === 'Active' || a.status === 'Past';
+    return isPublished && isAccessible;
+  });
+
+  // Sort New to Old (Active on top, then newest due dates/assignment numbers)
+  visibleToStudent.sort((a, b) => {
+    if (a.status === 'Active' && b.status !== 'Active') return -1;
+    if (b.status === 'Active' && a.status !== 'Active') return 1;
+
+    const numA = Number(a.assignment_number || 0);
+    const numB = Number(b.assignment_number || 0);
+    if (numA !== numB) return numB - numA;
+
+    const dateA = safeISOFormatDate(a.due_date) || '';
+    const dateB = safeISOFormatDate(b.due_date) || '';
+    return dateB.localeCompare(dateA);
+  });
+
+  return visibleToStudent;
+}
+
 // ── Student Portal ────────────────────────────────────────────────────────────
 
 async function getStudentClassDetail({ user, classId }) {
-  // Check if student is actively enrolled
-  const enrollment = await enrollmentsRepo.getActiveEnrollmentForStudent(classId, user.id);
-  if (!enrollment) {
-    throw forbidden();
+  // Check if student is actively enrolled (if role is student)
+  if (user.role === 'student') {
+    const enrollment = await enrollmentsRepo.getActiveEnrollmentForStudent(classId, user.id);
+    if (!enrollment) {
+      throw forbidden();
+    }
   }
 
   const cls = await requireClass(classId);
@@ -393,10 +518,26 @@ async function getStudentClassDetail({ user, classId }) {
     attendance: attendanceMap[sp.session_date] || null
   }));
 
+  // Fetch Homework Assignments for Student (fail-safe)
+  let homeworkAssignments = [];
+  try {
+    const schedule = await homeworkRepo.getScheduleByCourse(cls.course_id);
+    if (schedule) {
+      const rawAssignments = await homeworkRepo.listAssignmentsBySchedule(schedule.id, classId);
+      const submissions = await homeworkRepo.listSubmissionsForStudentInClass(classId, user.id);
+      const todayStr = safeISOFormatDate(new Date());
+      homeworkAssignments = computeStudentHomeworkAssignments(rawAssignments, schedule, submissions, todayStr);
+    }
+  } catch (err) {
+    console.error('Error fetching student homework assignments:', err);
+    homeworkAssignments = [];
+  }
+
   return {
     class: cls,
     teachers,
     sessionPlans: mappedSessionPlans,
+    homeworkAssignments,
     attendanceSummary: {
       total: attendanceRecords.length,
       present: attendanceRecords.filter(r => r.status === 'present').length,
