@@ -5,6 +5,7 @@ const { AppError } = require('../utils/errors');
 const enrollmentsRepo = require('../repositories/enrollments.repository');
 const attendanceRepo = require('../repositories/attendance.repository');
 const homeworkRepo = require('../repositories/homework.repository');
+const classworkRepo = require('../repositories/classwork.repository');
 
 const DAY_ALIASES = {
   sun: 'Sunday', sunday: 'Sunday',
@@ -320,19 +321,6 @@ async function deleteSchedule({ user, classId, scheduleId }) {
 async function listSessionPlans({ user, classId }) {
   const cls = await requireClass(classId);
   await assertClassAccess(user, cls);
-
-  if (user.roles.includes('super_admin') || user.roles.includes('center_manager')) {
-    return repo.listSessionPlans(classId);
-  }
-
-  if (user.roles.includes('teacher')) {
-    const isClassTeacher = await repo.getClassTeacherEntry(classId, user.id);
-    if (isClassTeacher) {
-      return repo.listSessionPlans(classId);
-    }
-    return repo.listSessionPlansForTopicTeacher(classId, user.id, cls.center_id);
-  }
-
   return repo.listSessionPlans(classId);
 }
 
@@ -506,17 +494,99 @@ async function getStudentClassDetail({ user, classId }) {
   const sessionPlans = await repo.listSessionPlans(classId);
   const attendanceRecords = await attendanceRepo.getStudentAttendanceRecords(user.id, { classId });
 
-  // Map attendance records by session_date for easy lookup on frontend
+  // Map attendance records by normalized session_date for easy lookup on frontend
   const attendanceMap = {};
   attendanceRecords.forEach(r => {
-    attendanceMap[r.session_date] = r;
+    const dKey = safeISOFormatDate(r.session_date);
+    if (dKey) attendanceMap[dKey] = r;
   });
 
-  // Attach attendance to session plans
-  const mappedSessionPlans = sessionPlans.map(sp => ({
-    ...sp,
-    attendance: attendanceMap[sp.session_date] || null
-  }));
+  // Fetch Classwork Sheet Entries for Student (fail-safe)
+  let classworkEntries = [];
+  try {
+    classworkEntries = await classworkRepo.getClassworkEntriesForStudentInClass(classId, user.id);
+  } catch (err) {
+    console.error('Error fetching student classwork sheet entries:', err);
+    classworkEntries = [];
+  }
+  const classworkMapBySessionId = new Map();
+  const classworkMapByDate = new Map();
+  (classworkEntries || []).forEach(entry => {
+    if (entry.class_session_id) {
+      classworkMapBySessionId.set(entry.class_session_id, entry);
+    }
+    const dKey = safeISOFormatDate(entry.session_date);
+    if (dKey) {
+      classworkMapByDate.set(dKey, entry);
+    }
+  });
+
+  const todayStr = safeISOFormatDate(new Date());
+
+  // Filter session plans up to today's date for student view
+  const filteredSessionPlans = sessionPlans.filter(sp => {
+    const dKey = safeISOFormatDate(sp.session_date);
+    return !dKey || dKey <= todayStr;
+  });
+
+  // Attach attendance & classwork evaluations to session plans
+  const mappedSessionPlans = filteredSessionPlans.map(sp => {
+    const dKey = safeISOFormatDate(sp.session_date);
+    const cw = classworkMapBySessionId.get(sp.id) || (dKey ? classworkMapByDate.get(dKey) : null) || null;
+    const att = dKey ? attendanceMap[dKey] : null;
+    return {
+      ...sp,
+      attendance: att,
+      classwork: cw ? {
+        id: cw.id,
+        topic_id: cw.topic_id,
+        topic_title: cw.topic_title || sp.topic_title || sp.syllabus_topic_title || null,
+        topic_title_ur: cw.topic_title_ur || sp.topic_title_ur || sp.syllabus_topic_title_ur || null,
+        subtopic_id: cw.subtopic_id,
+        subtopic_title: cw.subtopic_title,
+        subtopic_title_ur: cw.subtopic_title_ur,
+        grade: cw.grade,
+        comments: cw.comments,
+        teacher_name: cw.teacher_name || null,
+        teacher_name_ur: cw.teacher_name_ur || null,
+        updated_at: cw.updated_at
+      } : null
+    };
+  });
+
+  // Sort session plans from NEW to OLD (descending session_date)
+  mappedSessionPlans.sort((a, b) => {
+    const dateA = safeISOFormatDate(a.session_date) || '';
+    const dateB = safeISOFormatDate(b.session_date) || '';
+    return dateB.localeCompare(dateA);
+  });
+
+  // Calculate Classwork Summary stats (supporting numeric 0-10 and category strings)
+  const classworkSummary = {
+    totalEvaluated: 0,
+    excellent: 0,
+    good: 0,
+    average: 0,
+    revision: 0
+  };
+  mappedSessionPlans.forEach(sp => {
+    if (sp.classwork?.grade != null && sp.classwork.grade !== '') {
+      classworkSummary.totalEvaluated++;
+      const gStr = String(sp.classwork.grade).toLowerCase();
+      const num = parseFloat(gStr);
+      if (!isNaN(num)) {
+        if (num >= 9) classworkSummary.excellent++;
+        else if (num >= 7) classworkSummary.good++;
+        else if (num >= 5) classworkSummary.average++;
+        else classworkSummary.revision++;
+      } else {
+        if (gStr === 'excellent') classworkSummary.excellent++;
+        else if (gStr === 'good' || gStr === 'very good') classworkSummary.good++;
+        else if (gStr === 'average') classworkSummary.average++;
+        else if (gStr === 'revision' || gStr === 'practice') classworkSummary.revision++;
+      }
+    }
+  });
 
   // Fetch Homework Assignments for Student (fail-safe)
   let homeworkAssignments = [];
@@ -538,6 +608,7 @@ async function getStudentClassDetail({ user, classId }) {
     teachers,
     sessionPlans: mappedSessionPlans,
     homeworkAssignments,
+    classworkSummary,
     attendanceSummary: {
       total: attendanceRecords.length,
       present: attendanceRecords.filter(r => r.status === 'present').length,
