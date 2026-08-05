@@ -6,6 +6,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import Badge from '../../../components/Badge';
 import { useToast } from '../../../hooks/useToast';
+import { useAuth } from '../../../hooks/useAuth';
 import { getHomeworkGridSheet, saveHomeworkGridMarks } from '../../../api/homework';
 
 function safeFormatDate(dateStr) {
@@ -109,6 +110,7 @@ export function HomeworkGridSheetView({
   asPage = false,
 }) {
   const toast = useToast();
+  const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const assignmentId = assignment?.id;
 
@@ -127,6 +129,18 @@ export function HomeworkGridSheetView({
   const contents = gridData?.contents || [];
   const students = gridData?.students || [];
   const calculatedMaxMarks = gridData?.calculated_max_marks || assignment?.total_marks || 0;
+
+  const evaluatorId = gridData?.evaluator_teacher_id || assignment?.marked_by_teacher_id;
+  const evaluatorName = gridData?.evaluator_teacher_name || assignment?.marked_by_teacher_name;
+  const isFullyMarked = gridData?.is_fully_marked ?? assignment?.is_fully_marked;
+
+  const isTeacher = role === 'teacher' || (user?.roles && user.roles.includes('teacher'));
+  const isManagerOnly = (role === 'center_manager' || (user?.roles && user.roles.includes('center_manager'))) && !isTeacher;
+
+  const isUserEvaluator = !evaluatorId || (user && user.id === evaluatorId);
+  const isLockedByOther = Boolean(isFullyMarked && evaluatorId && !isUserEvaluator);
+
+  const effectiveReadOnly = readOnly || !isTeacher || isLockedByOther;
 
   // Flatten words across all linked contents
   const flattenedRows = useMemo(() => {
@@ -272,7 +286,7 @@ export function HomeworkGridSheetView({
           >
             ← Back to Assignments List
           </Button>
-          {!isPreviewMode && !readOnly && (
+          {!isPreviewMode && !effectiveReadOnly && (
             <Button
               variant="primary"
               size="sm"
@@ -283,6 +297,46 @@ export function HomeworkGridSheetView({
               Save Evaluation
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Notice Banner for Center Managers */}
+      {isManagerOnly && (
+        <div style={{
+          background: '#f8fafc',
+          border: '1px solid #cbd5e1',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          fontSize: 13,
+          color: '#475569',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <span style={{ fontSize: 16 }}>ℹ️</span>
+          <div>
+            <strong>Read-Only View:</strong> Center Managers can view student marks and manage due dates, but grid sheet marking is restricted to classroom teachers.
+          </div>
+        </div>
+      )}
+
+      {/* Locked Notice Banner for other teachers */}
+      {isLockedByOther && isTeacher && (
+        <div style={{
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          fontSize: 13,
+          color: '#1e40af',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <span style={{ fontSize: 16 }}>🔒</span>
+          <div>
+            <strong>Fully Evaluated:</strong> This assignment was completed by Teacher <strong>{evaluatorName || 'another teacher'}</strong>. Editing is restricted to <strong>{evaluatorName || 'the evaluator'}</strong>.
+          </div>
         </div>
       )}
 
@@ -297,7 +351,12 @@ export function HomeworkGridSheetView({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {evaluatorName && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--emerald, #059669)', background: '#ecfdf5', padding: '6px 12px', borderRadius: 16, border: '1px solid #a7f3d0' }}>
+              👤 Evaluated by {evaluatorName}
+            </div>
+          )}
           <Badge variant={isPublished ? 'green' : 'amber'}>
             {isPublished ? 'Published' : 'Draft Preview'}
           </Badge>
@@ -394,7 +453,7 @@ export function HomeworkGridSheetView({
                         const keyWordOnly = `${stu.student_id}_${row.wordId}`;
                         const currentVal = marksState.get(keyWithSub) ?? marksState.get(keyWordOnly) ?? '';
 
-                        if (readOnly) {
+                        if (effectiveReadOnly) {
                           return (
                             <td key={stu.student_id} style={{ ...S.td, textAlign: 'center', fontWeight: 700, fontSize: 14 }}>
                               <span style={{ color: currentVal > 0 ? 'var(--emerald)' : 'var(--ink-pale)' }}>
@@ -453,7 +512,7 @@ export function HomeworkGridSheetView({
                   </td>
                   {students.map((stu) => (
                     <td key={stu.student_id} style={{ ...S.td, padding: '12px 10px', verticalAlign: 'top', background: '#fafbfc' }}>
-                      {readOnly ? (
+                      {effectiveReadOnly ? (
                         <div style={{ fontSize: 12, color: studentNotes[stu.student_id] ? 'var(--ink)' : 'var(--ink-pale)', fontStyle: studentNotes[stu.student_id] ? 'normal' : 'italic', whiteSpace: 'pre-wrap', minHeight: 40 }}>
                           {studentNotes[stu.student_id] || 'No remarks provided.'}
                         </div>
@@ -506,7 +565,7 @@ export function HomeworkGridSheetView({
               Back to List
             </Button>
           )}
-          {!isPreviewMode && !readOnly && (
+          {!isPreviewMode && !effectiveReadOnly && (
             <Button
               variant="primary"
               onClick={() => saveMut.mutate()}
