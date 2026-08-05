@@ -366,6 +366,11 @@ async function listSubmissionsForAssignment(assignmentId, classId) {
     .where({ assignment_id: assignmentId, class_id: classId, is_active: true });
 }
 
+async function listSubmissionsForStudentInClass(classId, studentId) {
+  return db('homework_submissions')
+    .where({ class_id: classId, student_id: studentId, is_active: true });
+}
+
 async function upsertSubmission({ assignmentId, classId, studentId, status, marksAwarded, maxMarks, teacherNote, markedBy }) {
   const existing = await db('homework_submissions')
     .where({ assignment_id: assignmentId, class_id: classId, student_id: studentId })
@@ -525,6 +530,7 @@ module.exports = {
   getHomeworkGridSheet,
   bulkUpsertHomeworkMarks,
   listSubmissionsForAssignment,
+  listSubmissionsForStudentInClass,
   upsertSubmission
 };
 
