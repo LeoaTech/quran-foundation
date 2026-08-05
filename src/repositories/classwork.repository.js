@@ -376,7 +376,7 @@ async function upsertSheet({
           grade != null ? String(grade) : null,
           comments ?? null,
           userId,
-        ],
+        ]
       );
     }
 
@@ -384,6 +384,35 @@ async function upsertSheet({
   });
 }
 
+function getClassworkEntriesForStudentInClass(classId, studentUserId) {
+  return db("classwork_sheet_entries as e")
+    .join("classwork_sheets as s", "s.id", "e.sheet_id")
+    .join("class_session_plans as p", "p.id", "s.class_session_id")
+    .leftJoin("topics as t", "t.id", db.raw("COALESCE(e.topic_id, s.topic_id, p.topic_id)"))
+    .leftJoin("topic_subtopics as st", "st.id", db.raw("COALESCE(e.subtopic_id, s.subtopic_id)"))
+    .leftJoin("users as u_teacher", "u_teacher.id", db.raw("COALESCE(e.marked_by, s.created_by)"))
+    .where("p.class_id", classId)
+    .where("e.student_id", studentUserId)
+    .where("e.is_active", true)
+    .where("p.is_active", true)
+    .select(
+      "e.id",
+      "s.class_session_id",
+      "p.session_date",
+      db.raw("COALESCE(t.title, p.topic_title) as session_title"),
+      db.raw("COALESCE(e.topic_id, s.topic_id, p.topic_id) as topic_id"),
+      db.raw("COALESCE(t.title, p.topic_title) as topic_title"),
+      db.raw("COALESCE(t.title_ur, p.topic_title_ur) as topic_title_ur"),
+      db.raw("COALESCE(e.subtopic_id, s.subtopic_id) as subtopic_id"),
+      "st.title as subtopic_title",
+      "st.title_ur as subtopic_title_ur",
+      "e.grade",
+      "e.comments",
+      "u_teacher.full_name as teacher_name",
+      "u_teacher.full_name_ur as teacher_name_ur",
+      "e.updated_at"
+    );
+}
 
 module.exports = {
   listContent,
@@ -401,5 +430,6 @@ module.exports = {
   getTopicsUpToSession,
   getPresentStudentsBySession,
   getSheetBySession,
-  upsertSheet
+  upsertSheet,
+  getClassworkEntriesForStudentInClass,
 };
