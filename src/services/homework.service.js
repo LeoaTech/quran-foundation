@@ -161,6 +161,30 @@ async function getHomeworkGridSheet({ assignmentId, classId }) {
 async function saveHomeworkGridMarks({ user, assignmentId, classId, body }) {
   const existing = await repo.getAssignmentById(assignmentId);
   if (!existing) throw notFound("Homework Assignment");
+
+  const userRoles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
+  const isTeacher = userRoles.includes('teacher') || user?.role === 'teacher';
+
+  if (!isTeacher) {
+    const err = new Error("Center Managers cannot enter or edit homework marks. Marking is restricted to classroom teachers.");
+    err.status = 403;
+    throw err;
+  }
+
+  if (classId) {
+    const gridData = await repo.getHomeworkGridSheet({ assignmentId, classId });
+    if (gridData && gridData.is_fully_marked && gridData.evaluator_teacher_id) {
+      const isEvaluator = gridData.evaluator_teacher_id === user.id;
+
+      if (!isEvaluator) {
+        const teacherName = gridData.evaluator_teacher_name || 'another teacher';
+        const err = new Error(`This homework assignment has already been evaluated and completed by Teacher ${teacherName}. Editing is restricted to ${teacherName}.`);
+        err.status = 403;
+        throw err;
+      }
+    }
+  }
+
   const marks = Array.isArray(body?.marks) ? body.marks : [];
   const studentNotes = body?.studentNotes || {};
   return repo.bulkUpsertHomeworkMarks({ assignmentId, classId, marks, studentNotes, userId: user.id });
