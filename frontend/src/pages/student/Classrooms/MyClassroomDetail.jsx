@@ -3,12 +3,24 @@ import { useParams, Link } from 'react-router-dom';
 import { getStudentClassDetail } from '../../../api/classes';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Badge from '../../../components/Badge';
+import EmptyState from '../../../components/EmptyState';
 
 const STATUS_BADGE = {
   present: 'green',
-  absent:  'red',
-  late:    'gold',
+  absent: 'red',
+  late: 'gold',
 };
+
+function safeFormatDate(dateStr) {
+  if (!dateStr || dateStr === 'null' || dateStr === 'undefined') return 'Unscheduled';
+  try {
+    const clean = String(dateStr).split('T')[0];
+    const d = new Date(clean + 'T00:00:00');
+    return isNaN(d.getTime()) ? 'Unscheduled' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return 'Unscheduled';
+  }
+}
 
 export default function MyClassroomDetail() {
   const { id } = useParams();
@@ -36,7 +48,7 @@ export default function MyClassroomDetail() {
     return <div style={{ padding: 40, textAlign: 'center' }}>Class not found or you are not enrolled.</div>;
   }
 
-  const { class: cls, teachers, sessionPlans, attendanceSummary } = data;
+  const { class: cls, teachers, sessionPlans, attendanceSummary, homeworkAssignments = [] } = data;
 
   // Extract unique topics from session plans to show topic list
   const topicsMap = new Map();
@@ -117,7 +129,7 @@ export default function MyClassroomDetail() {
               </ul>
             )}
           </div>
-          
+
           <div style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Attendance Summary</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 16 }}>
@@ -162,28 +174,115 @@ export default function MyClassroomDetail() {
 
       {activeTab === 'homework' && (
         <div style={{ background: 'var(--white)', padding: 24, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Recent Homework</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Course Homework Assignments</h3>
+            <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 500 }}>
+              Total: {homeworkAssignments.length} Assignments
+            </span>
           </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[
-              { id: 1, title: 'Memorize Surah Al-Fatihah', date: '2023-10-15', status: 'Graded', score: '10/10' },
-              { id: 2, title: 'Tajweed Rules Worksheet', date: '2023-10-20', status: 'Pending Review', score: '-' },
-              { id: 3, title: 'Read Page 15-20', date: '2023-10-25', status: 'Not Submitted', score: '0/10' }
-            ].map(hw => (
-              <div key={hw.id} style={{ padding: 16, border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: 15, color: 'var(--ink)' }}>{hw.title}</h4>
-                  <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Due: {hw.date}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <Badge variant={hw.status === 'Graded' ? 'green' : hw.status === 'Pending Review' ? 'gold' : 'red'}>{hw.status}</Badge>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginTop: 8 }}>Score: {hw.score}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+
+          {homeworkAssignments.length === 0 ? (
+            <EmptyState
+              icon=""
+              title="No Homework Assignments"
+              description="No homework assignments have been scheduled for this course level yet."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {homeworkAssignments.map((hw) => {
+                const isAccessible = hw.status === 'Active' || hw.status === 'Past';
+                const statusVariant = hw.status === 'Active' ? 'green' : hw.status === 'Past' ? 'neutral' : 'gold';
+                const gradingVariant = hw.grading_status === 'Marked' ? 'green' : hw.grading_status === 'In-progress' ? 'amber' : 'sand';
+
+                return (
+                  <div
+                    key={hw.id}
+                    style={{
+                      padding: 20,
+                      border: '1px solid var(--sand-mid)',
+                      borderRadius: 'var(--radius-lg)',
+                      background: 'var(--white)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <h4 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>{hw.title}</h4>
+                          {hw.title_ur && (
+                            <span style={{ fontSize: 14, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)', direction: 'rtl' }}>
+                              ({hw.title_ur})
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
+                          Due Date: <strong>{safeFormatDate(hw.due_date)}</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Badge variant={statusVariant}>Status: {hw.status}</Badge>
+                        <Badge variant={gradingVariant}>Grading: {hw.grading_status}</Badge>
+                      </div>
+                    </div>
+
+                    {/* Teacher Remarks snippet if available */}
+                    {hw.teacher_note && hw.teacher_note !== 'Evaluated via Homework Sheet' && (
+                      <div
+                        style={{
+                          background: '#f8fafc',
+                          borderLeft: '3px solid var(--emerald, #059669)',
+                          padding: '10px 14px',
+                          borderRadius: '0 6px 6px 0',
+                          fontSize: 13,
+                          color: 'var(--ink)',
+                        }}
+                      >
+                        <strong style={{ color: 'var(--emerald, #059669)' }}>Teacher Remarks:</strong> {hw.teacher_note}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid var(--sand-light)' }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+                        {hw.marks_awarded !== null ? (
+                          <>
+                            Score: <span style={{ color: 'var(--emerald, #059669)', fontWeight: 700 }}>{hw.marks_awarded} / {hw.max_marks} Marks</span>
+                          </>
+                        ) : hw.max_marks > 0 ? (
+                          <>
+                            Total Score: <span style={{ color: 'var(--ink-soft)' }}>{hw.max_marks} Marks</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 13, color: 'var(--ink-soft, #94a3b8)', fontStyle: 'italic' }}>No marks assigned</span>
+                        )}
+                      </div>
+
+                      <Link
+                        to={`/student/classrooms/${id}/assignments/${hw.id}`}
+                        style={{
+                          padding: '8px 16px',
+                          background: 'var(--emerald, #059669)',
+                          color: '#ffffff',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        View Assignment Detail →
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -192,7 +291,7 @@ export default function MyClassroomDetail() {
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--sand-mid)', background: 'var(--sand)' }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Session History & Attendance</h3>
           </div>
-          
+
           {sessionPlans.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-soft)' }}>No session plans recorded.</div>
           ) : (
