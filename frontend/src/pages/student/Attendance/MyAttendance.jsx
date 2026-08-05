@@ -9,23 +9,23 @@ import { getStudentEnrollments } from '../../../api/enrollments';
 import { getStudentClassDetail } from '../../../api/classes';
 
 const STATUS_STYLE = {
-  present: { dot: 'var(--emerald)',    bg: 'var(--emerald-light)', label: 'Present'  },
-  absent:  { dot: 'var(--red)',        bg: 'var(--red-light)',     label: 'Absent'   },
-  late:    { dot: 'var(--amber)',      bg: 'var(--gold-light)',    label: 'Late'     },
+  present: { dot: 'var(--emerald)', bg: 'var(--emerald-light)', label: 'Present' },
+  absent: { dot: 'var(--red)', bg: 'var(--red-light)', label: 'Absent' },
+  late: { dot: 'var(--amber)', bg: 'var(--gold-light)', label: 'Late' },
 };
 
 const STATUS_BADGE = {
   present: 'green',
-  absent:  'red',
-  late:    'gold',
+  absent: 'red',
+  late: 'gold',
 };
 
 // ── Calendar Grid ─────────────────────────────────────────────────────────────
 function CalendarGrid({ year, month, records, scheduleDays, startDate }) {
   const firstDay = new Date(year, month, 1);
-  const lastDay  = new Date(year, month + 1, 0);
+  const lastDay = new Date(year, month + 1, 0);
   const today = new Date();
-  today.setHours(0,0,0,0);
+  today.setHours(0, 0, 0, 0);
 
   const byDay = {};
   records.forEach(r => {
@@ -45,13 +45,13 @@ function CalendarGrid({ year, month, records, scheduleDays, startDate }) {
   const allowedDays = new Set((scheduleDays || '').toLowerCase().split(',').map(d => d.trim()));
 
   const startDt = startDate ? new Date(startDate) : new Date(0);
-  startDt.setHours(0,0,0,0);
+  startDt.setHours(0, 0, 0, 0);
 
   return (
     <div>
       {/* Day labels */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 36px)', gap: 4, marginBottom: 4 }}>
-        {['M','T','W','T','F','S','S'].map((d, i) => (
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
           <div key={i} style={{ ...cellBase, fontSize: 10, color: 'var(--ink-pale)', fontWeight: 600 }}>{d}</div>
         ))}
       </div>
@@ -60,14 +60,14 @@ function CalendarGrid({ year, month, records, scheduleDays, startDate }) {
         {Array.from({ length: startBlank }).map((_, i) => <div key={'b' + i} style={cellBase} />)}
         {days.map((day) => {
           const rec = byDay[day];
-          const st  = rec ? STATUS_STYLE[rec.status] : null;
+          const st = rec ? STATUS_STYLE[rec.status] : null;
           const currentDt = new Date(year, month, day);
-          currentDt.setHours(0,0,0,0);
-          
+          currentDt.setHours(0, 0, 0, 0);
+
           const dayNameIdx = (new Date(year, month, day).getDay() + 6) % 7;
           const dayName = dayNames[dayNameIdx].toLowerCase();
-          const isAllowedDay = allowedDays.has(dayName) || allowedDays.has(dayName.substring(0,3));
-          
+          const isAllowedDay = allowedDays.has(dayName) || allowedDays.has(dayName.substring(0, 3));
+
           const isDisabled = !isAllowedDay || currentDt < startDt || currentDt > today;
 
           return (
@@ -76,9 +76,10 @@ function CalendarGrid({ year, month, records, scheduleDays, startDate }) {
               title={rec ? `${rec.session_date} — ${rec.status}` : undefined}
               style={{
                 ...cellBase,
-                background: st ? st.bg : (isDisabled ? 'var(--sand-light)' : 'transparent'),
-                color: st ? (rec.status === 'absent' ? 'var(--red)' : rec.status === 'late' ? 'var(--amber)' : 'var(--emerald)') : (isDisabled ? 'var(--sand-mid)' : 'var(--ink-pale)'),
-                border: st ? 'none' : (isDisabled ? 'none' : '1px solid var(--sand-mid)'),
+                background: st ? st.bg : (isDisabled ? 'var(--sand-light)' : 'Blue'),
+
+                color: st ? (rec.status === 'absent' ? 'var(--red)' : rec.status === 'late' ? 'var(--amber)' : 'var(--emerald)') : (isDisabled ? '#2d2d2c' : 'var(--ink-pale)'),
+                border: st ? 'none' : (isDisabled ? '1px dashed green' : '1px solid var(--sand-mid)'),
                 opacity: isDisabled && !st ? 0.4 : 1,
               }}
             >
@@ -97,10 +98,10 @@ function CalendarGrid({ year, month, records, scheduleDays, startDate }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MyAttendance() {
   const { user } = useAuth();
-  
+
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
-  const [year,  setYear]  = useState(now.getFullYear());
+  const [year, setYear] = useState(now.getFullYear());
   const [selectedClassId, setSelectedClassId] = useState('');
 
   // 1. Fetch Enrollments for Classroom Selection
@@ -148,7 +149,7 @@ export default function MyAttendance() {
 
   const detail = classData?.data ?? classData ?? {};
   const cls = detail.class || {};
-  
+
   // Extract attendance records from session plans
   const sessionPlans = detail.sessionPlans || [];
   const records = sessionPlans.filter(sp => sp.attendance).map(sp => ({
@@ -166,8 +167,8 @@ export default function MyAttendance() {
   function navigateMonth(dir) {
     let m = month + dir;
     let y = year;
-    if (m < 0)  { m = 11; y--; }
-    if (m > 11) { m = 0;  y++; }
+    if (m < 0) { m = 11; y--; }
+    if (m > 11) { m = 0; y++; }
     setMonth(m); setYear(y);
   }
 
@@ -184,10 +185,10 @@ export default function MyAttendance() {
           </h2>
           <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>View attendance history by class</p>
         </div>
-        
+
         <div>
-          <select 
-            value={selectedClassId} 
+          <select
+            value={selectedClassId}
             onChange={e => setSelectedClassId(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--sand-mid)', fontSize: 14, background: 'var(--white)', color: 'var(--ink)' }}
           >
@@ -209,10 +210,10 @@ export default function MyAttendance() {
         <>
           {/* Metric cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 14, marginBottom: 24 }}>
-            <MetricCard label="Present"    value={summary.present    ?? '—'} variant="green"   />
-            <MetricCard label="Absent"     value={summary.absent     ?? '—'} variant="red"     />
-            <MetricCard label="Late"       value={summary.late       ?? '—'} variant="gold"    />
-            <MetricCard label="Attendance" value={pctLabel}                  variant={pctColor} />
+            <MetricCard label="Present" value={summary.present ?? '—'} variant="green" />
+            <MetricCard label="Absent" value={summary.absent ?? '—'} variant="red" />
+            <MetricCard label="Late" value={summary.late ?? '—'} variant="gold" />
+            <MetricCard label="Attendance" value={pctLabel} variant={pctColor} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, alignItems: 'start' }}>
@@ -221,15 +222,15 @@ export default function MyAttendance() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <button onClick={() => navigateMonth(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-pale)', padding: '2px 6px' }}>←</button>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{monthName}</span>
-                <button onClick={() => navigateMonth(1)}  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-pale)', padding: '2px 6px' }}>→</button>
+                <button onClick={() => navigateMonth(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-pale)', padding: '2px 6px' }}>→</button>
               </div>
               <div style={{ position: 'relative' }}>
-                <CalendarGrid 
-                  year={year} 
-                  month={month} 
-                  records={records} 
-                  scheduleDays={cls.schedule_days} 
-                  startDate={cls.start_date} 
+                <CalendarGrid
+                  year={year}
+                  month={month}
+                  records={records}
+                  scheduleDays={cls.schedule_days}
+                  startDate={cls.start_date}
                 />
               </div>
               {/* Legend */}
