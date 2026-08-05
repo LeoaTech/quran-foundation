@@ -11,12 +11,40 @@ const STATUS_BADGE = {
   late: 'gold',
 };
 
+const GRADE_VARIANTS = {
+  excellent: 'green',
+  verygood: 'blue',
+  average: 'gold',
+};
+
+const GRADE_LABELS = {
+  excellent: '🌞 Excellent',
+  good: '👍Very Good',
+  average: '👌 Good',
+};
+
+function getGradeBadge(gradeVal) {
+  if (gradeVal === null || gradeVal === undefined || gradeVal === '') return null;
+  const num = parseFloat(gradeVal);
+  if (!isNaN(num)) {
+    if (num >= 9) return { label: `🌞 Excellent (${num}/10)`, variant: 'green' };
+    if (num >= 7) return { label: `🌟 Very Good (${num}/10)`, variant: 'blue' };
+    if (num >= 5) return { label: `⭐ Good (${num}/10)`, variant: 'gold' };
+    return { label: `🌙 Practice Required (${num}/10)`, variant: 'purple' };
+  }
+  const str = String(gradeVal).toLowerCase();
+  if (str === 'excellent') return { label: '🌞 Excellent', variant: 'green' };
+  if (str === 'verygood' || str === 'very good') return { label: '🌟 Very Good', variant: 'blue' };
+  if (str === 'good') return { label: '⭐ Good', variant: 'gold' };
+  return { label: `Grade: ${gradeVal}`, variant: 'sand' };
+}
+
 function safeFormatDate(dateStr) {
   if (!dateStr || dateStr === 'null' || dateStr === 'undefined') return 'Unscheduled';
   try {
     const clean = String(dateStr).split('T')[0];
     const d = new Date(clean + 'T00:00:00');
-    return isNaN(d.getTime()) ? 'Unscheduled' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    return isNaN(d.getTime()) ? 'Unscheduled' : d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   } catch (e) {
     return 'Unscheduled';
   }
@@ -27,6 +55,7 @@ export default function MyClassroomDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [expandedSessionId, setExpandedSessionId] = useState(null);
 
   useEffect(() => {
     getStudentClassDetail(id)
@@ -48,7 +77,7 @@ export default function MyClassroomDetail() {
     return <div style={{ padding: 40, textAlign: 'center' }}>Class not found or you are not enrolled.</div>;
   }
 
-  const { class: cls, teachers, sessionPlans, attendanceSummary, homeworkAssignments = [] } = data;
+  const { class: cls, teachers, sessionPlans = [], attendanceSummary = {}, homeworkAssignments = [], classworkSummary = {} } = data;
 
   // Extract unique topics from session plans to show topic list
   const topicsMap = new Map();
@@ -67,7 +96,7 @@ export default function MyClassroomDetail() {
     { id: 'overview', label: 'Overview & Teachers' },
     { id: 'topics', label: 'Topics' },
     { id: 'homework', label: 'Homework Assignments' },
-    { id: 'sessions', label: 'Class Sessions & Attendance' },
+    { id: 'sessions', label: 'Class Sessions & Classwork' },
   ];
 
   return (
@@ -287,42 +316,228 @@ export default function MyClassroomDetail() {
       )}
 
       {activeTab === 'sessions' && (
-        <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--sand-mid)', background: 'var(--sand)' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Session History & Attendance</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Top Classwork Performance Summary Bar */}
+          <div style={{ background: 'var(--white)', padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)', marginBottom: 16 }}>Classwork Evaluation Summary</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
+              <div style={{ padding: '12px 16px', background: 'var(--emerald-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--emerald)' }}>{classworkSummary.excellent || 0}</div>
+                <div style={{ fontSize: 11, color: 'var(--emerald)', fontWeight: 600, textTransform: 'uppercase', marginTop: 2 }}>🌞 Excellent</div>
+              </div>
+              <div style={{ padding: '12px 16px', background: 'var(--blue-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--blue)' }}>{classworkSummary.good || 0}</div>
+                <div style={{ fontSize: 11, color: 'var(--blue)', fontWeight: 600, textTransform: 'uppercase', marginTop: 2 }}>🌟 Very Good</div>
+              </div>
+              <div style={{ padding: '12px 16px', background: 'var(--gold-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--amber)' }}>{classworkSummary.average || 0}</div>
+                <div style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600, textTransform: 'uppercase', marginTop: 2 }}>⭐ Good</div>
+              </div>
+
+              <div style={{ padding: '12px 16px', background: 'var(--sand-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>{classworkSummary.totalEvaluated || 0} / {sessionPlans.length}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 600, textTransform: 'uppercase', marginTop: 2 }}>Evaluated Sessions</div>
+              </div>
+            </div>
           </div>
 
-          {sessionPlans.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-soft)' }}>No session plans recorded.</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '12px 20px', borderBottom: '1px solid var(--sand-mid)', color: 'var(--ink-soft)', fontWeight: 500, fontSize: 13 }}>Date</th>
-                  <th style={{ padding: '12px 20px', borderBottom: '1px solid var(--sand-mid)', color: 'var(--ink-soft)', fontWeight: 500, fontSize: 13 }}>Topic Assigned</th>
-                  <th style={{ padding: '12px 20px', borderBottom: '1px solid var(--sand-mid)', color: 'var(--ink-soft)', fontWeight: 500, fontSize: 13 }}>My Attendance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessionPlans.sort((a, b) => a.session_date.localeCompare(b.session_date)).map(sp => (
-                  <tr key={sp.id} style={{ borderBottom: '1px solid var(--sand)' }}>
-                    <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--ink)' }}>{new Date(sp.session_date).toLocaleDateString()}</td>
-                    <td style={{ padding: '16px 20px' }}>
-                      <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>{sp.topic_title || 'No Topic'}</div>
-                      {sp.topic_title_ur && <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)', direction: 'rtl' }}>{sp.topic_title_ur}</div>}
-                    </td>
-                    <td style={{ padding: '16px 20px' }}>
-                      {sp.attendance ? (
-                        <Badge variant={STATUS_BADGE[sp.attendance.status] || 'sand'}>{sp.attendance.status}</Badge>
-                      ) : (
-                        <span style={{ fontSize: 13, color: 'var(--ink-pale)' }}>Not Marked</span>
+          {/* Sessions List (New to Old) */}
+          <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--sand-mid)', background: 'var(--sand)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                Class Sessions & Classwork Progress (New to Old)
+              </h3>
+              <span style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 500 }}>
+                Total {sessionPlans.length} Session{sessionPlans.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {sessionPlans.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-soft)' }}>No session plans recorded for this classroom.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {sessionPlans.map((sp) => {
+                  
+                  const cw = sp.classwork;
+                  const badgeInfo = cw ? getGradeBadge(cw.grade) : null;
+                  const isExpanded = expandedSessionId === sp.id;
+
+                  return (
+                    <div
+                      key={sp.id}
+                      style={{
+                        padding: '20px',
+                        borderBottom: '1px solid var(--sand-light)',
+                        background: isExpanded ? '#f8fafc' : 'transparent',
+                        transition: 'background 0.2s ease',
+                      }}
+                    >
+                      {/* Session Header Bar */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span>{safeFormatDate(sp.session_date)}</span>
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
+                            Session Plan: <strong>{sp.title || sp.syllabus_topic_title || 'Class Session'}</strong>
+                            {sp.syllabus_topic_title_ur && (
+                              <span style={{ fontFamily: 'var(--font-display)', marginLeft: 6, direction: 'rtl' }}>
+                                ({sp.syllabus_topic_title_ur})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          {/* Attendance Status */}
+                          {sp.attendance ? (
+                            <Badge variant={STATUS_BADGE[sp.attendance.status] || 'sand'}>
+                              Attendance: {sp.attendance.status.toUpperCase()}
+                            </Badge>
+                          ) : (
+                            <Badge variant="sand">Attendance: Not Marked</Badge>
+                          )}
+
+                          {/* Classwork Grade */}
+                          {cw && (
+                            <Badge variant={badgeInfo?.variant || 'sand'} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px' }}>
+                              Classwork: {badgeInfo ? badgeInfo.label : 'Evaluated'}
+                            </Badge>
+                          )}
+
+                          {/* View Detail Button */}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedSessionId(isExpanded ? null : sp.id)}
+                            style={{
+                              padding: '6px 12px',
+                              background: isExpanded ? 'var(--emerald, #059669)' : 'var(--white)',
+                              color: isExpanded ? '#ffffff' : 'var(--emerald, #059669)',
+                              border: '1px solid var(--emerald, #059669)',
+                              borderRadius: 'var(--radius-md)',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              transition: 'all 0.2s ease',
+                              boxShadow: isExpanded ? '0 2px 4px rgba(5,150,105,0.2)' : 'none',
+                            }}
+                          >
+                            {isExpanded ? 'Hide Detail ▲' : 'View Detail ▼'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded Classwork Details Card */}
+                      {isExpanded && (
+                        <div
+                          style={{
+                            marginTop: 16,
+                            padding: 18,
+                            background: '#ffffff',
+                            border: '1px solid var(--sand-mid, #cbd5e1)',
+                            borderRadius: 'var(--radius-lg, 8px)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 14,
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink, #0f172a)', borderBottom: '1px solid var(--sand-light, #f1f5f9)', paddingBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Classwork & Session Detail</span>
+                            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-soft, #64748b)' }}>{safeFormatDate(sp.session_date)}</span>
+                          </div>
+
+                          {/* 1.  Summary */}
+                          <div style={{ fontSize: 13, color: 'var(--ink, #1e293b)' }}>
+                            <strong style={{ color: 'var(--ink-soft, #64748b)', display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>
+                              General Summary
+                            </strong>
+                            <div style={{ fontWeight: 500 }}>
+                              {sp.title || sp.syllabus_topic_title || 'Regular Class Session'}
+                              {sp.syllabus_topic_title_ur && (
+                                <span style={{ fontFamily: 'var(--font-display)', marginLeft: 6, direction: 'rtl', color: 'var(--ink-soft)' }}>
+                                  ({sp.syllabus_topic_title_ur})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 2. Topic Name */}
+                          <div style={{ fontSize: 13, color: 'var(--ink, #1e293b)' }}>
+                            <strong style={{ color: 'var(--ink-soft, #64748b)', display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                              Topic Name
+                            </strong>
+                            {(cw?.topic_title || cw?.subtopic_title) ? (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f1f5f9', padding: '8px 14px', borderRadius: 'var(--radius-md)', fontSize: 13, color: 'var(--ink)' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--ink-soft)' }}> Practiced / Evaluated:</span>
+                                <span style={{ fontWeight: 600 }}>{cw.topic_title || 'Topic'}</span>
+                                {cw.topic_title_ur && <span style={{ color: 'var(--ink-soft)', fontFamily: 'var(--font-display)' }}>({cw.topic_title_ur})</span>}
+                                {cw.subtopic_title && (
+                                  <>
+                                    <span style={{ color: 'var(--ink-soft)' }}>›</span>
+                                    <span>{cw.subtopic_title}</span>
+                                    {cw.subtopic_title_ur && <span style={{ color: 'var(--ink-soft)', fontFamily: 'var(--font-display)' }}>({cw.subtopic_title_ur})</span>}
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
+                                No specific subtopic evaluated for this session.
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 3. Evaluated By (Teacher) */}
+                          {cw?.teacher_name && (
+                            <div style={{ fontSize: 13, color: 'var(--ink, #1e293b)' }}>
+                              <strong style={{ color: 'var(--ink-soft, #64748b)', display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>
+                                Evaluated By (Teacher)
+                              </strong>
+                              <div style={{ fontWeight: 600, color: 'var(--emerald, #059669)', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--emerald-light, #ecfdf5)', padding: '6px 12px', borderRadius: 'var(--radius-md)' }}>
+                                <span>👤 {cw.teacher_name}</span>
+                                {cw.teacher_name_ur && <span style={{ fontFamily: 'var(--font-display)', color: 'var(--ink-soft)', fontWeight: 400 }}>({cw.teacher_name_ur})</span>}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. Remarks */}
+                          <div>
+                            <strong style={{ color: 'var(--ink-soft, #64748b)', display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                              Remarks
+                            </strong>
+                            {cw?.comments ? (
+                              <div
+                                style={{
+                                  background: '#f8fafc',
+                                  borderLeft: '4px solid var(--blue, #2563eb)',
+                                  padding: '12px 16px',
+                                  borderRadius: '0 8px 8px 0',
+                                  fontSize: 13,
+                                  color: 'var(--ink)',
+                                }}
+                              >
+                                <div style={{ fontWeight: 700, color: 'var(--blue, #2563eb)', marginBottom: 4 }}>
+                                  Teacher Classwork Remarks:
+                                </div>
+                                <div style={{ lineHeight: 1.5, color: '#334155' }}>{cw.comments}</div>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
+                                No teacher remarks recorded for this session.
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
