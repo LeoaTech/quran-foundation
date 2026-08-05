@@ -406,6 +406,8 @@ function computeStudentHomeworkAssignments(assignments, schedule, submissions, t
     let marks_awarded = null;
     let max_marks = a.total_marks || 0;
     let teacher_note = null;
+    let marked_by_teacher_name = null;
+    let marked_by_teacher_name_ur = null;
 
     if (sub) {
       if (sub.status === 'evaluated') {
@@ -418,6 +420,11 @@ function computeStudentHomeworkAssignments(assignments, schedule, submissions, t
       marks_awarded = sub.marks_awarded !== undefined && sub.marks_awarded !== null ? Number(sub.marks_awarded) : null;
       if (sub.max_marks) max_marks = Number(sub.max_marks);
       teacher_note = sub.teacher_note || null;
+      marked_by_teacher_name = sub.marked_by_name || a.marked_by_teacher_name || null;
+      marked_by_teacher_name_ur = sub.marked_by_name_ur || a.marked_by_teacher_name_ur || null;
+    } else if (a.marked_by_teacher_name) {
+      marked_by_teacher_name = a.marked_by_teacher_name;
+      marked_by_teacher_name_ur = a.marked_by_teacher_name_ur;
     }
 
     return {
@@ -427,6 +434,8 @@ function computeStudentHomeworkAssignments(assignments, schedule, submissions, t
       marks_awarded,
       max_marks,
       teacher_note,
+      marked_by_teacher_name,
+      marked_by_teacher_name_ur,
       is_accessible: status === 'Active' || status === 'Past'
     };
   });
