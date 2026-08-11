@@ -574,6 +574,62 @@ async function saveAudioSubmission({ assignmentId, classId, studentId, audioUrl,
 }
 
 
+async function setStudentEvaluationLock({ assignmentId, classId, studentId, teacherId, teacherName, action = 'lock' }) {
+  const existing = await db('homework_submissions')
+    .where({ assignment_id: assignmentId, class_id: classId, student_id: studentId })
+    .first();
+
+  if (action === 'unlock') {
+    if (existing && existing.locked_by_teacher_id === teacherId) {
+      await db('homework_submissions')
+        .where({ id: existing.id })
+        .update({
+          locked_by_teacher_id: null,
+          locked_by_teacher_name: null,
+          locked_at: null,
+        });
+    }
+    return { success: true, locked: false };
+  }
+
+  // Action: lock
+  if (existing) {
+    if (existing.locked_by_teacher_id && existing.locked_by_teacher_id !== teacherId) {
+      if (existing.locked_at) {
+        const lockAgeMs = Date.now() - new Date(existing.locked_at).getTime();
+        const MAX_LOCK_MS = 15 * 60 * 1000; // 15 mins
+        if (lockAgeMs < MAX_LOCK_MS) {
+          const err = new Error(`Student is currently being evaluated by ${existing.locked_by_teacher_name || 'another teacher'}.`);
+          err.status = 409;
+          throw err;
+        }
+      }
+    }
+
+    const [updated] = await db('homework_submissions')
+      .where({ id: existing.id })
+      .update({
+        locked_by_teacher_id: teacherId,
+        locked_by_teacher_name: teacherName,
+        locked_at: db.fn.now(),
+      })
+      .returning('*');
+    return updated;
+  } else {
+    const [inserted] = await db('homework_submissions')
+      .insert({
+        assignment_id: assignmentId,
+        class_id: classId,
+        student_id: studentId,
+        status: 'pending',
+        locked_by_teacher_id: teacherId,
+        locked_by_teacher_name: teacherName,
+        locked_at: db.fn.now(),
+      })
+      .returning('*');
+    return inserted;
+  }
+}
 module.exports = {
   getScheduleByCourse,
   createSchedule,
@@ -592,7 +648,8 @@ module.exports = {
   listSubmissionsForAssignment,
   listSubmissionsForStudentInClass,
   upsertSubmission,
-  saveAudioSubmission
+  saveAudioSubmission,
+  setStudentEvaluationLock
 };
 
 
