@@ -99,5 +99,19 @@ router.post(
   requireAuth,
   controller.saveHomeworkGridMarks,
 );
+
+const audioUpload = require('../middleware/audioUpload');
+
+// POST /homework-assignments/:assignment_id/audio-submission
+router.post(
+  '/homework-assignments/:assignment_id/audio-submission',
+  requireAuth,
+  audioUpload.single('audio'),
+  controller.submitHomeworkAudio,
+);
+
+
 module.exports = router;
+
+
 
