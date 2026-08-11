@@ -4,6 +4,7 @@ import { getStudentClassDetail } from '../../../api/classes';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import Badge from '../../../components/Badge';
 import EmptyState from '../../../components/EmptyState';
+import { MicIcon, ClockIcon, CheckIcon, EditIcon } from '../../../components/Icons';
 
 const STATUS_BADGE = {
   present: 'green',
@@ -253,8 +254,27 @@ export default function MyClassroomDetail() {
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        {hw.audio_url ? (
+                          <Badge variant="green">
+                            <MicIcon size={12} color="#047857" style={{ marginRight: 4 }} /> Audio Submitted
+                          </Badge>
+                        ) : (
+                          <Badge variant="amber">
+                            <ClockIcon size={12} color="#92400e" style={{ marginRight: 4 }} /> Pending Submission
+                          </Badge>
+                        )}
+                        <Badge variant={hw.grading_status === 'Marked' ? 'green' : 'sand'}>
+                          {hw.grading_status === 'Marked' ? (
+                            <>
+                              <CheckIcon size={12} color="#047857" style={{ marginRight: 4 }} /> Graded
+                            </>
+                          ) : (
+                            <>
+                              <EditIcon size={12} color="#92400e" style={{ marginRight: 4 }} /> Pending Evaluation
+                            </>
+                          )}
+                        </Badge>
                         <Badge variant={statusVariant}>Status: {hw.status}</Badge>
-                        <Badge variant={gradingVariant}>Grading: {hw.grading_status}</Badge>
                       </div>
                     </div>
 
@@ -298,16 +318,14 @@ export default function MyClassroomDetail() {
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid var(--sand-light)' }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-                        {hw.marks_awarded !== null ? (
+                        {hw.grading_status === 'Marked' && hw.marks_awarded !== null ? (
                           <>
-                            Score: <span style={{ color: 'var(--emerald, #059669)', fontWeight: 700 }}>{hw.marks_awarded} / {hw.max_marks} Marks</span>
-                          </>
-                        ) : hw.max_marks > 0 ? (
-                          <>
-                            Total Score: <span style={{ color: 'var(--ink-soft)' }}>{hw.max_marks} Marks</span>
+                            Obtained Score: <span style={{ color: 'var(--emerald, #059669)', fontWeight: 700 }}>{hw.marks_awarded} / {hw.max_marks} Marks</span>
                           </>
                         ) : (
-                          <span style={{ fontSize: 13, color: 'var(--ink-soft, #94a3b8)', fontStyle: 'italic' }}>No marks assigned</span>
+                          <span style={{ fontSize: 13, color: 'var(--ink-soft, #64748b)', fontStyle: 'italic' }}>
+                            Score: Pending Evaluation ({hw.max_marks || 0} Max Marks)
+                          </span>
                         )}
                       </div>
 
@@ -330,6 +348,7 @@ export default function MyClassroomDetail() {
                       </Link>
                     </div>
                   </div>
+
                 );
               })}
             </div>
