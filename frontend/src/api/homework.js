@@ -52,3 +52,19 @@ export const saveHomeworkGridMarks = (assignmentId, classId, marks, studentNotes
       params: { class_id: classId },
     })
     .then((r) => r.data?.data);
+
+// POST /homework-assignments/:assignmentId/audio-submission
+export const uploadHomeworkAudio = (assignmentId, classId, audioFile, duration) => {
+  const formData = new FormData();
+  formData.append('audio', audioFile);
+  if (classId) formData.append('class_id', classId);
+  if (duration) formData.append('duration', duration);
+
+  return client
+    .post(`/homework-assignments/${assignmentId}/audio-submission`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    .then((r) => r.data?.data);
+};
