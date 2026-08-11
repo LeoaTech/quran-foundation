@@ -107,6 +107,21 @@ async function submitHomeworkAudio(req, res) {
   } catch (e) { err(res, e); }
 }
 
+async function setStudentEvaluationLock(req, res) {
+  try {
+    const { assignment_id } = req.params;
+    const { class_id, student_id, action } = req.body || {};
+    const data = await service.setStudentEvaluationLock({
+      user: req.user,
+      assignmentId: assignment_id,
+      classId: class_id || req.query.class_id,
+      studentId: student_id || req.query.student_id,
+      action: action || req.query.action || 'lock',
+    });
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
+
 module.exports = {
   getSchedule,
   saveSchedule,
@@ -117,6 +132,7 @@ module.exports = {
   getHomeworkGridSheet,
   saveHomeworkGridMarks,
   submitHomeworkAudio,
+  setStudentEvaluationLock
 };
 
 
