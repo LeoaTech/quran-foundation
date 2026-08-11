@@ -68,3 +68,16 @@ export const uploadHomeworkAudio = (assignmentId, classId, audioFile, duration) 
     })
     .then((r) => r.data?.data);
 };
+
+
+// POST /homework-assignments/:assignmentId/student-lock
+export const lockStudentForEvaluation = (assignmentId, classId, studentId, action = 'lock') =>
+  client
+    .post(`/homework-assignments/${assignmentId}/student-lock`, {
+      class_id: classId,
+      student_id: studentId,
+      action,
+    })
+    .then((r) => r.data?.data);
+
+
