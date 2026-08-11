@@ -109,6 +109,12 @@ router.post(
   audioUpload.single('audio'),
   controller.submitHomeworkAudio,
 );
+// POST /homework-assignments/:assignment_id/student-lock
+router.post(
+  '/homework-assignments/:assignment_id/student-lock',
+  requireAuth,
+  controller.setStudentEvaluationLock,
+);
 
 
 module.exports = router;
