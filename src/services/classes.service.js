@@ -436,6 +436,9 @@ function computeStudentHomeworkAssignments(assignments, schedule, submissions, t
       teacher_note,
       marked_by_teacher_name,
       marked_by_teacher_name_ur,
+      audio_url: sub?.audio_url || null,
+      audio_duration: sub?.audio_duration || null,
+      audio_submitted_at: sub?.audio_submitted_at || null,
       is_accessible: status === 'Active' || status === 'Past'
     };
   });
