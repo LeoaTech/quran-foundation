@@ -103,10 +103,7 @@ async function saveSchedule({
 async function getScheduleWithAssignments(courseId, classId) {
   const schedule = await repo.getScheduleByCourse(courseId);
   if (!schedule) return null;
-  const assignments = await repo.listAssignmentsBySchedule(
-    schedule.id,
-    classId,
-  );
+  const assignments = await repo.listAssignmentsBySchedule(schedule.id, classId);
   return { schedule, assignments };
 }
 
@@ -117,15 +114,7 @@ async function updateAssignment(id, patch, userId) {
   if (!existing) throw notFound("Homework Assignment");
   // Allow center managers to patch individual due_date
   const allowedPatch = {};
-  const allowedFields = [
-    "title",
-    "title_ur",
-    "instructions",
-    "topic_ids",
-    "criteria_ids",
-    "is_published",
-    "due_date",
-  ];
+  const allowedFields = ['title', 'title_ur', 'instructions', 'topic_ids', 'criteria_ids', 'is_published', 'due_date'];
   for (const key of allowedFields) {
     if (key in patch) allowedPatch[key] = patch[key];
   }
@@ -139,7 +128,7 @@ async function updateAssignment(id, patch, userId) {
  */
 async function applyScheduleDates({ courseId, firstDueDate }) {
   const schedule = await repo.getScheduleByCourse(courseId);
-  if (!schedule) throw notFound("Homework Schedule");
+  if (!schedule) throw notFound('Homework Schedule');
   const assignments = await repo.applyDueDatesFromFirst({
     scheduleId: schedule.id,
     firstDueDate,
@@ -173,17 +162,11 @@ async function saveHomeworkGridMarks({ user, assignmentId, classId, body }) {
   const existing = await repo.getAssignmentById(assignmentId);
   if (!existing) throw notFound("Homework Assignment");
 
-  const userRoles = Array.isArray(user?.roles)
-    ? user.roles
-    : user?.role
-      ? [user.role]
-      : [];
-  const isTeacher = userRoles.includes("teacher") || user?.role === "teacher";
+  const userRoles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
+  const isTeacher = userRoles.includes('teacher') || user?.role === 'teacher';
 
   if (!isTeacher) {
-    const err = new Error(
-      "Center Managers cannot enter or edit homework marks. Marking is restricted to classroom teachers.",
-    );
+    const err = new Error("Center Managers cannot enter or edit homework marks. Marking is restricted to classroom teachers.");
     err.status = 403;
     throw err;
   }
@@ -194,11 +177,8 @@ async function saveHomeworkGridMarks({ user, assignmentId, classId, body }) {
       const isEvaluator = gridData.evaluator_teacher_id === user.id;
 
       if (!isEvaluator) {
-        const teacherName =
-          gridData.evaluator_teacher_name || "another teacher";
-        const err = new Error(
-          `This homework assignment has already been evaluated and completed by Teacher ${teacherName}. Editing is restricted to ${teacherName}.`,
-        );
+        const teacherName = gridData.evaluator_teacher_name || 'another teacher';
+        const err = new Error(`This homework assignment has already been evaluated and completed by Teacher ${teacherName}. Editing is restricted to ${teacherName}.`);
         err.status = 403;
         throw err;
       }
@@ -207,24 +187,12 @@ async function saveHomeworkGridMarks({ user, assignmentId, classId, body }) {
 
   const marks = Array.isArray(body?.marks) ? body.marks : [];
   const studentNotes = body?.studentNotes || {};
-  return repo.bulkUpsertHomeworkMarks({
-    assignmentId,
-    classId,
-    marks,
-    studentNotes,
-    userId: user.id,
-  });
+  return repo.bulkUpsertHomeworkMarks({ assignmentId, classId, marks, studentNotes, userId: user.id });
 }
 
 const audioStorage = require("./audioStorage.service");
 
-async function submitStudentAudio({
-  user,
-  assignmentId,
-  classId,
-  file,
-  duration,
-}) {
+async function submitStudentAudio({ user, assignmentId, classId, file, duration }) {
   if (!file) {
     const err = new Error("No audio file provided.");
     err.status = 400;
@@ -236,9 +204,7 @@ async function submitStudentAudio({
   // Max duration limit validation: 3 minutes (180 seconds)
   const MAX_DURATION_SECONDS = 180;
   if (parsedDuration > MAX_DURATION_SECONDS) {
-    const err = new Error(
-      `Audio recording exceeds maximum allowed time limit of 3 minutes (${MAX_DURATION_SECONDS} seconds).`,
-    );
+    const err = new Error(`Audio recording exceeds maximum allowed time limit of 3 minutes (${MAX_DURATION_SECONDS} seconds).`);
     err.status = 400;
     throw err;
   }
@@ -247,11 +213,7 @@ async function submitStudentAudio({
   if (!existingAssignment) throw notFound("Homework Assignment");
 
   // Store audio buffer via audioStorage service
-  const audioUrl = await audioStorage.uploadAudio(
-    file.buffer,
-    file.originalname,
-    file.mimetype,
-  );
+  const audioUrl = await audioStorage.uploadAudio(file.buffer, file.originalname, file.mimetype);
 
   // Save audio submission record
   const submission = await repo.saveAudioSubmission({
@@ -265,6 +227,17 @@ async function submitStudentAudio({
   return submission;
 }
 
+async function setStudentEvaluationLock({ user, assignmentId, classId, studentId, action }) {
+  return repo.setStudentEvaluationLock({
+    assignmentId,
+    classId,
+    studentId,
+    teacherId: user.id,
+    teacherName: user.full_name,
+    action,
+  });
+}
+
 module.exports = {
   saveSchedule,
   getScheduleWithAssignments,
@@ -275,4 +248,7 @@ module.exports = {
   getHomeworkGridSheet,
   saveHomeworkGridMarks,
   submitStudentAudio,
+  setStudentEvaluationLock,
 };
+
+
