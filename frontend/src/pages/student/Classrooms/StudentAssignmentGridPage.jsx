@@ -483,7 +483,7 @@ export default function StudentAssignmentGridPage() {
                         </div>
                       ) : (
                         <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-                          Standard Recitation
+                          Recitation Rule
                         </span>
                       )}
                     </td>
