@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { getHomeworkGridSheet } from '../../../api/homework';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
+import AudioPlayer from '../../../components/AudioPlayer';
+import AudioRecorder from '../../../components/AudioRecorder';
+import { MicIcon, ClockIcon, CheckIcon, EditIcon, LockIcon, RefreshIcon, BookIcon } from '../../../components/Icons';
 import Badge from '../../../components/Badge';
 
 function safeFormatDate(dateStr) {
@@ -121,8 +124,10 @@ const S = {
 export default function StudentAssignmentGridPage() {
   const { id: classId, assignmentId } = useParams();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [showReplaceRecorder, setShowReplaceRecorder] = useState(false);
 
-  const { data: gridData, isLoading } = useQuery({
+  const { data: gridData, isLoading, refetch } = useQuery({
     queryKey: ['homework-grid', assignmentId, classId],
     queryFn: () => getHomeworkGridSheet(assignmentId, classId),
     enabled: !!assignmentId,
@@ -139,6 +144,14 @@ export default function StudentAssignmentGridPage() {
   }, [gridData?.submissions, user?.id]);
 
   const teacherRemarks = studentSubmission?.teacher_note;
+  const submittedAudioUrl = studentSubmission?.audio_url;
+  const submittedAudioDuration = studentSubmission?.audio_duration;
+
+  const handleAudioSuccess = () => {
+    setShowReplaceRecorder(false);
+    queryClient.invalidateQueries(['homework-grid', assignmentId, classId]);
+    refetch();
+  };
 
   // Flatten words across all linked contents
   const flattenedRows = useMemo(() => {
@@ -224,6 +237,8 @@ export default function StudentAssignmentGridPage() {
     );
   }
 
+  const isEvaluated = studentSubmission?.status === 'evaluated';
+
   return (
     <div style={S.wrap}>
       {/* Navigation */}
@@ -240,37 +255,172 @@ export default function StudentAssignmentGridPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {studentSubmission ? (
-            <Badge variant={studentSubmission.status === 'evaluated' ? 'green' : 'amber'}>
-              {studentSubmission.status === 'evaluated' ? 'Marked' : 'In Progress'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Submission Status Badge */}
+          {submittedAudioUrl ? (
+            <Badge variant="green">
+              <MicIcon size={13} color="#047857" style={{ marginRight: 4 }} /> Audio Submitted
             </Badge>
           ) : (
-            <Badge variant="gold">Not Marked Yet</Badge>
+            <Badge variant="amber">
+              <ClockIcon size={13} color="#92400e" style={{ marginRight: 4 }} /> Pending Submission
+            </Badge>
           )}
 
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: 'var(--emerald, #059669)',
-              background: '#ecfdf5',
-              padding: '8px 16px',
-              borderRadius: 20,
-              border: '1px solid #a7f3d0',
-            }}
-          >
-            Obtained Score: {totalStudentScore} / {calculatedMaxMarks} Marks
-          </div>
+          {/* Grading Status Badge */}
+          {isEvaluated ? (
+            <Badge variant="green">
+              <CheckIcon size={13} color="#047857" style={{ marginRight: 4 }} /> Graded & Evaluated
+            </Badge>
+          ) : (
+            <Badge variant="sand">
+              <EditIcon size={13} color="#92400e" style={{ marginRight: 4 }} /> Pending Evaluation
+            </Badge>
+          )}
+
+          {/* Show Obtained Score ONLY if Evaluated */}
+          {isEvaluated && (
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: 'var(--emerald, #059669)',
+                background: '#ecfdf5',
+                padding: '8px 16px',
+                borderRadius: 20,
+                border: '1px solid #a7f3d0',
+              }}
+            >
+              Obtained Score: {totalStudentScore} / {calculatedMaxMarks} Marks
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Student Audio Submission Section  */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 70,
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          background: '#ffffff',
+          padding: 16,
+          borderRadius: 16,
+          border: '1px solid #a7f3d0',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#047857', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MicIcon size={16} color="#047857" /> Recitation Audio Recorder & Player
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Max Duration: 3 Minutes</span>
+        </div>
+        {isEvaluated ? (
+          // Read-Only mode after Teacher Evaluation
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {submittedAudioUrl && (
+              <AudioPlayer
+                src={submittedAudioUrl}
+                title="Your Submitted Recitation Audio"
+                duration={submittedAudioDuration}
+              />
+            )}
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: '12px 16px',
+                fontSize: 13,
+                color: '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <LockIcon size={16} color="#047857" />
+              <span>
+                <strong>Assignment Evaluated:</strong> This assignment has been graded by your teacher. Audio recording and resubmission are closed.
+              </span>
+            </div>
+          </div>
+        ) : (
+          // Active / Editable Submission Mode
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {submittedAudioUrl && !showReplaceRecorder ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <AudioPlayer
+                  src={submittedAudioUrl}
+                  title="Your Submitted Audio (Pending Evaluation)"
+                  duration={submittedAudioDuration}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowReplaceRecorder(true)}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--emerald, #059669)',
+                      color: 'var(--emerald, #059669)',
+                      padding: '6px 14px',
+                      borderRadius: 'var(--radius-md, 8px)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <RefreshIcon size={14} color="var(--emerald, #059669)" /> Replace / Re-record Audio Submission
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {submittedAudioUrl && showReplaceRecorder && (
+                  <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowReplaceRecorder(false)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--ink-soft)',
+                        color: 'var(--ink-soft)',
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel Replace
+                    </button>
+                  </div>
+                )}
+                <AudioRecorder
+                  assignmentId={assignmentId}
+                  classId={classId}
+                  onUploadSuccess={handleAudioSuccess}
+                  currentAudioUrl={submittedAudioUrl}
+                  currentAudioDuration={submittedAudioDuration}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Teacher Remarks Card - On Top if available */}
       {teacherRemarks && teacherRemarks !== 'Evaluated via Homework Sheet' && (
         <div style={S.remarksBanner}>
-          <div style={S.remarksHeader}>
-            <span>📚</span> Teacher Remarks & Feedback
+          <div style={{ ...S.remarksHeader, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <BookIcon size={16} color="#047857" /> Teacher Remarks & Feedback
           </div>
+
           <div style={S.remarksBody}>{teacherRemarks}</div>
         </div>
       )}
@@ -278,7 +428,7 @@ export default function StudentAssignmentGridPage() {
       {/* Paper Sheet Table */}
       {contents.length === 0 ? (
         <EmptyState
-          icon="📖"
+          icon={<BookIcon size={36} color="var(--emerald)" />}
           title="No Content Attached"
           description="No practice content items have been assigned to this homework sheet."
         />
