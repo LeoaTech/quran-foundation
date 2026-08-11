@@ -539,6 +539,41 @@ async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], stud
 
 
 
+async function saveAudioSubmission({ assignmentId, classId, studentId, audioUrl, audioDuration }) {
+  const existing = await db('homework_submissions')
+    .where({ assignment_id: assignmentId, class_id: classId, student_id: studentId })
+    .first();
+
+  if (existing) {
+    const [row] = await db('homework_submissions')
+      .where({ id: existing.id })
+      .update({
+        audio_url: audioUrl,
+        audio_duration: audioDuration ?? existing.audio_duration,
+        audio_submitted_at: db.fn.now(),
+        submitted_at: db.fn.now(),
+        updated_at: db.fn.now(),
+      })
+      .returning('*');
+    return row;
+  }
+
+  const [row] = await db('homework_submissions')
+    .insert({
+      assignment_id: assignmentId,
+      class_id: classId,
+      student_id: studentId,
+      status: 'pending',
+      audio_url: audioUrl,
+      audio_duration: audioDuration ?? null,
+      audio_submitted_at: db.fn.now(),
+      submitted_at: db.fn.now(),
+    })
+    .returning('*');
+  return row;
+}
+
+
 module.exports = {
   getScheduleByCourse,
   createSchedule,
@@ -556,6 +591,8 @@ module.exports = {
   bulkUpsertHomeworkMarks,
   listSubmissionsForAssignment,
   listSubmissionsForStudentInClass,
-  upsertSubmission
+  upsertSubmission,
+  saveAudioSubmission
 };
+
 
