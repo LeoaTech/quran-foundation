@@ -106,6 +106,7 @@ export function HomeworkGridSheetView({
   const [studentNotes, setStudentNotes] = useState({});
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [studentFilter, setStudentFilter] = useState('all'); // 'all' | 'available' | 'locked' | 'graded'
   const [activeAudioStudent, setActiveAudioStudent] = useState(null);
 
   const { data: gridData, isLoading, refetch } = useQuery({
@@ -113,6 +114,7 @@ export function HomeworkGridSheetView({
     queryFn: () => getHomeworkGridSheet(assignmentId, classId),
     enabled: !!assignmentId && (open || asPage || !!onBack),
     staleTime: 0,
+    refetchInterval: 5000, // 5s live polling to keep co-teacher evaluation locks updated in real time
   });
 
   const isPublished = gridData?.assignment?.is_published ?? assignment?.is_published;
@@ -130,28 +132,23 @@ export function HomeworkGridSheetView({
   const isLockedByOther = Boolean(isFullyMarked && evaluatorId && !isUserEvaluator);
   const effectiveReadOnly = readOnly || !isTeacher || isLockedByOther;
 
-  // Search filtered student list
-  const filteredStudents = useMemo(() => {
-    if (!studentSearchQuery.trim()) return students;
-    const q = studentSearchQuery.toLowerCase();
-    return students.filter((s) => s.full_name.toLowerCase().includes(q));
-  }, [students, studentSearchQuery]);
-
+  
   // Flatten words across all linked contents
   const flattenedRows = useMemo(() => {
     const rows = [];
     contents.forEach((content) => {
+
       const words = content.words || [];
       if (words.length === 0) {
         rows.push({
           contentId: content.id,
-          contentTitle: content.title || `Content (${content?.surah_number || 'Arabic Text'})`,
+          contentTitle: content.title|| content.label || `Content (${content?.surah_number || 'Arabic Text'})`,
           wordId: `content-${content.id}`,
           wordText: content.arabic_text || content.title || '—',
           translation: content.translation || '',
           rules: [],
           maxMarks: content.total_marks || 1,
-          comments: content?.notes || 'Standard Recitation',
+          comments: content?.note || 'Recitation Rule',
         });
       } else {
         words.forEach((w) => {
@@ -167,13 +164,13 @@ export function HomeworkGridSheetView({
 
           rows.push({
             contentId: content.id,
-            contentTitle: content.title || `Surah ${content.surah_number}`,
+            contentTitle: content.title || content.label || `Surah ${content.surah_number}`,
             wordId: w.id,
             wordText: w.text_uthmani || w.word_text || '—',
             translation: w.translation || '',
             rules,
             maxMarks: wordMaxMarks,
-            comments: w.teacher_notes || w.rules_summary || 'Standard Recitation',
+            comments: w.note || w.rules_summary || 'Recitation Rule',
           });
         });
       }
@@ -207,13 +204,6 @@ export function HomeworkGridSheetView({
     setStudentNotes(initialNotes);
   }, [gridData]);
 
-  // Default select first student if available
-  useEffect(() => {
-    if (students.length > 0 && !selectedStudentId) {
-      setSelectedStudentId(students[0].student_id);
-    }
-  }, [students, selectedStudentId]);
-
   // Calculate per-student total marks
   const studentTotals = useMemo(() => {
     const totals = new Map();
@@ -231,6 +221,50 @@ export function HomeworkGridSheetView({
     });
     return totals;
   }, [students, flattenedRows, marksState]);
+
+  // Search & Filter student list
+  const filteredStudents = useMemo(() => {
+    let result = students;
+
+    if (studentSearchQuery.trim()) {
+      const q = studentSearchQuery.toLowerCase();
+      result = result.filter((s) => s.full_name.toLowerCase().includes(q));
+    }
+
+    if (studentFilter === 'available') {
+      result = result.filter((s) => {
+        const sub = gridData?.submissions?.find((item) => String(item.student_id) === String(s.student_id));
+        return !sub?.locked_by_teacher_id || String(sub.locked_by_teacher_id) === String(user?.id);
+      });
+    } else if (studentFilter === 'locked') {
+      result = result.filter((s) => {
+        const sub = gridData?.submissions?.find((item) => String(item.student_id) === String(s.student_id));
+        return Boolean(sub?.locked_by_teacher_id && String(sub.locked_by_teacher_id) !== String(user?.id));
+      });
+    } else if (studentFilter === 'graded') {
+      result = result.filter((s) => {
+        const sub = gridData?.submissions?.find((item) => String(item.student_id) === String(s.student_id));
+        const score = studentTotals.get(s.student_id) || 0;
+        return Boolean(sub?.is_marked || score > 0);
+      });
+    }
+
+    return result;
+  }, [students, studentSearchQuery, studentFilter, gridData?.submissions, user?.id, studentTotals]);
+
+  // Default select first available student (not locked by another teacher)
+  useEffect(() => {
+    if (students.length > 0 && !selectedStudentId && gridData?.submissions) {
+      const firstAvailable = students.find((s) => {
+        const sub = gridData.submissions.find((item) => String(item.student_id) === String(s.student_id));
+        return !sub?.locked_by_teacher_id || String(sub.locked_by_teacher_id) === String(user?.id);
+      }) || students[0];
+
+      if (firstAvailable) {
+        handleSelectStudent(firstAvailable);
+      }
+    }
+  }, [students, selectedStudentId, gridData?.submissions]);
 
   // ── Summary Cards Calculations for Teachers & Center Managers ──────────────
   const totalStudentsCount = students.length;
@@ -251,6 +285,14 @@ export function HomeworkGridSheetView({
       return Boolean(sub?.is_marked || score > 0);
     }).length;
   }, [students, gridData?.submissions, studentTotals]);
+
+  const lockedByOthersCount = useMemo(() => {
+    if (!gridData?.submissions) return 0;
+    return students.filter((s) => {
+      const sub = gridData.submissions.find((item) => String(item.student_id) === String(s.student_id));
+      return Boolean(sub?.locked_by_teacher_id && String(sub.locked_by_teacher_id) !== String(user?.id));
+    }).length;
+  }, [students, gridData?.submissions, user?.id]);
 
   const pendingGradingCount = useMemo(() => {
     return students.filter((s) => {
@@ -313,7 +355,11 @@ export function HomeworkGridSheetView({
   const saveMut = useMutation({
     mutationFn: async () => {
       const payloadMarks = [];
-      students.forEach((s) => {
+      const targetStudents = selectedStudentId
+        ? students.filter((s) => String(s.student_id) === String(selectedStudentId))
+        : students;
+
+      targetStudents.forEach((s) => {
         flattenedRows.forEach((row) => {
           const firstRule = row.rules?.[0];
           const subId = firstRule?.subtopic_id || null;
@@ -436,12 +482,86 @@ export function HomeworkGridSheetView({
         </div>
       )}
 
-      {/* Searchable Student Selection Toolbar */}
+      {/* Searchable & Filterable Student Selection Toolbar */}
       {!isPreviewMode && students.length > 0 && (
-        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px 20px', borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px 20px', borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <UserIcon size={16} color="var(--emerald, #059669)" /> Select Student to Grade & Listen Audio:
+            </div>
+
+            {/* Filter Tabs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e2e8f0', padding: 3, borderRadius: 8 }}>
+              <button
+                type="button"
+                onClick={() => setStudentFilter('all')}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: 'none',
+                  background: studentFilter === 'all' ? '#ffffff' : 'transparent',
+                  color: studentFilter === 'all' ? '#0f172a' : '#64748b',
+                  cursor: 'pointer',
+                  boxShadow: studentFilter === 'all' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                }}
+              >
+                All ({totalStudentsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStudentFilter('available')}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: 'none',
+                  background: studentFilter === 'available' ? '#ffffff' : 'transparent',
+                  color: studentFilter === 'available' ? '#047857' : '#64748b',
+                  cursor: 'pointer',
+                  boxShadow: studentFilter === 'available' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                }}
+              >
+                Available ({totalStudentsCount - lockedByOthersCount})
+              </button>
+              {lockedByOthersCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStudentFilter('locked')}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: 'none',
+                    background: studentFilter === 'locked' ? '#ffffff' : 'transparent',
+                    color: studentFilter === 'locked' ? '#b91c1c' : '#64748b',
+                    cursor: 'pointer',
+                    boxShadow: studentFilter === 'locked' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                  }}
+                >
+                  🔒 Locked ({lockedByOthersCount})
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setStudentFilter('graded')}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: 'none',
+                  background: studentFilter === 'graded' ? '#ffffff' : 'transparent',
+                  color: studentFilter === 'graded' ? '#0369a1' : '#64748b',
+                  cursor: 'pointer',
+                  boxShadow: studentFilter === 'graded' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                }}
+              >
+                Graded ({gradedCount})
+              </button>
             </div>
           </div>
 
@@ -494,11 +614,84 @@ export function HomeworkGridSheetView({
 
                 return (
                   <option key={s.student_id} value={s.student_id} disabled={isLockedByOther}>
-                    {s.full_name} {hasAudio ? ' [Audio Submitted]' : ' [No Audio]'} — Score: {score}/{calculatedMaxMarks} {isLockedByOther ? ` (Locked by ${studentSub.locked_by_teacher_name})` : ''}
+                    {s.full_name} {hasAudio ? ' [🎙️ Audio Submitted]' : ' [No Audio]'} — Score: {score}/{calculatedMaxMarks} {isLockedByOther ? ` (🔒 Locked by ${studentSub.locked_by_teacher_name})` : ''}
                   </option>
                 );
               })}
             </select>
+          </div>
+
+          {/* Quick Select Student Chips Bar */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, pt: 2 }}>
+            {filteredStudents.map((s) => {
+              const studentSub = gridData?.submissions?.find((sub) => String(sub.student_id) === String(s.student_id));
+              const isLockedByOther = Boolean(
+                studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(user?.id)
+              );
+              const isSelected = String(s.student_id) === String(selectedStudentId);
+              const hasAudio = Boolean(studentSub?.audio_url);
+              const score = studentTotals.get(s.student_id) || 0;
+              const isGraded = Boolean(studentSub?.is_marked || score > 0);
+
+              let chipBg = '#ffffff';
+              let chipBorder = '#cbd5e1';
+              let chipColor = '#334155';
+
+              if (isSelected) {
+                chipBg = '#ecfdf5';
+                chipBorder = '#059669';
+                chipColor = '#047857';
+              } else if (isLockedByOther) {
+                chipBg = '#fef2f2';
+                chipBorder = '#fca5a5';
+                chipColor = '#991b1b';
+              } else if (isGraded) {
+                chipBg = '#f0f9ff';
+                chipBorder = '#bae6fd';
+                chipColor = '#0369a1';
+              }
+
+              return (
+                <button
+                  key={s.student_id}
+                  type="button"
+                  disabled={isLockedByOther}
+                  onClick={() => handleSelectStudent(s)}
+                  title={isLockedByOther ? `Currently being evaluated by Teacher ${studentSub.locked_by_teacher_name}` : `Select ${s.full_name} for grading`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    border: `1px solid ${chipBorder}`,
+                    background: chipBg,
+                    color: chipColor,
+                    fontSize: 12,
+                    fontWeight: isSelected ? 700 : 500,
+                    whiteSpace: 'nowrap',
+                    cursor: isLockedByOther ? 'not-allowed' : 'pointer',
+                    opacity: isLockedByOther ? 0.65 : 1,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {isLockedByOther ? (
+                    <LockIcon size={12} color="#b91c1c" />
+                  ) : hasAudio ? (
+                    <MicIcon size={12} color={isSelected ? '#047857' : '#059669'} />
+                  ) : (
+                    <UserIcon size={12} color={isSelected ? '#047857' : '#64748b'} />
+                  )}
+                  <span>{s.full_name}</span>
+                  {isLockedByOther && (
+                    <span style={{ fontSize: 10, fontStyle: 'italic', color: '#991b1b' }}>({studentSub.locked_by_teacher_name})</span>
+                  )}
+                  {isGraded && !isLockedByOther && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>({score}/{calculatedMaxMarks})</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -632,7 +825,7 @@ export function HomeworkGridSheetView({
                         </div>
                       ) : (
                         <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-                          Standard Recitation
+                           Recitation Rule
                         </span>
                       )}
                     </td>
