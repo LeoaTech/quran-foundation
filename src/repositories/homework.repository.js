@@ -454,6 +454,33 @@ async function bulkUpsertHomeworkMarks({ assignmentId, classId, marks = [], stud
       existingRows.forEach((r) => validSubtopicIds.add(r.id));
     }
 
+    // 3. Verify evaluation lock for target students
+    const targetStudentIds = Array.from(
+      new Set(marks.map((m) => m.student_id).filter(Boolean))
+    );
+    if (targetStudentIds.length > 0 && userId && classId) {
+      const existingSubmissions = await trx('homework_submissions')
+        .where({ assignment_id: assignmentId, class_id: classId })
+        .whereIn('student_id', targetStudentIds);
+
+      for (const sub of existingSubmissions) {
+        if (sub.locked_by_teacher_id && String(sub.locked_by_teacher_id) !== String(userId)) {
+          if (sub.locked_at) {
+            const lockAgeMs = Date.now() - new Date(sub.locked_at).getTime();
+            const MAX_LOCK_MS = 15 * 60 * 1000; // 15 mins
+            if (lockAgeMs < MAX_LOCK_MS) {
+              const teacherName = sub.locked_by_teacher_name || 'another teacher';
+              const err = new Error(
+                `Cannot save marks for student because they are currently locked and being evaluated by ${teacherName}.`
+              );
+              err.status = 409;
+              throw err;
+            }
+          }
+        }
+      }
+    }
+
     const studentScores = new Map();
 
     for (const item of marks) {
