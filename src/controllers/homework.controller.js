@@ -92,6 +92,21 @@ async function saveHomeworkGridMarks(req, res) {
 }
 
 
+async function submitHomeworkAudio(req, res) {
+  try {
+    const { assignment_id } = req.params;
+    const { class_id, duration } = req.body || {};
+    const data = await service.submitStudentAudio({
+      user: req.user,
+      assignmentId: assignment_id,
+      classId: class_id || req.query.class_id,
+      file: req.file,
+      duration: duration || req.query.duration,
+    });
+    ok(res, data);
+  } catch (e) { err(res, e); }
+}
+
 module.exports = {
   getSchedule,
   saveSchedule,
@@ -100,6 +115,8 @@ module.exports = {
   getAssignmentContent,
   linkContentToAssignment,
   getHomeworkGridSheet,
-  saveHomeworkGridMarks
+  saveHomeworkGridMarks,
+  submitHomeworkAudio,
 };
+
 
