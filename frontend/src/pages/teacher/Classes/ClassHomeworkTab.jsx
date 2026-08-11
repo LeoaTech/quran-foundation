@@ -7,6 +7,7 @@ import EmptyState from '../../../components/EmptyState';
 import Badge from '../../../components/Badge';
 import HomeworkGridModal, { HomeworkGridSheetView } from './HomeworkGridModal';
 import { useToast } from '../../../hooks/useToast';
+import { BookIcon, UserIcon, CalendarIcon } from '../../../components/Icons';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,14 +62,10 @@ function fmtDate(dateStr) {
  * - due_date < today → overdue and no marks      → 'pending'
  * - otherwise        → upcoming
  */
-function getAssignmentStatus(dueDateStr, isFullyMarked, hasAnyMarks) {
+function getAssignmentStatus(dueDateStr, isFullyMarked, hasAnyMarks, isPublished = true) {
   if (isFullyMarked) return 'marked';
   if (hasAnyMarks) return 'in_progress';
-  if (!dueDateStr) return 'upcoming';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dueDateStr + 'T00:00:00');
-  if (due < today) return 'pending';
+  if (isPublished || dueDateStr) return 'pending';
   return 'upcoming';
 }
 
@@ -453,7 +450,7 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
 
         {assignments.length === 0 ? (
           <EmptyState
-            icon="📚"
+            icon={<BookIcon size={36} color="var(--emerald)" />}
             title="No assignments scheduled"
             description="The admin has not configured a homework schedule for this course yet."
           />
@@ -483,7 +480,7 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
               <tbody>
 
                 {assignments.map((a, idx) => {
-                  const status = getAssignmentStatus(a.resolved_due_date, a.is_fully_marked, a.has_any_marks);
+                  const status = getAssignmentStatus(a.resolved_due_date, a.is_fully_marked, a.has_any_marks, a.is_published);
                   const isLast = idx === assignments.length - 1;
                   const canOpen = Boolean(a.is_published);
                   const isClickable = canOpen;
@@ -550,8 +547,8 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
                       <td style={{ padding: '12px 16px' }}>
                         <StatusBadge status={status} />
                         {a.marked_by_teacher_name && (
-                          <div style={{ fontSize: 11, color: 'var(--emerald, #059669)', marginTop: 4, fontWeight: 500 }}>
-                            👤 {a.marked_by_teacher_name}
+                          <div style={{ fontSize: 11, color: 'var(--emerald, #059669)', marginTop: 4, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <UserIcon size={12} color="var(--emerald, #059669)" /> {a.marked_by_teacher_name}
                           </div>
                         )}
                       </td>
