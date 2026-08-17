@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { getHomeworkGridSheet } from '../../../api/homework';
@@ -7,7 +7,9 @@ import LoadingSpinner from '../../../components/LoadingSpinner';
 import EmptyState from '../../../components/EmptyState';
 import AudioPlayer from '../../../components/AudioPlayer';
 import AudioRecorder from '../../../components/AudioRecorder';
-import { MicIcon, ClockIcon, CheckIcon, EditIcon, LockIcon, RefreshIcon, BookIcon } from '../../../components/Icons';
+import Button from '../../../components/Button';
+import Modal from '../../../components/Modal';
+import { MicIcon, ClockIcon, CheckIcon, EditIcon, LockIcon, RefreshIcon, BookIcon, TrashIcon } from '../../../components/Icons';
 import Badge from '../../../components/Badge';
 
 function safeFormatDate(dateStr) {
@@ -32,6 +34,10 @@ const S = {
     fontWeight: 600,
     fontSize: 14,
     width: 'fit-content',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
   },
   headerCard: {
     background: 'var(--white, #ffffff)',
@@ -123,9 +129,16 @@ const S = {
 
 export default function StudentAssignmentGridPage() {
   const { id: classId, assignmentId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
   const [showReplaceRecorder, setShowReplaceRecorder] = useState(false);
+  const [hasUnsavedAudio, setHasUnsavedAudio] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingTargetUrl, setPendingTargetUrl] = useState(null);
+
+  const audioRecorderRef = useRef(null);
 
   const { data: gridData, isLoading, refetch } = useQuery({
     queryKey: ['homework-grid', assignmentId, classId],
@@ -136,6 +149,67 @@ export default function StudentAssignmentGridPage() {
   const assignment = gridData?.assignment;
   const contents = gridData?.contents || [];
   const calculatedMaxMarks = gridData?.calculated_max_marks || assignment?.total_marks || 0;
+
+  // Check if assignment due date has passed
+  const isDueDatePassed = useMemo(() => {
+    if (!assignment?.due_date) return false;
+    const clean = String(assignment.due_date).split('T')[0];
+    const due = new Date(clean + 'T23:59:59');
+    return new Date() > due;
+  }, [assignment?.due_date]);
+
+  // Handle beforeunload to warn user when navigating away or refreshing tab
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedAudio) {
+        e.preventDefault();
+        e.returnValue = 'You have an unsaved voice recording. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedAudio]);
+
+  // Intercept in-app navigation when unsaved audio exists
+  const handleLeavePageAttempt = (targetUrl) => {
+    if (hasUnsavedAudio) {
+      setPendingTargetUrl(targetUrl);
+      setShowUnsavedModal(true);
+    } else {
+      navigate(targetUrl);
+    }
+  };
+
+  // Discard recording & leave page
+  const handleConfirmDiscardAndLeave = () => {
+    if (audioRecorderRef.current?.discardAudio) {
+      audioRecorderRef.current.discardAudio();
+    }
+    setHasUnsavedAudio(false);
+    setShowUnsavedModal(false);
+    if (pendingTargetUrl) {
+      navigate(pendingTargetUrl);
+    }
+  };
+
+  // Submit audio & leave page
+  const handleConfirmSubmitAndLeave = async () => {
+    setShowUnsavedModal(false);
+    if (audioRecorderRef.current?.performUploadImmediately) {
+      try {
+        await audioRecorderRef.current.performUploadImmediately();
+        setHasUnsavedAudio(false);
+        if (pendingTargetUrl) {
+          navigate(pendingTargetUrl);
+        }
+      } catch (err) {
+        console.error('Submit & Leave failed:', err);
+      }
+    } else if (audioRecorderRef.current?.submitAudio) {
+      audioRecorderRef.current.submitAudio();
+    }
+  };
 
   // Find logged-in student's submission & marks
   const studentSubmission = useMemo(() => {
@@ -148,9 +222,14 @@ export default function StudentAssignmentGridPage() {
   const submittedAudioDuration = studentSubmission?.audio_duration;
 
   const handleAudioSuccess = () => {
+    setHasUnsavedAudio(false);
     setShowReplaceRecorder(false);
     queryClient.invalidateQueries(['homework-grid', assignmentId, classId]);
     refetch();
+    if (pendingTargetUrl) {
+      navigate(pendingTargetUrl);
+      setPendingTargetUrl(null);
+    }
   };
 
   // Flatten words across all linked contents
@@ -238,13 +317,18 @@ export default function StudentAssignmentGridPage() {
   }
 
   const isEvaluated = studentSubmission?.status === 'evaluated';
+  const isSubmissionDisabled = isEvaluated || isDueDatePassed;
 
   return (
     <div style={S.wrap}>
       {/* Navigation */}
-      <Link to={`/student/classrooms/${classId}`} style={S.backLink}>
+      <button
+        type="button"
+        onClick={() => handleLeavePageAttempt(`/student/classrooms/${classId}`)}
+        style={S.backLink}
+      >
         ← Back to Classroom Homework
-      </Link>
+      </button>
 
       {/* Header Card */}
       <div style={S.headerCard}>
@@ -262,8 +346,9 @@ export default function StudentAssignmentGridPage() {
               <MicIcon size={13} color="#047857" style={{ marginRight: 4 }} /> Audio Submitted
             </Badge>
           ) : (
-            <Badge variant="amber">
-              <ClockIcon size={13} color="#92400e" style={{ marginRight: 4 }} /> Pending Submission
+            <Badge variant={isDueDatePassed ? "red" : "amber"}>
+              <ClockIcon size={13} color={isDueDatePassed ? "#dc2626" : "#92400e"} style={{ marginRight: 4 }} />
+              {isDueDatePassed ? "Due Date Passed" : "Pending Submission"}
             </Badge>
           )}
 
@@ -297,7 +382,30 @@ export default function StudentAssignmentGridPage() {
         </div>
       </div>
 
-      {/* Student Audio Submission Section  */}
+      {/* Due Date Passed Warning Banner */}
+      {isDueDatePassed && !isEvaluated && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #fffbe6 0%, #fefce8 100%)',
+            border: '1px solid #fde68a',
+            borderRadius: 10,
+            padding: '14px 18px',
+            fontSize: 13,
+            color: '#92400e',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+          }}
+        >
+          <LockIcon size={20} color="#b45309" style={{ flexShrink: 0 }} />
+          <div>
+            <strong>Assignment Submission Locked:</strong> The due date for this assignment ({safeFormatDate(assignment?.due_date)}) has passed. Audio recording and submissions are closed so your teacher can evaluate your homework.
+          </div>
+        </div>
+      )}
+
+      {/* Student Audio Submission Section */}
       <div
         style={{
           position: 'sticky',
@@ -319,6 +427,7 @@ export default function StudentAssignmentGridPage() {
           </div>
           <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Max Duration: 3 Minutes</span>
         </div>
+
         {isEvaluated ? (
           // Read-Only mode after Teacher Evaluation
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -358,27 +467,29 @@ export default function StudentAssignmentGridPage() {
                   title="Your Submitted Audio (Pending Evaluation)"
                   duration={submittedAudioDuration}
                 />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowReplaceRecorder(true)}
-                    style={{
-                      background: 'none',
-                      border: '1px solid var(--emerald, #059669)',
-                      color: 'var(--emerald, #059669)',
-                      padding: '6px 14px',
-                      borderRadius: 'var(--radius-md, 8px)',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <RefreshIcon size={14} color="var(--emerald, #059669)" /> Replace / Re-record Audio Submission
-                  </button>
-                </div>
+                {!isDueDatePassed && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowReplaceRecorder(true)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--emerald, #059669)',
+                        color: 'var(--emerald, #059669)',
+                        padding: '6px 14px',
+                        borderRadius: 'var(--radius-md, 8px)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <RefreshIcon size={14} color="var(--emerald, #059669)" /> Replace / Re-record Audio Submission
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div>
@@ -402,8 +513,11 @@ export default function StudentAssignmentGridPage() {
                   </div>
                 )}
                 <AudioRecorder
+                  ref={audioRecorderRef}
                   assignmentId={assignmentId}
                   classId={classId}
+                  disabled={isSubmissionDisabled}
+                  onUnsavedAudioChange={(hasUnsaved) => setHasUnsavedAudio(hasUnsaved)}
                   onUploadSuccess={handleAudioSuccess}
                   currentAudioUrl={submittedAudioUrl}
                   currentAudioDuration={submittedAudioDuration}
@@ -414,99 +528,90 @@ export default function StudentAssignmentGridPage() {
         )}
       </div>
 
-      {/* Teacher Remarks Card - On Top if available */}
+      {/* Teacher Remarks Card */}
       {teacherRemarks && teacherRemarks !== 'Evaluated via Homework Sheet' && (
         <div style={S.remarksBanner}>
           <div style={{ ...S.remarksHeader, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <BookIcon size={16} color="#047857" /> Teacher Remarks & Feedback
+            <BookIcon size={18} color="#047857" /> Teacher Remarks & Evaluation Notes
           </div>
-
           <div style={S.remarksBody}>{teacherRemarks}</div>
         </div>
       )}
 
-      {/* Paper Sheet Table */}
-      {contents.length === 0 ? (
+      {/* Assignment Words Table */}
+      {flattenedRows.length === 0 ? (
         <EmptyState
-          icon={<BookIcon size={36} color="var(--emerald)" />}
-          title="No Content Attached"
-          description="No practice content items have been assigned to this homework sheet."
+          title="No Assignment Content"
+          message="No words or reading items are linked to this homework assignment yet."
         />
       ) : (
         <div style={S.tableWrap}>
           <table style={S.table}>
             <thead>
               <tr>
-                <th style={{ ...S.th, width: 50, textAlign: 'center' }}>#</th>
-                <th style={{ ...S.th, minWidth: 220 }}>Verse / Word</th>
-                <th style={{ ...S.th, minWidth: 180 }}>Assessed Rules</th>
-                <th style={{ ...S.th, minWidth: 150 }}>Notes</th>
-                <th style={{ ...S.th, textAlign: 'center', width: 110 }}>Max Marks</th>
-                <th style={{ ...S.th, textAlign: 'center', width: 130 }}>Obtained Marks</th>
+                <th style={{ ...S.th, width: 60 }}>#</th>
+                <th style={S.th}>Assignment Word / Content</th>
+                <th style={S.th}>Tajweed Rules</th>
+                <th style={{ ...S.th, width: 130 }}>Max Marks</th>
+                {isEvaluated && <th style={{ ...S.th, width: 140 }}>Obtained Score</th>}
               </tr>
             </thead>
             <tbody>
               {flattenedRows.map((row, idx) => {
-                const firstRule = row.rules?.[0];
-                const subId = firstRule?.subtopic_id || null;
+                const subId = row.rules?.[0]?.subtopic_id || null;
                 const keyWithSub = `${row.wordId}_${subId || 'default'}`;
                 const keyWordOnly = `${row.wordId}`;
-                const obtainedVal = studentMarksMap.get(keyWithSub) ?? studentMarksMap.get(keyWordOnly);
-
-                const isGraded = obtainedVal !== undefined && obtainedVal !== null;
+                const obtainedMark = studentMarksMap.get(keyWithSub) ?? studentMarksMap.get(keyWordOnly);
 
                 return (
                   <tr key={`${row.wordId}-${idx}`}>
-                    <td style={{ ...S.td, color: 'var(--ink-soft)', fontSize: 13, textAlign: 'center', fontWeight: 600 }}>
-                      {idx + 1}
-                    </td>
-
-                    {/* Word & Arabic Text */}
+                    <td style={{ ...S.td, fontWeight: 600, color: 'var(--ink-soft)' }}>{idx + 1}</td>
                     <td style={S.td}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <span style={S.arabicText}>{row.wordText}</span>
-                        <span style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 500 }}>
-                          {row.contentTitle} {row.translation ? `— "${row.translation}"` : ''}
-                        </span>
+                        <div style={S.arabicText}>{row.wordText}</div>
+                        {row.translation && (
+                          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{row.translation}</div>
+                        )}
+                        <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>
+                          Source: {row.contentTitle}
+                        </div>
                       </div>
                     </td>
-
-                    {/* Rules */}
                     <td style={S.td}>
                       {row.rules.length > 0 ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {row.rules.map((r, rIdx) => (
+                          {row.rules.map((rule, rIdx) => (
                             <span key={rIdx} style={S.ruleBadge}>
-                              {r.rule_name || r.subtopic_name || 'Rule'} ({r.marks_per_rule || 1} mk)
+                              {rule.rule_name || rule.rule_code || 'Tajweed Rule'} ({rule.marks_per_rule || 1}m)
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-                          Recitation Rule
-                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>—</span>
                       )}
                     </td>
-
-                    <td style={{ ...S.td, color: 'var(--ink)', fontSize: 13 }}>
-                      {row.comments}
-                    </td>
-
-                    {/* Max Marks */}
-                    <td style={{ ...S.td, textAlign: 'center', fontWeight: 600, color: 'var(--ink-soft)', fontSize: 14 }}>
-                      {row.maxMarks}
-                    </td>
-
-                    {/* Student Obtained Marks */}
-                    <td style={{ ...S.td, textAlign: 'center', fontWeight: 700, fontSize: 15 }}>
-                      {isGraded ? (
-                        <span style={{ color: obtainedVal >= row.maxMarks ? 'var(--emerald, #059669)' : '#d97706' }}>
-                          {obtainedVal} / {row.maxMarks}
-                        </span>
-                      ) : (
-                        <span style={{ color: 'var(--ink-soft)', fontWeight: 500 }}>—</span>
-                      )}
-                    </td>
+                    <td style={{ ...S.td, fontWeight: 700, color: 'var(--ink)' }}>{row.maxMarks}</td>
+                    {isEvaluated && (
+                      <td style={S.td}>
+                        {obtainedMark !== undefined && obtainedMark !== null ? (
+                          <span
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: Number(obtainedMark) === row.maxMarks ? '#047857' : '#b45309',
+                              background: Number(obtainedMark) === row.maxMarks ? '#ecfdf5' : '#fffbe6',
+                              padding: '4px 10px',
+                              borderRadius: 12,
+                              border: `1px solid ${Number(obtainedMark) === row.maxMarks ? '#a7f3d0' : '#fde68a'}`,
+                            }}
+                          >
+                            {obtainedMark} / {row.maxMarks}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 13, color: '#94a3b8' }}>0 / {row.maxMarks}</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -514,6 +619,71 @@ export default function StudentAssignmentGridPage() {
           </table>
         </div>
       )}
+
+      {/* Unsaved Changes Warning Modal */}
+      <Modal
+        open={showUnsavedModal}
+        title="Unsaved Voice Recording"
+        size="md"
+        onClose={() => setShowUnsavedModal(false)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div
+            style={{
+              background: '#fff7ed',
+              border: '1px solid #ffedd5',
+              borderRadius: 10,
+              padding: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+            }}
+          >
+            <ClockIcon size={24} color="#c2410c" style={{ marginTop: 2, flexShrink: 0 }} />
+            <div style={{ fontSize: 14, color: '#9a3412', lineHeight: 1.5 }}>
+              <strong>Unsaved Audio Recording Detected!</strong>
+              <br />
+              You have recorded or attached an audio recitation that has not been submitted yet. Leaving this page will lose your recording.
+            </div>
+          </div>
+
+          <div style={{ fontSize: 13, color: 'var(--ink-soft, #64748b)' }}>
+            Do you want to discard your recording or submit it before leaving?
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justify: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              paddingTop: 14,
+              borderTop: '1px solid var(--sand-mid, #e2e8f0)',
+            }}
+          >
+            <Button
+              variant="outline"
+              onClick={handleConfirmDiscardAndLeave}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#dc2626', borderColor: '#fca5a5' }}
+            >
+              <TrashIcon size={14} color="#dc2626" /> Discard & Leave
+            </Button>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button variant="ghost" onClick={() => setShowUnsavedModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleConfirmSubmitAndLeave}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <CheckIcon size={14} color="#ffffff" /> Submit & Leave
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
