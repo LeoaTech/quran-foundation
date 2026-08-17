@@ -171,17 +171,19 @@ function StudentsTab({ classId, cls, isMobile }) {
             <option value="dropped_withdrawn">Dropped/Withdrawn</option>
           </select>
         </div>
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() => {
-            const params = new URLSearchParams({ class_id: classId });
-            if (cls?.course_id) params.set('course_id', cls.course_id);
-            navigate(`/manager/enrollment?${params.toString()}`);
-          }}
-        >
-          + Enroll Student
-        </Button>
+        <Can permission="enrollments.create">
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => {
+              const params = new URLSearchParams({ class_id: classId });
+              if (cls?.course_id) params.set('course_id', cls.course_id);
+              navigate(`/manager/enrollment?${params.toString()}`);
+            }}
+          >
+            + Enroll Student
+          </Button>
+        </Can>
       </div>
 
       {filteredRows.length === 0 ? (

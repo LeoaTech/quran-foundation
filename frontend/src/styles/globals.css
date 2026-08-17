@@ -1383,18 +1383,20 @@
 }
 .f-label {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-mid);
   letter-spacing: 0.02em;
 }
 .f-input,
 .f-select,
 .f-textarea {
+  box-sizing: border-box;
+  max-width: 100%;
   padding: 10px 13px;
   border: 1.5px solid var(--sand-deep);
   border-radius: var(--radius-md);
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink);
   background: var(--white);
   outline: none;
@@ -1406,10 +1408,10 @@
 .f-select:focus,
 .f-textarea:focus {
   border-color: var(--emerald-bright);
-  box-shadow: 0 0 0 3px rgba(42, 170, 132, 0.1);
+  box-shadow: 0 0 0 3px rgba(42, 170, 132, 0.12);
 }
 .f-textarea {
-  resize: none;
+  resize: vertical;
 }
 .f-urdu {
   direction: rtl;
@@ -1427,11 +1429,11 @@
   .f-select,
   .f-textarea {
     padding: 9px 12px;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .f-label {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 
@@ -1443,21 +1445,26 @@
   .f-input,
   .f-select,
   .f-textarea {
-    padding: 8px 11px;
-    font-size: 11px;
+    padding: 9px 11px;
+    font-size: 13px;
   }
 }
 
 /* ── BUTTONS ── */
 .btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 9px 18px;
   border-radius: var(--radius-md);
   font-family: var(--font-body);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
   border: none;
+  white-space: nowrap;
 }
 .btn-primary {
   background: var(--emerald);
@@ -1480,15 +1487,15 @@
 
 @media (max-width: 768px) {
   .btn {
-    padding: 8px 16px;
+    padding: 8px 14px;
     font-size: 12px;
   }
 }
 
 @media (max-width: 640px) {
   .btn {
-    padding: 8px 14px;
-    font-size: 11px;
+    padding: 8px 12px;
+    font-size: 12px;
   }
 }
 
