@@ -13,6 +13,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { getTopics } from '../../../../api/courses'; // Assuming standard topic endpoints
 import { getCenterTeacherTopics, assignTeacherTopic, removeTeacherTopic, updateTeacherTopic } from '../../../../api/teacherTopics';
 import { getUsers } from '../../../../api/users'; // Assuming standard user endpoint
+import { UserIcon } from '../../../../components/Icons';
 
 export default function TopicAssignmentTab({ cls }) {
   const centerId = cls.center_id;
@@ -129,7 +130,7 @@ export default function TopicAssignmentTab({ cls }) {
           <CardBody>
             <form onSubmit={handleAssign}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px', marginBottom: 16 }}>
-                
+
                 {/* Topic selection is disabled so the user can only modify the teacher selection */}
                 <div className="f-group">
                   <label className="f-label">Selected Topic</label>
@@ -198,65 +199,71 @@ export default function TopicAssignmentTab({ cls }) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
                   gap: 12,
-                  padding: '11px 16px',
+                  flexWrap: 'wrap',
+                  padding: '14px 16px',
                   borderBottom: isLast ? 'none' : '1px solid var(--sand-mid)',
                 }}
               >
-                {/* Numeric Indicator Circular Badge */}
-                <div
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: '50%',
-                    background: 'var(--emerald-light)',
-                    color: 'var(--emerald)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    flexShrink: 0,
-                  }}
-                >
-                  {t.display_order || i + 1}
-                </div>
+                {/* Topic Indicator & Details */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 240px', minWidth: 200 }}>
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: 'var(--emerald-light)',
+                      color: 'var(--emerald)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {t.display_order || i + 1}
+                  </div>
 
-                {/* Topic Titles Details */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-                    {t.title}
-                    {t.title_ur && (
-                      <span
-                        className="urdu"
-                        style={{
-                          fontSize: 12,
-                          color: 'var(--ink-soft)',
-                          marginLeft: 8,
-                          display: 'inline-block',
-                          fontFamily: 'var(--font-display)',
-                        }}
-                      >
-                        ({t.title_ur})
-                      </span>
-                    )}
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.4 }}>
+                      {t.title}
+                      {t.title_ur && (
+                        <span
+                          className="urdu"
+                          style={{
+                            fontSize: 13,
+                            color: 'var(--ink-soft)',
+                            marginLeft: 8,
+                            display: 'inline-block',
+                            fontFamily: 'var(--font-display)',
+                          }}
+                        >
+                          ({t.title_ur})
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
+
                 {/* Assignment Status Actions & Badges */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', flex: '1 1 auto' }}>
                   {assignment ? (
                     <>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--emerald)' }}>
-                        {assignment.teacher_name}
-                      </span>
-                      <Badge variant="green">Assigned</Badge>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--emerald, #059669)', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6, border: '1px solid #a7f3d0' }}>
+                          <UserIcon size={12} color="var(--emerald, #059669)" /> {assignment.teacher_name}
+                        </span>
+                        <Badge variant="green">Assigned</Badge>
+                      </div>
                       {canEdit && (
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <Button size="xs" variant="outline" onClick={() => handleEdit(assignment)}>
-                            Change
+                            Edit
                           </Button>
-                          <Button size="xs" variant="outline" onClick={() => handleRemove(assignment.id)} style={{ color: 'var(--red)' }}>
+                          <Button size="xs" variant="outline" onClick={() => handleRemove(assignment.id)} style={{ color: 'var(--red)', borderColor: '#fca5a5' }}>
                             Remove
                           </Button>
                         </div>

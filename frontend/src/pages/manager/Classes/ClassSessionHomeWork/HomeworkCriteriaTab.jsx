@@ -380,6 +380,7 @@ const styles = {
         justifyContent: "space-between",
         alignItems: "center",
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 12,
         marginBottom: 10,
         width: '100%',
