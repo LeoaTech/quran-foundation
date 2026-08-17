@@ -122,15 +122,15 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
       alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
       <div style={{
-        background: '#fff', borderRadius: 12, width: '100%', maxWidth: 580,
-        maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        background: '#fff', borderRadius: 12, width: '95%', maxWidth: 620,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
         boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
       }}>
         {/* Header */}
         <div style={{
           padding: '16px 20px', borderBottom: '1px solid var(--border, #e5e7eb)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: 'var(--surface-0, #fafafa)',
+          background: 'var(--surface-0, #fafafa)', flexWrap: 'wrap', gap: 10,
         }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
@@ -144,7 +144,7 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
 
             <button
               onClick={onClose}
-              style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-soft)' }}
+              style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--ink-soft)', padding: '0 4px' }}
             >×</button>
           </div>
         </div>
@@ -184,7 +184,7 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
               {allContent.map((item) => {
                 const isChecked = activeSelected.includes(item.id);
                 return (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <div
                       onClick={() => handleToggle(item.id)}
                       style={{
@@ -213,7 +213,7 @@ function AssignContentModal({ courseId, assignment, onClose, onSaved }) {
                             <span>Surah {item.surah_number}{item.ayah_number ? `:${item.ayah_number}` : ''}</span>
                           )}
                           {item.total_marks > 0 && (
-                            <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>📐 {item.total_marks} marks</span>
+                            <span style={{ color: 'var(--emerald)', fontWeight: 600 }}> {item.total_marks} marks</span>
                           )}
                           <span>({item.words?.length ?? 0} words)</span>
                         </div>
@@ -339,7 +339,7 @@ function ScheduleForm({ courseId, course, existing, onSaved, onClose }) {
         ℹ️ Configure the expected number of assignments and frequency for this course. Assignments due dates will be configured per center cohort by center managers.
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         <Field label="Frequency" hint={`One assignment every ${currentOpt?.hint ?? 'interval'}`}>
           <select
             className="f-select"
@@ -380,7 +380,7 @@ function ScheduleForm({ courseId, course, existing, onSaved, onClose }) {
         </Field>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8, gap: 10 }}>
         <button
           onClick={onClose}
           style={{
@@ -434,46 +434,74 @@ function AssignmentRow({ assignment, courseId }) {
 
   return (
     <div style={{
-      border: '1px solid var(--sand-mid)',
-      borderRadius: 8,
-      background: 'var(--white)',
+      border: '1.5px solid var(--sand-mid, #e2e8f0)',
+      borderRadius: 10,
+      background: 'var(--white, #ffffff)',
       overflow: 'hidden',
+      marginBottom: 10,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
     }}>
-      {/* Row header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+      {/* Row header layout */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justify: 'space-between',
+        gap: 14,
+        padding: '14px 18px',
+        flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flex: '1 1 260px', minWidth: 0 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+            background: '#e6f4f0', color: 'var(--emerald, #059669)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, marginTop: 2,
+          }}>
+            {assignment.assignment_number}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink, #0f172a)', lineHeight: 1.3 }}>
+              {assignment.title}
+            </div>
+            {assignment.title_ur && (
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)', direction: 'rtl', fontFamily: 'var(--font-display)', marginTop: 2 }}>
+                {assignment.title_ur}
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 6, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>📅 Schedule Due: Configured per cohort</span>
+              {linkedCount > 0 ? (
+                <span style={{ color: '#047857', fontWeight: 600 }}>📖 {linkedCount} content item{linkedCount !== 1 ? 's' : ''}</span>
+              ) : (
+                <span style={{ color: '#94a3b8' }}>📖 No content linked</span>
+              )}
+              {totalMarks > 0 && (
+                <span style={{ color: '#047857', fontWeight: 700, background: '#d1fae5', padding: '2px 8px', borderRadius: 12, border: '1px solid #a7f3d0' }}>
+                  {totalMarks} total marks
+                </span>
+              )}
+              <Badge variant={assignment.is_published ? 'green' : 'sand'} style={{ padding: '5px 10px', fontSize: 12 }}>
+                {assignment.is_published ? '● Published' : 'Draft'}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons on the right side - Clean aligned flex group */}
         <div style={{
-          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-          background: 'var(--emerald-light)', color: 'var(--emerald)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+          flexShrink: 0,
         }}>
-          {assignment.assignment_number}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)' }}>
-            {assignment.title}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-pale)', marginTop: 4, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span>📅 Due date: Configured per classroom cohort</span>
-            {linkedCount > 0 ? (
-              <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>📖 {linkedCount} content item{linkedCount !== 1 ? 's' : ''}</span>
-            ) : (
-              <span style={{ color: 'var(--ink-pale)' }}>📖 No content linked</span>
-            )}
-            {totalMarks > 0 && (
-              <span style={{ color: 'var(--emerald)', fontWeight: 700, background: '#d1fae5', padding: '1px 6px', borderRadius: 10 }}>📐 {totalMarks} total marks</span>
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-          <Badge variant={assignment.is_published ? 'green' : 'sand'}>
-            {assignment.is_published ? 'Published' : 'Draft'}
-          </Badge>
+
           <Button size="sm" variant="outline" onClick={() => setShowAssignModal(true)}>
             🔗 Assign Content
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowGridModal(true)}>
-            Preview Grid Sheet
+            Preview Content
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setEditing((v) => !v)}>
             {editing ? 'Cancel' : 'Edit'}
@@ -481,34 +509,34 @@ function AssignmentRow({ assignment, courseId }) {
         </div>
       </div>
 
-
       {/* Inline edit form */}
       {editing && (
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--sand-mid)', background: 'var(--surface-0)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div style={{ padding: '16px 18px', borderTop: '1px solid var(--sand-mid)', background: '#fafafa' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 14 }}>
             <Field label="Title (English)">
-              <input className="f-input" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+              <input className="f-input" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} style={{ fontSize: 14 }} />
             </Field>
             <Field label="Title (Urdu)">
-              <input className="f-input" style={{ direction: 'rtl' }} value={form.title_ur} onChange={(e) => setForm((f) => ({ ...f, title_ur: e.target.value }))} />
+              <input className="f-input" style={{ direction: 'rtl', fontSize: 14 }} value={form.title_ur} onChange={(e) => setForm((f) => ({ ...f, title_ur: e.target.value }))} />
             </Field>
           </div>
           <Field label="Specific Instructions">
-            <textarea className="f-input" rows={2} style={{ resize: 'vertical' }} value={form.instructions}
+            <textarea className="f-input" rows={2} style={{ resize: 'vertical', fontSize: 14 }} value={form.instructions}
               onChange={(e) => setForm((f) => ({ ...f, instructions: e.target.value }))}
               placeholder="Any specific instructions for this particular homework…" />
           </Field>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--ink)' }}>
               <input
                 type="checkbox"
                 checked={form.is_published}
                 onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
               />
               Published (visible to students when due date arrives)
             </label>
             <Button size="sm" variant="primary" onClick={() => mut.mutate()} isLoading={mut.isPending}>
-              Save
+              Save Changes
             </Button>
           </div>
         </div>
