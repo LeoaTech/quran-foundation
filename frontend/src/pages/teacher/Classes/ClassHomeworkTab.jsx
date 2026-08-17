@@ -546,11 +546,11 @@ export default function ClassHomeworkTab({ courseId, classId, cls }) {
                       {/* Status */}
                       <td style={{ padding: '12px 16px' }}>
                         <StatusBadge status={status} />
-                        {a.marked_by_teacher_name && (
+                        {/* {a.marked_by_teacher_name && (
                           <div style={{ fontSize: 11, color: 'var(--emerald, #059669)', marginTop: 4, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <UserIcon size={12} color="var(--emerald, #059669)" /> {a.marked_by_teacher_name}
                           </div>
-                        )}
+                        )} */}
                       </td>
 
                       {/* Action */}

@@ -83,6 +83,7 @@ const S = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 16,
+    flexWrap: 'wrap',
     paddingTop: 16,
     borderTop: '1px solid var(--sand-mid)',
   },
@@ -132,7 +133,7 @@ export function HomeworkGridSheetView({
   const isLockedByOther = Boolean(isFullyMarked && evaluatorId && !isUserEvaluator);
   const effectiveReadOnly = readOnly || !isTeacher || isLockedByOther;
 
-  
+
   // Flatten words across all linked contents
   const flattenedRows = useMemo(() => {
     const rows = [];
@@ -142,7 +143,7 @@ export function HomeworkGridSheetView({
       if (words.length === 0) {
         rows.push({
           contentId: content.id,
-          contentTitle: content.title|| content.label || `Content (${content?.surah_number || 'Arabic Text'})`,
+          contentTitle: content.title || content.label || `Content (${content?.surah_number || 'Arabic Text'})`,
           wordId: `content-${content.id}`,
           wordText: content.arabic_text || content.title || '—',
           translation: content.translation || '',
@@ -188,7 +189,7 @@ export function HomeworkGridSheetView({
       gridData.marks.forEach((m) => {
         const subId = m.subtopic_id || 'default';
         const key = `${m.student_id}_${m.word_id}_${subId}`;
-        initialMarks.set(key, m.marks_obtained);
+        initialMarks.set(key, m.marks_awarded ?? m.marks_obtained);
       });
     }
 
@@ -252,19 +253,21 @@ export function HomeworkGridSheetView({
     return result;
   }, [students, studentSearchQuery, studentFilter, gridData?.submissions, user?.id, studentTotals]);
 
-  // Default select first available student (not locked by another teacher)
+  // Default select first available student (not locked by another teacher for teachers)
   useEffect(() => {
     if (students.length > 0 && !selectedStudentId && gridData?.submissions) {
-      const firstAvailable = students.find((s) => {
-        const sub = gridData.submissions.find((item) => String(item.student_id) === String(s.student_id));
-        return !sub?.locked_by_teacher_id || String(sub.locked_by_teacher_id) === String(user?.id);
-      }) || students[0];
+      const firstAvailable = isTeacher
+        ? (students.find((s) => {
+          const sub = gridData.submissions.find((item) => String(item.student_id) === String(s.student_id));
+          return !sub?.locked_by_teacher_id || String(sub.locked_by_teacher_id) === String(user?.id);
+        }) || students[0])
+        : students[0];
 
       if (firstAvailable) {
         handleSelectStudent(firstAvailable);
       }
     }
-  }, [students, selectedStudentId, gridData?.submissions]);
+  }, [students, selectedStudentId, gridData?.submissions, isTeacher]);
 
   // ── Summary Cards Calculations for Teachers & Center Managers ──────────────
   const totalStudentsCount = students.length;
@@ -316,27 +319,31 @@ export function HomeworkGridSheetView({
     });
   };
 
-  // Handle student selection with concurrent lock check
+  // Handle student selection with teacher concurrent lock check
   const handleSelectStudent = async (student, shouldAutoPlay = false) => {
     const studentSub = gridData?.submissions?.find((sub) => String(sub.student_id) === String(student.student_id));
     const currentUserId = user?.id;
 
-    if (studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(currentUserId)) {
-      toast.error(`${student.full_name} is currently being evaluated by ${studentSub.locked_by_teacher_name || 'another teacher'}.`);
-      return;
-    }
-
-    try {
-      if (classId && assignmentId && isTeacher) {
-        await lockStudentForEvaluation(assignmentId, classId, student.student_id, 'lock');
-      }
-    } catch (err) {
-      if (err?.response?.status === 409) {
-        toast.error(err?.response?.data?.message || 'Student is currently locked by another teacher.');
+    // Lock checking & lock acquisition apply ONLY to teachers who edit marks
+    if (isTeacher) {
+      if (studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(currentUserId)) {
+        toast.error(`${student.full_name} is currently being evaluated by ${studentSub.locked_by_teacher_name || 'another teacher'}.`);
         return;
       }
+
+      try {
+        if (classId && assignmentId) {
+          await lockStudentForEvaluation(assignmentId, classId, student.student_id, 'lock');
+        }
+      } catch (err) {
+        if (err?.response?.status === 409) {
+          toast.error(err?.response?.data?.message || 'Student is currently locked by another teacher.');
+          return;
+        }
+      }
     }
 
+    // Set selected student for viewing (Managers/Admins) or evaluation (Teachers)
     setSelectedStudentId(student.student_id);
 
     if (studentSub?.audio_url) {
@@ -371,7 +378,7 @@ export function HomeworkGridSheetView({
             student_id: s.student_id,
             word_id: row.wordId,
             subtopic_id: subId,
-            marks_obtained: Number(val) || 0,
+            marks_awarded: Number(val) || 0,
             max_marks: row.maxMarks,
           });
         });
@@ -395,6 +402,14 @@ export function HomeworkGridSheetView({
 
   const bodyContent = (
     <div style={S.wrap}>
+      <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
+
+        {onBack && (
+          <Button variant="outline" onClick={onBack} disabled={saveMut.isPending}>
+            ← Back to Assignments List
+          </Button>
+        )}
+      </div>
       {/* Header Banner */}
       <div style={S.headerBanner}>
         <div>
@@ -531,6 +546,8 @@ export function HomeworkGridSheetView({
                   type="button"
                   onClick={() => setStudentFilter('locked')}
                   style={{
+                    display:"flex",
+                    gap:4,
                     padding: '4px 10px',
                     fontSize: 12,
                     fontWeight: 600,
@@ -542,7 +559,8 @@ export function HomeworkGridSheetView({
                     boxShadow: studentFilter === 'locked' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                   }}
                 >
-                  🔒 Locked ({lockedByOthersCount})
+                  <LockIcon size={12} color="Green" style={{ flexShrink: 0 }} />
+                  Locked ({lockedByOthersCount})
                 </button>
               )}
               <button
@@ -565,9 +583,9 @@ export function HomeworkGridSheetView({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* Search Input */}
-            <div style={{ position: 'relative', flex: '1 1 220px', maxWidth: 300 }}>
+          {/* Student Search & Select Bar */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', width: '100%', marginBottom: 12 }}>
+            <div style={{ flex: '1 1 200px', minWidth: 160, position: 'relative' }}>
               <input
                 type="text"
                 placeholder="Search student name..."
@@ -581,6 +599,7 @@ export function HomeworkGridSheetView({
                   borderRadius: 8,
                   outline: 'none',
                   background: '#ffffff',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
@@ -593,28 +612,36 @@ export function HomeworkGridSheetView({
                 if (matched) handleSelectStudent(matched);
               }}
               style={{
-                flex: '2 1 320px',
+                flex: '2 1 260px',
+                minWidth: 200,
+                maxWidth: '100%',
                 padding: '8px 14px',
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: 600,
                 borderRadius: 8,
                 border: '1.5px solid var(--emerald, #059669)',
                 background: '#ffffff',
                 color: 'var(--ink)',
                 cursor: 'pointer',
+                boxSizing: 'border-box',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
               }}
             >
               {filteredStudents.map((s) => {
                 const studentSub = gridData?.submissions?.find((sub) => String(sub.student_id) === String(s.student_id));
-                const isLockedByOther = Boolean(
+                const isLockedByOtherTeacher = Boolean(
+                  isTeacher && studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(user?.id)
+                );
+                const isEvaluatingByTeacher = Boolean(
                   studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(user?.id)
                 );
                 const hasAudio = Boolean(studentSub?.audio_url);
                 const score = studentTotals.get(s.student_id) || 0;
 
                 return (
-                  <option key={s.student_id} value={s.student_id} disabled={isLockedByOther}>
-                    {s.full_name} {hasAudio ? ' [🎙️ Audio Submitted]' : ' [No Audio]'} — Score: {score}/{calculatedMaxMarks} {isLockedByOther ? ` (🔒 Locked by ${studentSub.locked_by_teacher_name})` : ''}
+                  <option key={s.student_id} value={s.student_id} disabled={isLockedByOtherTeacher}>
+                    {s.full_name} {hasAudio ? ' [Audio Submitted]' : ' [No Audio]'} - Score: {score}/{calculatedMaxMarks} {isEvaluatingByTeacher ? ` ( Evaluating: ${studentSub.locked_by_teacher_name || ''})` : ''}
                   </option>
                 );
               })}
@@ -625,7 +652,10 @@ export function HomeworkGridSheetView({
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, pt: 2 }}>
             {filteredStudents.map((s) => {
               const studentSub = gridData?.submissions?.find((sub) => String(sub.student_id) === String(s.student_id));
-              const isLockedByOther = Boolean(
+              const isLockedByOtherTeacher = Boolean(
+                isTeacher && studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(user?.id)
+              );
+              const isEvaluatingByTeacher = Boolean(
                 studentSub?.locked_by_teacher_id && String(studentSub.locked_by_teacher_id) !== String(user?.id)
               );
               const isSelected = String(s.student_id) === String(selectedStudentId);
@@ -641,7 +671,7 @@ export function HomeworkGridSheetView({
                 chipBg = '#ecfdf5';
                 chipBorder = '#059669';
                 chipColor = '#047857';
-              } else if (isLockedByOther) {
+              } else if (isLockedByOtherTeacher) {
                 chipBg = '#fef2f2';
                 chipBorder = '#fca5a5';
                 chipColor = '#991b1b';
@@ -655,9 +685,9 @@ export function HomeworkGridSheetView({
                 <button
                   key={s.student_id}
                   type="button"
-                  disabled={isLockedByOther}
+                  disabled={isLockedByOtherTeacher}
                   onClick={() => handleSelectStudent(s)}
-                  title={isLockedByOther ? `Currently being evaluated by Teacher ${studentSub.locked_by_teacher_name}` : `Select ${s.full_name} for grading`}
+                  title={isLockedByOtherTeacher ? `Currently being evaluated by Teacher ${studentSub.locked_by_teacher_name}` : `Select ${s.full_name} to view homework`}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -670,12 +700,12 @@ export function HomeworkGridSheetView({
                     fontSize: 12,
                     fontWeight: isSelected ? 700 : 500,
                     whiteSpace: 'nowrap',
-                    cursor: isLockedByOther ? 'not-allowed' : 'pointer',
-                    opacity: isLockedByOther ? 0.65 : 1,
+                    cursor: isLockedByOtherTeacher ? 'not-allowed' : 'pointer',
+                    opacity: isLockedByOtherTeacher ? 0.65 : 1,
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  {isLockedByOther ? (
+                  {isEvaluatingByTeacher ? (
                     <LockIcon size={12} color="#b91c1c" />
                   ) : hasAudio ? (
                     <MicIcon size={12} color={isSelected ? '#047857' : '#059669'} />
@@ -683,10 +713,10 @@ export function HomeworkGridSheetView({
                     <UserIcon size={12} color={isSelected ? '#047857' : '#64748b'} />
                   )}
                   <span>{s.full_name}</span>
-                  {isLockedByOther && (
+                  {isEvaluatingByTeacher && (
                     <span style={{ fontSize: 10, fontStyle: 'italic', color: '#991b1b' }}>({studentSub.locked_by_teacher_name})</span>
                   )}
-                  {isGraded && !isLockedByOther && (
+                  {isGraded && !isEvaluatingByTeacher && (
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>({score}/{calculatedMaxMarks})</span>
                   )}
                 </button>
@@ -825,7 +855,7 @@ export function HomeworkGridSheetView({
                         </div>
                       ) : (
                         <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-                           Recitation Rule
+                          Recitation Rule
                         </span>
                       )}
                     </td>
@@ -892,51 +922,76 @@ export function HomeworkGridSheetView({
                 );
               })}
 
-              {/* Overall Remarks / Feedback Row */}
-              {!isPreviewMode && selectedStudent && (
-                <tr style={{ background: '#f8fafc', borderTop: '2px solid var(--sand-mid)' }}>
-                  <td colSpan={5} style={{ ...S.td, padding: '16px 20px', fontWeight: 600, color: 'var(--ink)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <EditIcon size={15} color="var(--emerald, #059669)" /> Remarks & Feedback for {selectedStudent.full_name}
-                      </span>
-                      <span style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 400 }}>
-                        Explain mark deductions or provide specific Tajweed pronunciation advice for this student.
-                      </span>
-                    </div>
+              {/* Total Marks & Total Obtained Marks Summary Row */}
+              <tr style={{ background: '#f8fafc', borderTop: '2.5px solid var(--sand-mid, #cbd5e1)', fontWeight: 700 }}>
+                <td colSpan={4} style={{ ...S.td, textAlign: 'right', padding: '12px 16px', fontSize: 13, color: 'var(--ink, #111827)' }}>
+                  Total Assignment Marks:
+                </td>
+                <td style={{ ...S.td, textAlign: 'center', fontWeight: 800, color: 'var(--emerald, #059669)', fontSize: 15 }}>
+                  {calculatedMaxMarks}
+                </td>
+                {!isPreviewMode && selectedStudent && (
+                  <td style={{ ...S.td, textAlign: 'center', fontWeight: 800, color: (studentTotals.get(selectedStudent.student_id) || 0) > 0 ? 'var(--emerald, #059669)' : 'var(--ink, #111827)', fontSize: 15, background: '#ecfdf5' }}>
+                    {studentTotals.get(selectedStudent.student_id) || 0} / {calculatedMaxMarks}
                   </td>
-                  <td style={{ ...S.td, padding: '12px 14px', verticalAlign: 'top', background: '#f0fdf4' }}>
-                    {effectiveReadOnly ? (
-                      <div style={{ fontSize: 12, color: studentNotes[selectedStudent.student_id] ? 'var(--ink)' : 'var(--ink-soft)', fontStyle: studentNotes[selectedStudent.student_id] ? 'normal' : 'italic', whiteSpace: 'pre-wrap', minHeight: 40 }}>
-                        {studentNotes[selectedStudent.student_id] || 'No remarks provided.'}
-                      </div>
-                    ) : (
-                      <textarea
-                        disabled={saveMut.isPending}
-                        placeholder={`Add Tajweed feedback for ${selectedStudent.full_name}...`}
-                        value={studentNotes[selectedStudent.student_id] || ''}
-                        onChange={(e) => setStudentNotes((prev) => ({ ...prev, [selectedStudent.student_id]: e.target.value }))}
-                        rows={3}
-                        style={{
-                          width: '100%',
-                          minWidth: 160,
-                          fontSize: 12,
-                          padding: '8px 10px',
-                          border: '1px solid var(--emerald, #059669)',
-                          borderRadius: 6,
-                          resize: 'vertical',
-                          fontFamily: 'inherit',
-                          color: 'var(--ink, #111827)',
-                          background: '#ffffff',
-                          lineHeight: 1.4,
-                        }}
-                      />
-                    )}
-                  </td>
-                </tr>
-              )}
+                )}
+              </tr>
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Dedicated Separate Field for Teacher Remarks & Feedback */}
+      {!isPreviewMode && selectedStudent && (
+        <div style={{
+          marginTop: 16,
+          padding: '14px 16px',
+          borderRadius: 10,
+          background: '#f8fafc',
+          border: '1.5px solid var(--emerald, #059669)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 14, color: 'var(--ink, #111827)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <EditIcon size={16} color="var(--emerald, #059669)" /> Teacher Remarks & Feedback for {selectedStudent.full_name}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, background: '#ecfdf5', padding: '2px 8px', borderRadius: 12, border: '1px solid #a7f3d0' }}>
+              Score: <strong style={{ color: 'var(--emerald)' }}>{studentTotals.get(selectedStudent.student_id) || 0} / {calculatedMaxMarks} Marks</strong>
+            </span>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--ink-pale)', margin: 0 }}>
+            Provide specific Tajweed feedback, explanation of mark deductions, or guidance for this student.
+          </p>
+          {effectiveReadOnly ? (
+            <div style={{ fontSize: 13, color: studentNotes[selectedStudent.student_id] ? 'var(--ink)' : 'var(--ink-soft)', fontStyle: studentNotes[selectedStudent.student_id] ? 'normal' : 'italic', whiteSpace: 'pre-wrap', padding: '10px 12px', background: '#ffffff', borderRadius: 6, border: '1px solid var(--sand-mid)' }}>
+              {studentNotes[selectedStudent.student_id] || 'No remarks provided.'}
+            </div>
+          ) : (
+            <textarea
+              disabled={saveMut.isPending}
+              placeholder={`Enter detailed feedback and remarks for ${selectedStudent.full_name}...`}
+              value={studentNotes[selectedStudent.student_id] || ''}
+              onChange={(e) => setStudentNotes((prev) => ({ ...prev, [selectedStudent.student_id]: e.target.value }))}
+              rows={3}
+              style={{
+                width: '100%',
+                fontSize: 13,
+                padding: '10px 12px',
+                border: '1.5px solid var(--emerald, #059669)',
+                borderRadius: 8,
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                color: 'var(--ink, #111827)',
+                background: '#ffffff',
+                lineHeight: 1.5,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -947,7 +1002,7 @@ export function HomeworkGridSheetView({
             ? 'Preview Mode: Publish this assignment to evaluate student submissions.'
             : `Evaluating for ${students.length} enrolled students.`}
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {onClose && (
             <Button variant="outline" onClick={onClose} disabled={saveMut.isPending}>
               Close
