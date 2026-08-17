@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import Button from './Button';
 import Modal from './Modal';
+import LoadingSpinner from './LoadingSpinner';
 import { uploadHomeworkAudio } from '../api/homework';
 import { useToast } from '../hooks/useToast';
 import {
@@ -13,6 +14,7 @@ import {
   TrashIcon,
   CheckIcon,
   BookIcon,
+  LockIcon,
 } from './Icons';
 
 const MAX_DURATION_SECONDS = 180; // 3 Minutes limit
@@ -23,7 +25,18 @@ function formatSeconds(secs) {
   return `${String(mins).padStart(2, '0')}:${String(remainingSecs).padStart(2, '0')}`;
 }
 
-export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, currentAudioUrl = null, currentAudioDuration = null }) {
+const AudioRecorder = forwardRef(function AudioRecorder(
+  {
+    assignmentId,
+    classId,
+    onUploadSuccess,
+    currentAudioUrl = null,
+    currentAudioDuration = null,
+    disabled = false,
+    onUnsavedAudioChange = null,
+  },
+  ref
+) {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('record'); // 'record' | 'file'
 
@@ -49,6 +62,30 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
   const audioChunksRef = useRef([]);
   const timerIntervalRef = useRef(null);
 
+  // Expose imperative methods to parent (e.g. for navigation guard)
+  useImperativeHandle(ref, () => ({
+    submitAudio: () => {
+      openConfirmationModal();
+    },
+    performUploadImmediately: async () => {
+      return await performUpload();
+    },
+    discardAudio: () => {
+      resetRecording();
+      setSelectedFile(null);
+      setFileAudioUrl(null);
+      if (onUnsavedAudioChange) onUnsavedAudioChange(false);
+    },
+  }));
+
+  // Notify parent component of unsaved audio state
+  useEffect(() => {
+    const hasUnsaved = Boolean(recordedBlob || selectedFile);
+    if (onUnsavedAudioChange) {
+      onUnsavedAudioChange(hasUnsaved);
+    }
+  }, [recordedBlob, selectedFile, onUnsavedAudioChange]);
+
   // Clean up timer and media stream on unmount
   useEffect(() => {
     return () => {
@@ -63,6 +100,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
   // ── Recording Controls ───────────────────────────────────────────────────────
 
   const startRecording = async () => {
+    if (disabled) return;
     setErrorMsg('');
     setRecordedBlob(null);
     setRecordedAudioUrl(null);
@@ -164,6 +202,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
   // ── File Selection & Validation ──────────────────────────────────────────────
 
   const handleFileSelect = (e) => {
+    if (disabled) return;
     setErrorMsg('');
     const file = e.target.files?.[0];
     if (!file) return;
@@ -201,6 +240,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
   // ── Trigger Confirmation Modal ────────────────────────────────────────────────
 
   const openConfirmationModal = () => {
+    if (disabled) return;
     setErrorMsg('');
     let durationSecs = activeTab === 'record' ? recordedDuration : fileDuration;
 
@@ -228,14 +268,18 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
     let durationSecs = 0;
 
     if (activeTab === 'record') {
+      if (!recordedBlob) return;
       fileToUpload = new File([recordedBlob], `recording_${Date.now()}.webm`, { type: 'audio/webm' });
       durationSecs = recordedDuration;
     } else {
+      if (!selectedFile) return;
       fileToUpload = selectedFile;
       durationSecs = fileDuration;
     }
 
     setIsUploading(true);
+    setErrorMsg('');
+
     try {
       const res = await uploadHomeworkAudio(assignmentId, classId, fileToUpload, durationSecs);
       toast.success('Voice recording submitted successfully!');
@@ -244,12 +288,19 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
       resetRecording();
       setSelectedFile(null);
       setFileAudioUrl(null);
+
+      if (onUnsavedAudioChange) onUnsavedAudioChange(false);
       if (onUploadSuccess) onUploadSuccess(res);
+      return res;
     } catch (err) {
       console.error('Audio upload failed:', err);
-      setErrorMsg(err?.response?.data?.message || err?.message || 'Failed to upload audio submission.');
+      const msg = err?.response?.data?.message || err?.message || 'Failed to upload audio submission.';
+      setErrorMsg(msg);
+      toast.error(msg);
       setIsUploading(false);
       setShowConfirmModal(false);
+      // Crucially preserve recordedBlob / selectedFile so student can retry submitting!
+      throw err;
     }
   };
 
@@ -259,38 +310,112 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
     <div
       style={{
         background: '#ffffff',
-        border: '1px solid var(--sand-mid, #cbd5e1)',
+        border: disabled ? '1px solid #cbd5e1' : '1px solid var(--sand-mid, #cbd5e1)',
         borderRadius: 'var(--radius-lg, 12px)',
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',
         gap: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        opacity: disabled ? 0.8 : 1,
       }}
     >
+      {/* Uploading Progress Overlay */}
+      {isUploading && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16,
+            color: '#ffffff',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 16,
+              padding: '32px 40px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 16,
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+            }}
+          >
+            <LoadingSpinner size={48} color="var(--emerald, #059669)" />
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink, #0f172a)' }}>
+              Uploading Voice Recording...
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft, #64748b)', lineHeight: 1.5 }}>
+              Please wait while your audio recitation is being processed and saved securely.
+            </div>
+            <div
+              style={{
+                width: '100%',
+                height: 6,
+                background: '#e2e8f0',
+                borderRadius: 3,
+                overflow: 'hidden',
+                marginTop: 8,
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  background: 'var(--emerald, #059669)',
+                  borderRadius: 3,
+                  animation: 'pulse 1.2s infinite ease-in-out',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink, #0f172a)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MicIcon size={18} color="var(--emerald, #059669)" /> Submit Voice Recording
+          <MicIcon size={18} color={disabled ? '#64748b' : 'var(--emerald, #059669)'} /> Submit Voice Recording
         </h3>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: 12, border: '1px solid #a7f3d0', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <ClockIcon size={13} color="#047857" /> Max Duration: 3:00 mins
-        </span>
+        {disabled ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '4px 10px', borderRadius: 12, border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <LockIcon size={13} color="#92400e" /> Recorder Disabled (Due Date Passed or Graded)
+          </span>
+        ) : (
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: 12, border: '1px solid #a7f3d0', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <ClockIcon size={13} color="#047857" /> Max Duration: 3:00 mins
+          </span>
+        )}
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--sand-mid, #e2e8f0)', paddingBottom: 8 }}>
         <button
           type="button"
+          disabled={disabled}
           onClick={() => setActiveTab('record')}
           style={{
             padding: '8px 16px',
             borderRadius: 'var(--radius-md, 8px)',
             border: 'none',
-            background: activeTab === 'record' ? 'var(--emerald, #059669)' : 'transparent',
+            background: activeTab === 'record' ? (disabled ? '#64748b' : 'var(--emerald, #059669)') : 'transparent',
             color: activeTab === 'record' ? '#ffffff' : 'var(--ink-soft, #64748b)',
             fontWeight: 600,
             fontSize: 13,
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -300,16 +425,17 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
         </button>
         <button
           type="button"
+          disabled={disabled}
           onClick={() => setActiveTab('file')}
           style={{
             padding: '8px 16px',
             borderRadius: 'var(--radius-md, 8px)',
             border: 'none',
-            background: activeTab === 'file' ? 'var(--emerald, #059669)' : 'transparent',
+            background: activeTab === 'file' ? (disabled ? '#64748b' : 'var(--emerald, #059669)') : 'transparent',
             color: activeTab === 'file' ? '#ffffff' : 'var(--ink-soft, #64748b)',
             fontWeight: 600,
             fontSize: 13,
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -345,7 +471,12 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
           {/* Recording Actions */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
             {!isRecording && !recordedAudioUrl && (
-              <Button variant="primary" onClick={startRecording} style={{ background: '#dc2626', borderColor: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Button
+                variant="primary"
+                onClick={startRecording}
+                disabled={disabled}
+                style={{ background: disabled ? '#94a3b8' : '#dc2626', borderColor: disabled ? '#94a3b8' : '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer' }}
+              >
                 <MicIcon size={15} color="#ffffff" /> Start Recording
               </Button>
             )}
@@ -368,7 +499,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
             )}
 
             {recordedAudioUrl && !isRecording && (
-              <Button variant="outline" onClick={resetRecording} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Button variant="outline" onClick={resetRecording} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <RefreshIcon size={14} color="currentColor" /> Re-record Audio
               </Button>
             )}
@@ -394,6 +525,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
           </label>
           <input
             type="file"
+            disabled={disabled}
             accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg"
             onChange={handleFileSelect}
             style={{
@@ -402,7 +534,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
               borderRadius: 8,
               background: '#f8fafc',
               fontSize: 13,
-              cursor: 'pointer',
+              cursor: disabled ? 'not-allowed' : 'pointer',
             }}
           />
 
@@ -420,7 +552,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
         <Button
           variant="primary"
           onClick={openConfirmationModal}
-          disabled={isUploading || (activeTab === 'record' ? !recordedBlob : !selectedFile)}
+          disabled={disabled || isUploading || (activeTab === 'record' ? !recordedBlob : !selectedFile)}
         >
           Submit Voice Recording
         </Button>
@@ -474,11 +606,13 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingTop: 12, borderTop: '1px solid var(--sand-mid)' }}>
             <Button
               variant="outline"
+              disabled={isUploading}
               onClick={() => {
                 setShowConfirmModal(false);
                 resetRecording();
                 setSelectedFile(null);
                 setFileAudioUrl(null);
+                if (onUnsavedAudioChange) onUnsavedAudioChange(false);
                 toast.info('Recording discarded. You can record again.');
               }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
@@ -487,7 +621,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
             </Button>
 
             <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="ghost" onClick={() => setShowConfirmModal(false)}>
+              <Button variant="ghost" disabled={isUploading} onClick={() => setShowConfirmModal(false)}>
                 Back
               </Button>
               <Button variant="primary" onClick={performUpload} isLoading={isUploading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -499,4 +633,7 @@ export default function AudioRecorder({ assignmentId, classId, onUploadSuccess, 
       </Modal>
     </div>
   );
-}
+});
+
+export default AudioRecorder;
+
