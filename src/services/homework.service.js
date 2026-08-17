@@ -212,6 +212,17 @@ async function submitStudentAudio({ user, assignmentId, classId, file, duration 
   const existingAssignment = await repo.getAssignmentById(assignmentId);
   if (!existingAssignment) throw notFound("Homework Assignment");
 
+  // Check if due date has passed
+  if (existingAssignment.due_date) {
+    const cleanDate = String(existingAssignment.due_date).split('T')[0];
+    const dueDate = new Date(cleanDate + 'T23:59:59');
+    if (new Date() > dueDate) {
+      const err = new Error("Homework assignment due date has passed. Audio recordings and submissions are closed.");
+      err.status = 400;
+      throw err;
+    }
+  }
+
   // Store audio buffer via audioStorage service
   const audioUrl = await audioStorage.uploadAudio(file.buffer, file.originalname, file.mimetype);
 
