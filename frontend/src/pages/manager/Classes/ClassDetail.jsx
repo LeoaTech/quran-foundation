@@ -45,6 +45,7 @@ import TopicAssignmentTab from './CenterLevelTopicAssignment/TopicAssignmentTab'
 import TeacherClassworkModal from '../../teacher/Classes/TeacherClassworkModal';
 import ClassHomeworkTab from '../../teacher/Classes/ClassHomeworkTab';
 import { useIsMobile } from '../../../hooks/useIsMobile';
+import { LockIcon } from '../../../components/Icons';
 const TYPE_CHIP = {
   hifz: { label: 'Hifz', cls: 'chip chip-green' },
   nazra: { label: 'Nazra', cls: 'chip chip-blue' },
@@ -886,15 +887,40 @@ function SettingsTab({ cls, classId }) {
     }
   }
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const startDateNorm = cls?.start_date ? cls.start_date.split('T')[0] : '';
+  const isCourseStarted = Boolean(startDateNorm && startDateNorm <= todayStr);
+  const isFormDisabled = !canEdit || isCourseStarted;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Course Started Warning Banner ── */}
+      {isCourseStarted && (
+        <div style={{
+          background: '#fefce8',
+          border: '1.5px solid #fef08a',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 16px',
+          color: '#854d0e',
+          fontSize: 13,
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <LockIcon size={18}/>
+          <div>
+            <strong>Course Started:</strong> Classroom details and schedules cannot be changed or updated because this course started on {new Date(startDateNorm + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
+          </div>
+        </div>
+      )}
 
       {/* ── Identity ── */}
       <Card>
         <CardHeader><span className="card-title">Class identity</span></CardHeader>
         <CardBody>
           <form onSubmit={handleSave}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
 
               <div className="f-group" style={{ marginBottom: 16 }}>
                 <label className="f-label">Name (English)</label>
@@ -903,7 +929,7 @@ function SettingsTab({ cls, classId }) {
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   required
-                  disabled={!canEdit}
+                  disabled={isFormDisabled}
                 />
               </div>
 
@@ -912,7 +938,7 @@ function SettingsTab({ cls, classId }) {
                 <RTLInput
                   value={form.name_ur}
                   onChange={(e) => setForm((f) => ({ ...f, name_ur: e.target.value }))}
-                  disabled={!canEdit}
+                  disabled={isFormDisabled}
                 />
               </div>
 
@@ -928,7 +954,7 @@ function SettingsTab({ cls, classId }) {
                     <button
                       key={day}
                       type="button"
-                      disabled={!canEdit}
+                      disabled={isFormDisabled}
                       onClick={() => toggleDay(day)}
                       style={{
                         padding: '8px 14px',
@@ -938,9 +964,10 @@ function SettingsTab({ cls, classId }) {
                         color: active ? 'var(--emerald)' : 'var(--ink-pale)',
                         fontWeight: active ? 600 : 400,
                         fontSize: 13,
-                        cursor: canEdit ? 'pointer' : 'default',
+                        cursor: !isFormDisabled ? 'pointer' : 'not-allowed',
                         fontFamily: 'var(--font-body)',
                         transition: 'all 0.15s',
+                        opacity: isFormDisabled ? 0.7 : 1,
                       }}
                     >
                       {day}
@@ -950,7 +977,7 @@ function SettingsTab({ cls, classId }) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16 }}>
 
               <div className="f-group" style={{ marginBottom: 16 }}>
                 <label className="f-label">Start time</label>
@@ -959,7 +986,7 @@ function SettingsTab({ cls, classId }) {
                   type="time"
                   value={form.start_time}
                   onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
-                  disabled={!canEdit}
+                  disabled={isFormDisabled}
                 />
               </div>
 
@@ -970,7 +997,7 @@ function SettingsTab({ cls, classId }) {
                   type="date"
                   value={form.start_date}
                   onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-                  disabled={!canEdit}
+                  disabled={isFormDisabled}
                   required
                 />
               </div>
@@ -984,7 +1011,7 @@ function SettingsTab({ cls, classId }) {
                   placeholder="No limit"
                   value={form.max_capacity}
                   onChange={(e) => setForm((f) => ({ ...f, max_capacity: e.target.value }))}
-                  disabled={!canEdit}
+                  disabled={isFormDisabled}
                 />
               </div>
 
@@ -997,15 +1024,13 @@ function SettingsTab({ cls, classId }) {
                 placeholder="Optional notes…"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                disabled={!canEdit}
+                disabled={isFormDisabled}
               />
             </div>
 
-
-
             {canEdit && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                <Button type="submit" variant="primary" disabled={busy}>
+                <Button type="submit" variant="primary" disabled={isFormDisabled || busy}>
                   {busy ? 'Saving…' : 'Save changes'}
                 </Button>
               </div>
