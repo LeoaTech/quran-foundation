@@ -110,7 +110,7 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
       boxShadow: '0 2px 5px rgba(0,0,0,0.02)',
     }}>
       {/* ── Row 1: Word + Notes (Adjacent) ─────────────────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: "row-reverse", alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* Remove Button */}
         <button
           type="button"
@@ -134,23 +134,24 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
         }}>{idx + 1}</span>
 
         {/* Word Input */}
-        <div style={{ width: 220, flexShrink: 0 }}>
+        <div style={{ flex: '1 1 180px', minWidth: 140, maxWidth: '100%' }}>
           <RTLInput
             value={word.word_text}
             onChange={(e) => onChange({ ...word, word_text: e.target.value })}
             placeholder="الكلمة (Word)"
             disabled={disabled}
             style={{
-              width: '100%', fontSize: 20, fontWeight: 700,
+              width: '100%', fontSize: 18, fontWeight: 700,
               textAlign: 'right', fontFamily: 'var(--font-arabic, serif)',
-              padding: '6px 12px', borderRadius: 8,
+              padding: '8px 12px', borderRadius: 8,
               border: '1px solid var(--border, #d1d5db)', background: '#fafafa',
+              boxSizing: 'border-box',
             }}
           />
         </div>
 
         {/* Notes Input (adjacent to word) */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: '2 1 200px', minWidth: 160, maxWidth: '100%' }}>
           <RTLInput
             value={word.note ?? ''}
             onChange={(e) => onChange({ ...word, note: e.target.value })}
@@ -160,6 +161,7 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
               width: '100%', fontSize: 13, padding: '8px 12px',
               borderRadius: 8, border: '1px solid var(--border, #d1d5db)',
               background: '#fff', color: 'var(--ink, #111)',
+              boxSizing: 'border-box',
             }}
           />
         </div>
@@ -171,11 +173,9 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
             padding: '4px 10px', background: '#d1fae5', borderRadius: 20,
             whiteSpace: 'nowrap', border: '1px solid #a7f3d0', flexShrink: 0,
           }}>
-            📐 {wordTotal} mark{wordTotal !== 1 ? 's' : ''}
+             {wordTotal} mark{wordTotal !== 1 ? 's' : ''}
           </span>
         )}
-
-
       </div>
 
       {/* ── Row 2: Selected Rule Tags & Marks Breakdown ─────────────────────── */}
@@ -237,7 +237,7 @@ function WordRow({ word, idx, subtopics, onChange, onRemove, disabled }) {
               const ruleTotal = mpr * occ;
               return (
                 <div key={rd.subtopic_id} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  display: 'inline-flex', flexDirection: "column", alignItems: 'center', gap: 6,
                   padding: '4px 10px', background: '#ffffff', borderRadius: 6,
                   border: '1px solid #a7f3d0', fontSize: 12, boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                 }}>
@@ -298,7 +298,7 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
         onClick={() => setExpanded(!expanded)}
         style={{
           display: 'flex', flexDirection: "row-reverse", alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 18px', cursor: 'pointer',
+          padding: '14px 18px', cursor: 'pointer', flexWrap: 'wrap', gap: 12,
           background: 'var(--surface-0, #fafafa)',
           borderBottom: expanded ? '1px solid var(--border, #e5e7eb)' : 'none',
         }}
@@ -312,7 +312,7 @@ function ContentCard({ content, topics, onEdit, onDelete, canEdit }) {
             color: 'var(--ink, #111)',
           }}>
             {content.arabic_text}
-            <span style={{ marginRight: "10px", color: 'var(--ink-pale)', fontSize: 17 }}>{expanded ? '▼':'➤'}</span>
+            <span style={{ marginRight: "10px", color: 'var(--ink-pale)', fontSize: 17 }}>{expanded ? '▼' : '➤'}</span>
 
           </span>
           {/* Meta */}
@@ -607,7 +607,7 @@ export function ContentForm({ courseId, topics, initialData, onSave, onCancel })
       </div>
 
       {/* Row 1: Surah / Ayah */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 14 }}>
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: 'var(--ink-soft)' }}>
             Surah Number <span style={{ fontWeight: 400, color: 'var(--ink-pale)', fontSize: 11 }}>(Optional)</span>
@@ -711,7 +711,7 @@ export function ContentForm({ courseId, topics, initialData, onSave, onCancel })
               fontSize: 13, fontWeight: 700, color: 'var(--emerald)',
               padding: '4px 12px', background: '#d1fae5', borderRadius: 8,
             }}>
-              📐 Grand Total: {grandTotal} marks
+              Grand Total: {grandTotal} marks
             </span>
             <button
               onClick={addWord}

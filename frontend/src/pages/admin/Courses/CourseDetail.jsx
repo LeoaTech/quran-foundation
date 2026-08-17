@@ -24,7 +24,19 @@ const TYPE_CHIP = {
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 function TabBar({ tabs, active, onChange }) {
   return (
-    <div style={{ display: 'flex', borderBottom: '1.5px solid var(--sand-mid)', marginBottom: 24 }}>
+    <div
+      style={{
+        display: 'flex',
+        borderBottom: '1.5px solid var(--sand-mid)',
+        marginBottom: 24,
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        maxWidth: '100%',
+      }}
+    >
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -39,6 +51,8 @@ function TabBar({ tabs, active, onChange }) {
             cursor: 'pointer',
             fontFamily: 'var(--font-body)',
             transition: 'color 0.2s',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
           }}
         >
           {t.label}
