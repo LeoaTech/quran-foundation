@@ -122,12 +122,12 @@ const S = {
   },
   gridTwo: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: 12,
   },
   gridInputs: {
     display: 'grid',
-    gridTemplateColumns: '1fr 140px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
     gap: 12,
   },
   ratingBadge: {
@@ -142,7 +142,7 @@ const S = {
   },
   viewDetailRow: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: 12,
     background: 'var(--surface-1, #f9fafb)',
     borderRadius: 8,
@@ -155,6 +155,7 @@ const S = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    flexWrap: 'wrap',
     paddingTop: 12,
     borderTop: '1px solid var(--border, #e5e7eb)',
   },
@@ -539,8 +540,33 @@ export default function TeacherClassworkModal({
                         </div>
                       </div>
 
-                      {/* Topic & Dynamic Subtopic Selectors for this Student */}
-                      <div style={S.gridTwo}>
+                      {/* First Row: Grade, Assessed Topic & Subtopic in a clean auto-fit grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 12 }}>
+                        <div style={S.fGroup}>
+                          <label style={S.fLabel}>Marks (Max 10)</label>
+                          <select
+                            style={S.fSelect}
+                            value={entry.grade ?? ''}
+                            disabled={saveMut.isPending}
+                            onChange={(e) =>
+                              handleStudentEntryChange(stu.student_id, 'grade', e.target.value)
+                            }
+                          >
+                            <option value="">— Grade —</option>
+                            <option value="10">10 (🌞 Excellent)</option>
+                            <option value="9">9 (🌞 Excellent)</option>
+                            <option value="8">8 (🌟 Very Good)</option>
+                            <option value="7">7 (🌟 Very Good)</option>
+                            <option value="6">6 (⭐ Good)</option>
+                            <option value="5">5 (⭐ Good)</option>
+                            <option value="4">4 (🌙 Practice)</option>
+                            <option value="3">3 (🌙 Practice)</option>
+                            <option value="2">2 (🌙 Practice)</option>
+                            <option value="1">1 (🌙 Practice)</option>
+                            <option value="0">0 (🌙 Practice)</option>
+                          </select>
+                        </div>
+
                         <div style={S.fGroup}>
                           <label style={S.fLabel}>Assessed Topic</label>
                           <select
@@ -580,46 +606,19 @@ export default function TeacherClassworkModal({
                         </div>
                       </div>
 
-                      {/* Description / Remarks & Marks Inputs */}
-                      <div style={S.gridInputs}>
-                        <div style={S.fGroup}>
-                          <label style={S.fLabel}>Description / Comments (Rule asked, weakness, errors)</label>
-                          <textarea
-                            style={{ ...S.fTextArea, minHeight: 38 }}
-                            rows={1}
-                            placeholder="Add comments on rules tested, specific mistakes, or strengths..."
-                            value={entry.comments}
-                            disabled={saveMut.isPending}
-                            onChange={(e) =>
-                              handleStudentEntryChange(stu.student_id, 'comments', e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div style={S.fGroup}>
-                          <label style={S.fLabel}>Marks (Max 10)</label>
-                          <select
-                            style={S.fSelect}
-                            value={entry.grade ?? ''}
-                            disabled={saveMut.isPending}
-                            onChange={(e) =>
-                              handleStudentEntryChange(stu.student_id, 'grade', e.target.value)
-                            }
-                          >
-                            <option value="">— Grade —</option>
-                            <option value="10">10 (🌞 Excellent)</option>
-                            <option value="9">9 (🌞 Excellent)</option>
-                            <option value="8">8 (🌟 Very Good)</option>
-                            <option value="7">7 (🌟 Very Good)</option>
-                            <option value="6">6 (⭐ Good)</option>
-                            <option value="5">5 (⭐ Good)</option>
-                            <option value="4">4 (🌙 Practice)</option>
-                            <option value="3">3 (🌙 Practice)</option>
-                            <option value="2">2 (🌙 Practice)</option>
-                            <option value="1">1 (🌙 Practice)</option>
-                            <option value="0">0 (🌙 Practice)</option>
-                          </select>
-                        </div>
+                      {/* Second Row: Full-width Remarks / Comments Textarea */}
+                      <div style={S.fGroup}>
+                        <label style={S.fLabel}>Remarks / Comments (Rule asked, weakness, errors)</label>
+                        <textarea
+                          style={{ ...S.fTextArea, minHeight: 48, width: '100%', resize: 'vertical' }}
+                          rows={2}
+                          placeholder="Add comments on rules tested, specific mistakes, or strengths..."
+                          value={entry.comments}
+                          disabled={saveMut.isPending}
+                          onChange={(e) =>
+                            handleStudentEntryChange(stu.student_id, 'comments', e.target.value)
+                          }
+                        />
                       </div>
                     </div>
                   );
@@ -629,14 +628,14 @@ export default function TeacherClassworkModal({
 
             {/* ── Footer ── */}
             <div style={S.footer}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 12, color: 'var(--ink-pale, #6b7280)' }}>
-                <span>Rating Scale:</span>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: 'var(--ink-pale, #6b7280)' }}>
+                <span style={{ fontWeight: 600 }}>Rating Scale:</span>
                 <span>🌞 9-10</span>
                 <span>🌟 7-8</span>
                 <span>⭐ 5-6</span>
                 <span>🌙 &lt;5</span>
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <Button variant="outline" onClick={onClose} disabled={saveMut.isPending}>
                   Close
                 </Button>
