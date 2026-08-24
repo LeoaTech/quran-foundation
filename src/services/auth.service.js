@@ -122,7 +122,50 @@ async function refresh({ refresh_token }) {
     roles = [...new Set(scoped.map((r) => r.role))];
   }
 
-  return { access_token: signAccess(user.id, roles, payload.center_id, user.full_name) };
+  const access_token = signAccess(user.id, roles, payload.center_id, user.full_name);
+
+  return {
+    access_token,
+    user: {
+      id: user.id,
+      full_name: user.full_name,
+      full_name_ur: user.full_name_ur,
+      preferred_lang: user.preferred_lang,
+      roles,
+      center_id: payload.center_id,
+    },
+  };
+}
+
+async function getMe(userId) {
+  const user = await authRepo.findById(userId);
+  if (!user) {
+    throw new AppError('NOT_FOUND', 'User not found.', 'صارف نہیں ملا۔', 404);
+  }
+
+  const allRoles = await authRepo.getUserRoles(userId);
+  const globalRoles = allRoles.filter((r) => r.center_id === null).map((r) => r.role);
+  const isGlobal = globalRoles.includes('super_admin') || globalRoles.includes('finance_manager');
+  let roles, scopedCenterId;
+  if (isGlobal) {
+    roles = globalRoles;
+    scopedCenterId = null;
+  } else {
+    scopedCenterId = allRoles[0]?.center_id || null;
+    const centerRoles = allRoles.filter((r) => r.center_id === scopedCenterId);
+    roles = [...new Set(centerRoles.map((r) => r.role))];
+  }
+
+  return {
+    user: {
+      id: user.id,
+      full_name: user.full_name,
+      full_name_ur: user.full_name_ur,
+      preferred_lang: user.preferred_lang,
+      roles,
+      center_id: scopedCenterId,
+    },
+  };
 }
 
 async function logout({ refresh_token }) {
@@ -234,4 +277,4 @@ async function listPublicCenters() {
     .orderBy('name', 'asc');
 }
 
-module.exports = { login, refresh, logout, changePassword, signup, listPublicCenters };
+module.exports = { login, refresh, logout, changePassword, signup, listPublicCenters, getMe };
