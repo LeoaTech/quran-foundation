@@ -44,6 +44,7 @@ router.post('/signup',  validate(signupSchema),  controller.signup);
 router.get('/centers',  controller.listPublicCenters);
 
 // Authenticated
+router.get('/me',              requireAuth, controller.getMe);
 router.post('/logout',          requireAuth, validate(logoutSchema),         controller.logout);
 router.post('/change-password', requireAuth, validate(changePasswordSchema), controller.changePassword);
 
