@@ -50,4 +50,12 @@ async function listPublicCenters(req, res, next) {
   }
 }
 
-module.exports = { login, refresh, logout, changePassword, signup, listPublicCenters };
+async function getMe(req, res, next) {
+  try {
+    res.json(await authService.getMe(req.user.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, refresh, logout, changePassword, signup, listPublicCenters, getMe };
