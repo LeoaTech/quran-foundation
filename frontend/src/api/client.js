@@ -6,6 +6,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 let accessToken = null;
 export function setAccessToken(token) { accessToken = token; }
 export function clearAccessToken()    { accessToken = null; }
+export function getAccessToken()      { return accessToken; }
 
 // Queue of requests that arrived while a token refresh was in flight.
 let isRefreshing = false;
@@ -34,7 +35,12 @@ client.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    if (err.response?.status !== 401 || original._retry) {
+    const isAuthRoute = original?.url?.includes('/auth/login') ||
+                        original?.url?.includes('/auth/signup') ||
+                        original?.url?.includes('/auth/refresh') ||
+                        original?.url?.includes('/auth/logout');
+
+    if (err.response?.status !== 401 || original._retry || isAuthRoute) {
       return Promise.reject(err);
     }
 
