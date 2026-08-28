@@ -142,7 +142,7 @@ export default function Students() {
             onClick={() => setIsImportModalOpen(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            Import Students
+           ⬇︎ Import Students
           </Button>
 
           <Button
@@ -151,7 +151,7 @@ export default function Students() {
             onClick={() => handleExport('xlsx')}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            Export Excel
+            💹 Export Excel
           </Button>
 
           <Button
@@ -160,7 +160,7 @@ export default function Students() {
             onClick={() => handleExport('csv')}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            Export CSV
+            𝄜 Export CSV
           </Button>
         </div>
       </div>
@@ -183,7 +183,7 @@ export default function Students() {
       {/* Search & Filter Bar */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: 400 }}>
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-pale)', fontSize: 14, pointerEvents: 'none' }}>🔍</span>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-pale)', fontSize: 14, pointerEvents: 'none' }}>⌕</span>
           <input
             type="text"
             className="f-input"

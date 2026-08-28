@@ -75,3 +75,32 @@ export async function exportStudents({ center_id, format = 'xlsx' } = {}) {
   link.parentNode.removeChild(link);
   window.URL.revokeObjectURL(url);
 }
+
+
+export async function importStudents(formData) {
+  const { data } = await client.post('/users/import/students', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function downloadImportTemplate(format = 'csv') {
+  const response = await client.get('/users/import/template', {
+    params: { format },
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'text/csv',
+  });
+
+  const filename = `sample_student_import_template.${format}`;
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
