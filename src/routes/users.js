@@ -102,6 +102,30 @@ const linkGuardianSchema = z.object({
   relation:         z.string().optional(),
   is_primary:       z.boolean().optional(),
 });
+const importExportController = require('../controllers/studentImportExport.controller');
+
+// Dedicated multer instance for spreadsheet file imports (CSV / XLSX)
+const multer = require('multer');
+const spreadsheetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max for import files
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'text/csv',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/octet-stream', // fallback for some browsers
+    ];
+    const allowedExts = ['.csv', '.xlsx', '.xls'];
+    const ext = (file.originalname || '').toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV or Excel (.xlsx, .xls) files are allowed.'), false);
+    }
+  },
+});
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -112,6 +136,19 @@ router.get(
   importExportController.exportStudents,
 );
 
+router.get(
+  '/users/import/template',
+  requireAuth,
+  importExportController.getImportTemplate,
+);
+
+router.post(
+  '/users/import/students',
+  requireAuth,
+  requirePermission('users.create'),
+  spreadsheetUpload.single('file'),
+  importExportController.importStudents,
+);
 
 router.get(
   '/users',
