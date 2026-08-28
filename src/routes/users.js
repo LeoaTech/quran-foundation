@@ -106,6 +106,14 @@ const linkGuardianSchema = z.object({
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 router.get(
+  '/users/export/students',
+  requireAuth,
+  requirePermission('users.view'),
+  importExportController.exportStudents,
+);
+
+
+router.get(
   '/users',
   requireAuth,
   requirePermission('users.view'),
