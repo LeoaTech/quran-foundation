@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '../../components/PageHeader';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -6,6 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 import ShareCredentialsModal from '../../components/ShareCredentialsModal';
+import ImportStudentsModal from '../../components/ImportStudentsModal';
 import { getStudents, updateUser, exportStudents } from '../../api/users';
 import { getCenters } from '../../api/centers';
 import { useAuth } from '../../hooks/useAuth';
@@ -22,6 +23,8 @@ export default function Students() {
   const [shareUser, setShareUser] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [ageFilter, setAgeFilter] = useState('all'); // 'all' | 'minor' | 'adult'
 
   const qc = useQueryClient();
   const toast = useToast();
@@ -54,6 +57,38 @@ export default function Students() {
   });
 
   const usersList = usersData?.data ?? usersData ?? [];
+
+  // Client-side filtering
+  const filteredList = useMemo(() => {
+    let list = usersList;
+    const q = searchQuery.trim().toLowerCase();
+
+    if (activeTab === 'students') {
+      // Age filter
+      if (ageFilter === 'minor') list = list.filter(u => u.is_minor);
+      else if (ageFilter === 'adult') list = list.filter(u => !u.is_minor);
+
+      // Search filter: name, phone, enrolled course
+      if (q) {
+        list = list.filter(u =>
+          (u.full_name || '').toLowerCase().includes(q) ||
+          (u.full_name_ur || '').includes(q) ||
+          (u.phone || '').toLowerCase().includes(q) ||
+          (u.enrolled_courses || '').toLowerCase().includes(q)
+        );
+      }
+    } else {
+      // Guardians tab: search by guardian name or phone
+      if (q) {
+        list = list.filter(u =>
+          (u.full_name || '').toLowerCase().includes(q) ||
+          (u.phone || '').toLowerCase().includes(q) ||
+          (u.children_names || '').toLowerCase().includes(q)
+        );
+      }
+    }
+    return list;
+  }, [usersList, searchQuery, ageFilter, activeTab]);
 
   const withdrawMutation = useMutation({
     mutationFn: (studentId) => updateUser(studentId, { is_active: false }),
@@ -130,19 +165,63 @@ export default function Students() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--sand)', marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--sand)', marginBottom: 16 }}>
         <button
-          onClick={() => setActiveTab('students')}
+          onClick={() => { setActiveTab('students'); setSearchQuery(''); }}
           style={{ padding: '8px 4px', borderBottom: activeTab === 'students' ? '2px solid var(--emerald)' : '2px solid transparent', color: activeTab === 'students' ? 'var(--emerald)' : 'var(--ink-muted)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'students' ? 600 : 400 }}
         >
           Students
         </button>
         <button
-          onClick={() => setActiveTab('guardians')}
+          onClick={() => { setActiveTab('guardians'); setSearchQuery(''); setAgeFilter('all'); }}
           style={{ padding: '8px 4px', borderBottom: activeTab === 'guardians' ? '2px solid var(--emerald)' : '2px solid transparent', color: activeTab === 'guardians' ? 'var(--emerald)' : 'var(--ink-muted)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'guardians' ? 600 : 400 }}
         >
           Guardians
         </button>
+      </div>
+
+      {/* Search & Filter Bar */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: 400 }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-pale)', fontSize: 14, pointerEvents: 'none' }}>🔍</span>
+          <input
+            type="text"
+            className="f-input"
+            placeholder={activeTab === 'students' ? 'Search by name, phone or course...' : 'Search by guardian name or phone...'}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ width: '100%', paddingLeft: 36, paddingRight: searchQuery ? 36 : undefined }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setSearchQuery('')}
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', color: 'var(--ink-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {activeTab === 'students' && (
+          <select
+            className="f-input"
+            value={ageFilter}
+            onChange={e => setAgeFilter(e.target.value)}
+            style={{ width: 160 }}
+          >
+            <option value="all">All Students</option>
+            <option value="minor">Under 18 (Minors)</option>
+            <option value="adult">Adults</option>
+          </select>
+        )}
+
+        {(searchQuery || ageFilter !== 'all') && (
+          <span style={{ fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
+            Showing {filteredList.length} of {usersList.length}
+          </span>
+        )}
       </div>
 
       {error && (
@@ -152,11 +231,11 @@ export default function Students() {
       )}
 
       <div style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--sand-mid)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
-        {usersList.length === 0 && !isLoading ? (
+        {filteredList.length === 0 && !isLoading ? (
           <EmptyState
             icon="⊙"
-            title={`No ${activeTab} yet`}
-            description={`There are no ${activeTab} to display.`}
+            title={searchQuery || ageFilter !== 'all' ? 'No results found' : `No ${activeTab} yet`}
+            description={searchQuery || ageFilter !== 'all' ? 'Try adjusting your search or filter criteria.' : `There are no ${activeTab} to display.`}
           />
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -174,7 +253,7 @@ export default function Students() {
                 </tr>
               </thead>
               <tbody>
-                {usersList.map((userRow) => {
+                {filteredList.map((userRow) => {
                   const avatarUrl = userRow.metadata?.profile_picture;
                   const initials = userRow.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || (activeTab === 'students' ? 'S' : 'G');
 
@@ -280,7 +359,14 @@ export default function Students() {
         onClose={() => setShareUser(null)}
       />
 
-     
+      <ImportStudentsModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        centers={centers}
+        defaultCenterId={selectedCenter}
+        isGlobal={isGlobal}
+        onSuccess={() => qc.invalidateQueries(['students', selectedCenter, activeTab])}
+      />
     </>
   );
 }
