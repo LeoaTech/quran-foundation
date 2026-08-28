@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 
 export const ToastContext = createContext(null);
 
-const ICONS = { success: '✓', error: '✕', warning: '!' };
+const ICONS = { success: '✓', error: '✕', warning: '!', info: 'ℹ' };
 
 const COLORS = {
   success: { bg: 'var(--emerald)',    text: 'var(--white)' },
   error:   { bg: 'var(--red)',        text: 'var(--white)' },
   warning: { bg: 'var(--gold)',       text: 'var(--white)' },
+  info:    { bg: 'var(--blue)',       text: 'var(--white)' },
 };
 
 function ToastItem({ id, type = 'success', message, onRemove }) {

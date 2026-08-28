@@ -11,6 +11,7 @@ export function useToast() {
     success: (message, opts) => addToast({ type: 'success', message, ...opts }),
     error:   (message, opts) => addToast({ type: 'error',   message, ...opts }),
     warning: (message, opts) => addToast({ type: 'warning', message, ...opts }),
+    info:    (message, opts) => addToast({ type: 'info',    message, ...opts }),
     toast:   addToast,
   };
 }

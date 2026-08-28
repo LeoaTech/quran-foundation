@@ -6,7 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 import ShareCredentialsModal from '../../components/ShareCredentialsModal';
-import { getStudents, updateUser } from '../../api/users';
+import { getStudents, updateUser, exportStudents } from '../../api/users';
 import { getCenters } from '../../api/centers';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -20,10 +20,25 @@ export default function Students() {
   const [selectedCenter, setSelectedCenter] = useState(isGlobal ? 'all' : centerId);
   const [activeTab, setActiveTab] = useState('students');
   const [shareUser, setShareUser] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const qc = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
+
+  const handleExport = async (format) => {
+    try {
+      setIsExporting(true);
+      toast.info(`Generating ${format.toUpperCase()} export...`);
+      await exportStudents({ center_id: selectedCenter, format });
+      toast.success('Export downloaded successfully!');
+    } catch (err) {
+      toast.error(`Failed to export students data: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const { data: centersData } = useQuery({
     queryKey: ['centers'],
@@ -67,24 +82,52 @@ export default function Students() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <PageHeader
           title="Students & Guardians"
           subtitle={isGlobal ? "All students and guardians across centers" : "Manage students and guardians in your center"}
         />
-        {isGlobal && (
-          <select
-            className="f-input"
-            style={{ width: 200 }}
-            value={selectedCenter}
-            onChange={e => setSelectedCenter(e.target.value)}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          {isGlobal && (
+            <select
+              className="f-input"
+              style={{ width: 200 }}
+              value={selectedCenter}
+              onChange={e => setSelectedCenter(e.target.value)}
+            >
+              <option value="all">All Centers</option>
+              {centers.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+
+          <Button
+            variant="emerald"
+            onClick={() => setIsImportModalOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <option value="all">All Centers</option>
-            {centers.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        )}
+            Import Students
+          </Button>
+
+          <Button
+            variant="outline"
+            disabled={isExporting}
+            onClick={() => handleExport('xlsx')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            Export Excel
+          </Button>
+
+          <Button
+            variant="outline"
+            disabled={isExporting}
+            onClick={() => handleExport('csv')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--sand)', marginBottom: 24 }}>
@@ -122,11 +165,11 @@ export default function Students() {
                 <tr>
                   {activeTab === 'students'
                     ? ['Student', 'Course', 'Phone', 'Gender', 'Status', 'Actions'].map((h) => (
-                        <th key={h} style={{ textAlign: h === 'Actions' ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))
+                      <th key={h} style={{ textAlign: h === 'Actions' ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))
                     : ['Guardian', 'Children', 'Phone', 'Status', 'Actions'].map((h) => (
-                        <th key={h} style={{ textAlign: h === 'Actions' ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))
+                      <th key={h} style={{ textAlign: h === 'Actions' ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: 'var(--ink-pale)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '12px 14px', borderBottom: '1px solid var(--sand-mid)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))
                   }
                 </tr>
               </thead>
@@ -186,7 +229,7 @@ export default function Students() {
                           {userRow.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
-                      
+
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <Button
@@ -208,7 +251,7 @@ export default function Students() {
                               Withdraw
                             </Button>
                           )}
-                          
+
                           {/* Only show Share Credentials if it's a Guardian, or an Adult Student */}
                           {(!userRow.is_minor) && (
                             <Button
@@ -236,6 +279,8 @@ export default function Students() {
         user={shareUser}
         onClose={() => setShareUser(null)}
       />
+
+     
     </>
   );
 }
