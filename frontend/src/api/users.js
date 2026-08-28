@@ -44,3 +44,34 @@ export async function getStudents(params = {}) {
   const res = await client.get(`/users?${query.toString()}`);
   return res.data;
 }
+
+export async function exportStudents({ center_id, format = 'xlsx' } = {}) {
+  const params = { format };
+  if (center_id && center_id !== 'all') {
+    params.center_id = center_id;
+  }
+  const response = await client.get('/users/export/students', {
+    params,
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/octet-stream',
+  });
+
+  const contentDisposition = response.headers['content-disposition'];
+  let filename = `students_export.${format}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
