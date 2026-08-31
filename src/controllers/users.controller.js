@@ -1,5 +1,5 @@
 const service = require('../services/users.service');
-const { uploadImage } = require('../services/cloudinary.service');
+const { uploadImage } = require('../services/bunny.service');
 
 async function listUsers(req, res, next) {
   try {
