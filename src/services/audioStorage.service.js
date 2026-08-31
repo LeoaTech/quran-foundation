@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { cloudinary } = require('./cloudinary.service');
+const { uploadAudio: bunnyUploadAudio, isBunnyConfigured } = require('./bunny.service');
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'audio');
 
@@ -15,28 +15,16 @@ function ensureUploadDir() {
 }
 
 /**
- * Uploads an audio buffer to Cloudinary or falls back to local disk storage
+ * Uploads an audio buffer to Bunny.net or falls back to local disk storage
  */
 async function uploadAudio(fileBuffer, originalName = 'audio.webm', mimeType = 'audio/webm') {
-  // 1. Try Cloudinary if configured
-  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+  // 1. Try Bunny.net if configured
+  if (isBunnyConfigured()) {
     try {
-      const url = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: 'homework_audio',
-            resource_type: 'auto',
-          },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result.secure_url);
-          }
-        );
-        uploadStream.end(fileBuffer);
-      });
+      const url = await bunnyUploadAudio(fileBuffer, originalName, mimeType);
       if (url) return url;
     } catch (err) {
-      console.warn('Cloudinary audio upload failed, falling back to local storage:', err.message);
+      console.warn('Bunny.net audio upload failed, falling back to local storage:', err.message);
     }
   }
 
