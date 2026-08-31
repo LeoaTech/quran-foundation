@@ -1,5 +1,5 @@
 const service = require('../services/enrollments.service');
-const { uploadImage } = require('../services/cloudinary.service');
+const { uploadImage } = require('../services/bunny.service');
 
 async function createEnrollment(req, res, next) {
   try {
