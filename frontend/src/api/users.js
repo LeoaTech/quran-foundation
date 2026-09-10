@@ -77,6 +77,10 @@ export async function exportStudents({ center_id, format = 'xlsx' } = {}) {
 }
 
 
+/**
+ * Upload a student import file. Returns { jobId, status: 'queued' } immediately.
+ * The file is processed asynchronously by a background worker.
+ */
 export async function importStudents(formData) {
   const { data } = await client.post('/users/import/students', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -84,7 +88,7 @@ export async function importStudents(formData) {
   return data;
 }
 
-export async function downloadImportTemplate(format = 'csv') {
+export async function downloadImportTemplate(format = 'xlsx') {
   const response = await client.get('/users/import/template', {
     params: { format },
     responseType: 'blob',
