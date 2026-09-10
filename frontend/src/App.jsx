@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ImportJobProvider } from './context/ImportJobContext';
 import { useToast } from './hooks/useToast';
 import AppRoutes from './router';
 
@@ -31,9 +32,11 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <PermissionAlert />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <ImportJobProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </ImportJobProvider>
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
