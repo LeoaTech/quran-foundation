@@ -99,6 +99,35 @@ export async function getImportJobStatus(jobId, page = 1, limit = 50) {
   return data;
 }
 
+/**
+ * Download the error report file for a completed import job.
+ */
+export async function downloadImportErrorReport(jobId) {
+  const response = await client.get(`/users/import/students/${jobId}/errors/download`, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/octet-stream',
+  });
+
+  const contentDisposition = response.headers['content-disposition'];
+  let filename = `import_errors_${jobId}.xlsx`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
 
 export async function downloadImportTemplate(format = 'xlsx') {
   const response = await client.get('/users/import/template', {
