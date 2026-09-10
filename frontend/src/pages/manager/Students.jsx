@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '../../components/PageHeader';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -12,6 +12,7 @@ import { getCenters } from '../../api/centers';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useNavigate } from 'react-router-dom';
+import { useImportJob } from '../../context/ImportJobContext';
 
 export default function Students() {
   const { user, role } = useAuth();
@@ -22,13 +23,27 @@ export default function Students() {
   const [activeTab, setActiveTab] = useState('students');
   const [shareUser, setShareUser] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [ageFilter, setAgeFilter] = useState('all'); // 'all' | 'minor' | 'adult'
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
+  const importJob = useImportJob();
   const qc = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
+
+  // Set userId on the context so it uses the right localStorage key
+  useEffect(() => {
+    if (user?.id) importJob.setUserId(user.id);
+  }, [user?.id]); 
+
+
+  // Auto-open modal when navigating to Students page if a job is active
+  useEffect(() => {
+    if (importJob.hasJob && activeTab === 'students') {
+      setIsImportModalOpen(true);
+    }
+  }, [activeTab]);
 
   const handleExport = async (format) => {
     try {
@@ -140,9 +155,11 @@ export default function Students() {
           <Button
             variant="emerald"
             onClick={() => setIsImportModalOpen(true)}
+            disabled={importJob.isActive}
+            title={importJob.isActive ? 'An import is already in progress.' : undefined}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-           ⬇︎ Import Students
+            {importJob.isActive ? '⌛︎ Import in Progress...' : '⬇ Import Students'}
           </Button>
 
           <Button
@@ -151,7 +168,7 @@ export default function Students() {
             onClick={() => handleExport('xlsx')}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            💹 Export Excel
+            📉 Export Excel
           </Button>
 
           <Button
@@ -160,7 +177,7 @@ export default function Students() {
             onClick={() => handleExport('csv')}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            𝄜 Export CSV
+            📄 Export CSV
           </Button>
         </div>
       </div>
