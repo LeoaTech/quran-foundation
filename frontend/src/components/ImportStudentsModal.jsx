@@ -86,19 +86,65 @@ export default function ImportStudentsModal({
     }
   };
 
+  const handleDownloadErrorReport = async () => {
+    if (!jobId) return;
+    try {
+      await downloadImportErrorReport(jobId);
+      toast.info('Error report downloaded.');
+    } catch {
+      toast.error('Failed to download error report.');
+    }
+  };
 
   const handleMinimize = () => {
     onClose(); // close modal, float card takes over
   };
 
- 
+  const handleReset = () => {
+    ctx.dismissJob();
+    setFile(null);
+  };
+
+  const handleDone = () => {
+    ctx.dismissJob();
+    setFile(null);
+    onClose();
+  };
+
+  // ── Shared sub-components ────────────────────────────────────────────────
+
+  const ProgressBar = ({ label, processed, total, percentage }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>
+        <span>{label}</span>
+        <span>{processed}/{total} ({percentage}%)</span>
+      </div>
+      <div style={{ width: '100%', background: 'var(--sand)', borderRadius: 10, height: 8, overflow: 'hidden' }}>
+        <div style={{
+          width: `${percentage}%`,
+          height: '100%',
+          background: 'var(--emerald)',
+          borderRadius: 10,
+          transition: 'width 0.4s ease',
+        }} />
+      </div>
+    </div>
+  );
+
+  const CounterCard = ({ value, label, color, bgColor }) => (
+    <div style={{ background: bgColor, padding: 10, borderRadius: 'var(--radius-md)', textAlign: 'center', flex: 1 }}>
+      <div style={{ fontSize: 20, fontWeight: 'bold', color }}>{value}</div>
+      <div style={{ fontSize: 10, color, fontWeight: 600, opacity: 0.8 }}>{label}</div>
+    </div>
+  );
+
   // Determine if we should show the form or the job view
   const showForm = phase === 'idle';
   const showJobView = phase !== 'idle';
 
   return (
     <Modal open={isOpen} onClose={handleMinimize} title="⬇ Bulk Import Students" size="lg">
-
+      
       {/* ── UPLOADING PHASE ───────────────────────────────────────────────── */}
       {phase === 'uploading' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', gap: 16, textAlign: 'center' }}>
@@ -112,8 +158,137 @@ export default function ImportStudentsModal({
             </p>
           </div>
           <Button type="button" variant="outline" onClick={handleMinimize} style={{ marginTop: 8 }}>
-            ↘ Minimize modal, process continues in background
+            ↘ Minimize modal, process continues in background...
           </Button>
+        </div>
+      )}
+
+      {/* ── POLLING / RESULTS / ERROR PHASE ───────────────────────────────── */}
+      {showJobView && phase !== 'uploading' && jobData && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '10px 0' }}>
+
+          {/* Status header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {phase === 'polling' && <LoadingSpinner size={20} />}
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>
+              {phase === 'error'
+                ? 'Import failed (fix the reported rows and ) try again.'
+                : phase === 'results'
+                  ? '✔ Import completed.'
+                  : jobData.status === 'completed'
+                    ? 'Finishing up image uploads...'
+                    : 'Processing import...'}
+            </span>
+            {phase === 'polling' && (
+              <Button size="sm" variant="outline" onClick={handleMinimize} title="Minimize dialog">
+                ↘
+              </Button>
+            )}
+          </div>
+
+          {/* Progress bars */}
+          <ProgressBar
+            label="📉 Student Accounts"
+            processed={jobData.progress.students.processed}
+            total={jobData.progress.students.total}
+            percentage={jobData.progress.students.percentage}
+          />
+
+          {jobData.progress.enrollments.total > 0 && (
+            <ProgressBar
+              label="🗒 Enrollments"
+              processed={jobData.progress.enrollments.processed}
+              total={jobData.progress.enrollments.total}
+              percentage={jobData.progress.enrollments.percentage}
+            />
+          )}
+
+          {/* Counter cards */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <CounterCard value={jobData.counters.studentsCreated} label="Created" color="var(--emerald)" bgColor="var(--emerald-light)" />
+            <CounterCard value={jobData.counters.studentsReused} label="Reused" color="var(--blue, #3b82f6)" bgColor="rgba(59,130,246,0.1)" />
+            <CounterCard value={jobData.counters.enrollmentsCreated} label="Enrolled" color="var(--purple, #8b5cf6)" bgColor="rgba(139,92,246,0.1)" />
+            <CounterCard value={jobData.counters.errors} label="Errors" color="var(--red)" bgColor="var(--red-light)" />
+          </div>
+
+          {/* Image progress */}
+          {jobData.imageProgress.queued > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--ink-mid)', padding: '6px 10px', background: 'var(--sand-light)', borderRadius: 'var(--radius-md)' }}>
+              📸 Profile images: {jobData.imageProgress.done}/{jobData.imageProgress.queued} uploaded
+              {jobData.imageProgress.failed > 0 && <span style={{ color: 'var(--red)' }}> · {jobData.imageProgress.failed} failed</span>}
+            </div>
+          )}
+
+          {/* Failed reason banner */}
+          {jobData.failedReason && (
+            <div style={{ padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--red-light, #fdecea)', color: 'var(--red)', fontSize: 13 }}>
+              <b>What went wrong:</b> {jobData.failedReason}
+            </div>
+          )}
+
+          {/* Error table */}
+          {(phase === 'results' || phase === 'error') && jobData.errors && jobData.errors.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 8 }}>
+                Error Details ({jobData.pagination.totalErrors}):
+              </div>
+              <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead style={{ background: 'var(--sand-light)', position: 'sticky', top: 0, zIndex: 1 }}>
+                    <tr>
+                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Sheet</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Row</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Student</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jobData.errors.map((errItem) => (
+                      <tr key={errItem.id} style={{ borderTop: '1px solid var(--sand)' }}>
+                        <td style={{ padding: '6px 10px', color: 'var(--ink-soft)', fontWeight: 500 }}>{errItem.sheet}</td>
+                        <td style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--ink-mid)' }}>{errItem.row || '—'}</td>
+                        <td style={{ padding: '6px 10px', fontWeight: 500 }}>{errItem.studentName || errItem.studentRef || '—'}</td>
+                        <td style={{ padding: '6px 10px', color: 'var(--red)', fontWeight: 500 }}>{errItem.error}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {jobData.pagination.hasMore && (
+                <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4, textAlign: 'center' }}>
+                  Showing {jobData.errors.length} of {jobData.pagination.totalErrors} errors
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+            {(phase === 'results' || phase === 'error') && jobData.pagination?.totalErrors > 0 && (
+              <Button variant="outline" onClick={handleDownloadErrorReport}>
+                ⬇ Download Error Report
+              </Button>
+            )}
+            {(phase === 'results' || phase === 'error') && (
+              <Button variant="outline" onClick={handleReset}>Import Another File</Button>
+            )}
+            {phase === 'polling' && (
+              <Button variant="outline" onClick={handleMinimize}>
+                ↘ Minimize
+              </Button>
+            )}
+            {(phase === 'results' || phase === 'error') && (
+              <Button variant="emerald" onClick={handleDone}>Done & Close</Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Polling but no data yet ───────────────────────────────────────── */}
+      {phase === 'polling' && !jobData && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', gap: 16, textAlign: 'center' }}>
+          <LoadingSpinner size={40} />
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-mid)' }}>Loading import progress...</p>
         </div>
       )}
 
@@ -130,7 +305,7 @@ export default function ImportStudentsModal({
           <div style={{ background: 'var(--sand-light)', borderRadius: 'var(--radius-md)', padding: 14, border: '1px solid var(--sand-mid)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
-                Download Sample Templates 
+                Download Sample Templates
               </span>
               <button
                 type="button"
@@ -147,7 +322,7 @@ export default function ImportStudentsModal({
                 variant="outline"
                 onClick={() => handleDownloadTemplate('csv')}
               >
-             𝄜  Sample CSV Template
+                𝄜  Sample CSV Template
               </Button>
               <Button
                 type="button"
@@ -155,7 +330,7 @@ export default function ImportStudentsModal({
                 variant="outline"
                 onClick={() => handleDownloadTemplate('xlsx')}
               >
-               💹 Sample Excel Template
+                💹 Sample Excel Template
               </Button>
             </div>
             <p style={{ fontSize: 11, color: 'var(--ink-soft)', margin: '8px 0 0' }}>
@@ -166,7 +341,7 @@ export default function ImportStudentsModal({
             {showGuide && (
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--sand-mid)', fontSize: 11, color: 'var(--ink-mid)' }}>
                 <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 Expected Sheets & Columns Guide:</div>
-                
+
                 <div style={{ background: '#fff', padding: 10, borderRadius: 6, marginBottom: 8, border: '1px solid var(--sand-mid)' }}>
                   <div style={{ fontWeight: 600, color: 'var(--emerald)', marginBottom: 4 }}>🗒Sheet 1: Students</div>
                   <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.5 }}>
