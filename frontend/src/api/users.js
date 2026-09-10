@@ -88,6 +88,18 @@ export async function importStudents(formData) {
   return data;
 }
 
+/**
+ * Get the status of an import job.
+ * Returns progress, counters, image progress, and paginated errors.
+ */
+export async function getImportJobStatus(jobId, page = 1, limit = 50) {
+  const { data } = await client.get(`/users/import/students/${jobId}/status`, {
+    params: { page, limit },
+  });
+  return data;
+}
+
+
 export async function downloadImportTemplate(format = 'xlsx') {
   const response = await client.get('/users/import/template', {
     params: { format },
