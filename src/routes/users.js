@@ -151,6 +151,20 @@ router.post(
 );
 
 router.get(
+  '/users/import/students/:jobId/status',
+  requireAuth,
+  requirePermission('users.view'),
+  importExportController.getImportStatus,
+);
+
+router.get(
+  '/users/import/students/:jobId/errors/download',
+  requireAuth,
+  requirePermission('users.view'),
+  importExportController.downloadErrorReport,
+);
+
+router.get(
   '/users',
   requireAuth,
   requirePermission('users.view'),
