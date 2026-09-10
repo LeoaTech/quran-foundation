@@ -21,18 +21,21 @@ async function importStudents(req, res, next) {
   try {
     const { center_id } = req.body || {};
     const fileBuffer = req.file?.buffer;
+    const fileName = req.file?.originalname;
 
-    const summary = await service.importStudentsData({
+    const result = await service.importStudentsData({
       user: req.user,
       centerId: center_id || req.query.center_id,
       fileBuffer,
+      fileName,
     });
 
-    res.json(summary);
+    res.status(202).json(result);
   } catch (err) {
     next(err);
   }
 }
+
 
 async function getImportTemplate(req, res, next) {
   try {
