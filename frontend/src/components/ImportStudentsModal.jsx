@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import LoadingSpinner from './LoadingSpinner';
-import { importStudents, downloadImportTemplate } from '../api/users';
+import { importStudents, downloadImportTemplate, downloadImportErrorReport } from '../api/users';
 import { useToast } from '../hooks/useToast';
+import { useImportJob } from '../context/ImportJobContext';
+
+// ── ImportStudentsModal ─────────────────────────────────────────────────────
+// Uses ImportJobContext for persistent polling across page navigations.
+// The modal is a view-only layer on top of the context state.
 
 export default function ImportStudentsModal({
   isOpen,
@@ -15,17 +20,31 @@ export default function ImportStudentsModal({
 }) {
   const [file, setFile] = useState(null);
   const [targetCenter, setTargetCenter] = useState(defaultCenterId);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const toast = useToast();
+  const ctx = useImportJob();
+
+  // Register the onSuccess callback with the context so it fires
+  // even if the modal is closed when the import completes.
+  useEffect(() => {
+    if (!onSuccess) return;
+    return ctx.registerOnSuccess(onSuccess);
+  }, [onSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync modal open state with context
+  useEffect(() => {
+    if (isOpen) ctx.openModal();
+    else ctx.closeModal();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
+
+  const { phase, jobData, jobId, isActive } = ctx;
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
-      setResult(null);
     }
   };
 
@@ -51,7 +70,7 @@ export default function ImportStudentsModal({
     }
 
     try {
-      setUploading(true);
+      ctx.setUploading();
       const formData = new FormData();
       formData.append('file', file);
       if (targetCenter && targetCenter !== 'all') {
@@ -59,71 +78,51 @@ export default function ImportStudentsModal({
       }
 
       const res = await importStudents(formData);
-      setResult(res);
-
-      if (res.successCount > 0) {
-        if (res.skippedCount > 0) {
-          toast.warning(`Import completed: ${res.successCount} imported, ${res.skippedCount} skipped due to validation errors.`);
-        } else {
-          toast.success(`Successfully imported all ${res.successCount} student account(s)!`);
-        }
-        if (onSuccess) onSuccess();
-      } else {
-        toast.error('No student records were imported. Please review the validation error list below.');
-      }
+      ctx.startImport(res.jobId);
+      toast.success('File uploaded! Import is being processed in the background.');
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || err.message || 'Import process failed.');
-    } finally {
-      setUploading(false);
+      ctx.cancelUploading();
+      toast.error(err.response?.data?.error?.message || err.message || 'Upload failed.');
     }
   };
 
-  const handleReset = () => {
-    setFile(null);
-    setResult(null);
+ 
+
+  const handleMinimize = () => {
+    onClose(); // close modal, float card takes over
   };
 
-  const handleClose = () => {
-    handleReset();
-    onClose();
-  };
+ 
+
+  // Determine if we should show the form or the job view
+  const showForm = phase === 'idle';
+  const showJobView = phase !== 'idle';
 
   return (
-    <Modal open={isOpen} onClose={handleClose} title="➜] Bulk Import Student Accounts" size="lg">
-      {uploading ? (
-        /* Progress / Loader Screen during import process */
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', gap: 16, textAlign: 'center' }}>
-          <LoadingSpinner size={40} />
-          <div>
-            <h4 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
-              Processing Student Import...
-            </h4>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-mid)' }}>
-              Parsing spreadsheet, verifying data, and setting up student profiles.
-            </p>
-          </div>
-          <div style={{ width: '100%', maxWidth: 320, background: 'var(--sand)', borderRadius: 10, height: 6, overflow: 'hidden', marginTop: 10 }}>
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                background: 'var(--emerald)',
-                animation: 'pulse 1.5s infinite ease-in-out',
-              }}
-            />
-          </div>
-        </div>
-      ) : !result ? (
+    <Modal open={isOpen} onClose={handleMinimize} title="⬇ Bulk Import Students" size="lg">
+
+     
+      {/* ── Initial PHASE (Upload File Form) ──────────────────────────────────────── */}
+      {showForm && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <p style={{ fontSize: 13, color: 'var(--ink-mid)', margin: 0 }}>
-            Upload a spreadsheet (<b>.csv</b> or <b>.xlsx</b>) containing student account profiles.
-            You can download a pre-formatted sample template below 👇.
+            Upload a spreadsheet (<b>.xlsx</b> or <b>.csv</b>) containing student accounts and enrollments.
+            The file will be processed in the background. You can minimize this dialog and continue working in the app.
           </p>
 
           {/* Template Download Section */}
           <div style={{ background: 'var(--sand-light)', borderRadius: 'var(--radius-md)', padding: 14, border: '1px solid var(--sand-mid)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
-              Need the file format template?
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
+                Download Sample Templates 
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowGuide(!showGuide)}
+                style={{ background: 'none', border: 'none', color: 'var(--emerald)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                {showGuide ? '▲ Hide Guide' : '▼ View Columns & Types Guide'}
+              </button>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
@@ -132,7 +131,7 @@ export default function ImportStudentsModal({
                 variant="outline"
                 onClick={() => handleDownloadTemplate('csv')}
               >
-                𝄜 Sample CSV Template
+             𝄜  Sample CSV Template
               </Button>
               <Button
                 type="button"
@@ -140,9 +139,49 @@ export default function ImportStudentsModal({
                 variant="outline"
                 onClick={() => handleDownloadTemplate('xlsx')}
               >
-                💹 Sample Excel Template
+               💹 Sample Excel Template
               </Button>
             </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-soft)', margin: '8px 0 0' }}>
+              Excel template has two sheets (<b>Students</b> & <b>Enrollments</b>). CSV uses a single flat sheet.
+            </p>
+
+            {/* Column Specs & Guide Accordion */}
+            {showGuide && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--sand-mid)', fontSize: 11, color: 'var(--ink-mid)' }}>
+                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>📋 Expected Sheets & Columns Guide:</div>
+                
+                <div style={{ background: '#fff', padding: 10, borderRadius: 6, marginBottom: 8, border: '1px solid var(--sand-mid)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--emerald)', marginBottom: 4 }}>🗒Sheet 1: Students</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.5 }}>
+                    <li><b>Student Ref</b> <span style={{ color: 'var(--red)' }}>*</span>: Unique ID per student in this file (e.g. <code>S1</code>, <code>S2</code>) or their phone number.</li>
+                    <li><b>Name (English)</b> <span style={{ color: 'var(--red)' }}>*</span>: Full name in English (e.g. <code>Ahmad Raza</code>).</li>
+                    <li><b>Name (Urdu)</b>: Optional Urdu name (e.g. <code>احمد رضا</code>).</li>
+                    <li><b>Father Name</b>: Father's full name.</li>
+                    <li><b>Is Minor</b> <span style={{ color: 'var(--red)' }}>*</span>: Strictly <code>true</code> or <code>false</code>.</li>
+                    <li><b>Phone Number</b>: Student's phone (required if <i>Is Minor</i> is <code>false</code>).</li>
+                    <li><b>Guardian Name / Phone</b>: Guardian details (required if <i>Is Minor</i> is <code>true</code>).</li>
+                    <li><b>Gender</b> <span style={{ color: 'var(--red)' }}>*</span>: <code>male</code> or <code>female</code>.</li>
+                    <li><b>Date of Birth</b>: Format <code>MM-DD-YYYY</code> (e.g. <code>05-15-1998</code>).</li>
+                    <li><b>Profile Picture</b>: Optional image URL (e.g. <code>https://example.com/photo.jpg</code> or Google Drive link).</li>
+                    <li><b>Marital Status, Qualification, Occupation, Address</b>: Optional student info.</li>
+                  </ul>
+                </div>
+
+                <div style={{ background: '#fff', padding: 10, borderRadius: 6, border: '1px solid var(--sand-mid)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--purple, #8b5cf6)', marginBottom: 4 }}>🗒 Sheet 2: Enrollments</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.5 }}>
+                    <li><b>Student Ref</b> <span style={{ color: 'var(--red)' }}>*</span>: <b style={{ color: 'var(--red)' }}>MUST MATCH</b> a <i>Student Ref</i> from the Students sheet (e.g. <code>S1</code>) or an existing student's phone.</li>
+                    <li><b>Class ID</b> <span style={{ color: 'var(--red)' }}>*</span>: Class ID (e.g. <code>123e4567-e89b-12d3-a456-426614174000</code>).</li>
+                    <li><b>Enrolled On</b> <span style={{ color: 'var(--red)' }}>*</span>: Format <code>MM-DD-YYYY</code> (e.g. <code>01-15-2024</code>).</li>
+                    <li><b>Prior Level</b>: Optional (e.g. <code>Beginner</code>, <code>Intermediate</code>).</li>
+                    <li><b>Notes (Urdu)</b>: Optional enrollment notes by teachers in Urdu.</li>
+                    <li><b>Amount Paid</b>: Optional fee payment amount (e.g. <code>5000</code>).</li>
+                    <li><b>Payment Method</b>: Optional (e.g. <code>cash</code>, <code>online</code>, <code>bank_transfer</code>).</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Target Center Selector for Super Admin */}
@@ -165,7 +204,7 @@ export default function ImportStudentsModal({
             </div>
           )}
 
-          {/* File Input Dropzone */}
+          {/* File Input */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
               Select File (.csv or .xlsx) <span style={{ color: 'var(--red)' }}>*</span>
@@ -186,73 +225,15 @@ export default function ImportStudentsModal({
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-            <Button type="button" variant="outline" onClick={handleClose} disabled={uploading}>
+            <Button type="button" variant="outline" onClick={() => onClose()}>
               Cancel
             </Button>
-            <Button type="submit" variant="emerald" disabled={!file || uploading}>
-             ⬇ Upload & Import Students
+            <Button type="submit" variant="emerald" disabled={!file}>
+              ⬆ Upload & Start Import
             </Button>
           </div>
         </form>
-      ) : (
-        /* Summary Results View */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            <div style={{ background: 'var(--emerald-light)', padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 'bold', color: 'var(--emerald)' }}>{result.successCount}</div>
-              <div style={{ fontSize: 11, color: 'var(--emerald-dark)', fontWeight: 600 }}>Imported Successfully</div>
-            </div>
-            <div style={{ background: result.skippedCount > 0 ? 'var(--red-light)' : 'var(--sand-light)', padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 'bold', color: result.skippedCount > 0 ? 'var(--red)' : 'var(--ink-mid)' }}>{result.skippedCount}</div>
-              <div style={{ fontSize: 11, color: result.skippedCount > 0 ? 'var(--red-dark)' : 'var(--ink-soft)', fontWeight: 600 }}>Skipped / Errors</div>
-            </div>
-            <div style={{ background: 'var(--sand)', padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 'bold', color: 'var(--ink)' }}>{result.total}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-mid)', fontWeight: 600 }}>Total Rows Read</div>
-            </div>
-          </div>
-
-          {result.errors && result.errors.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 8 }}>
-                Validation & Error Details ({result.errors.length}):
-              </div>
-              <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--sand-mid)', borderRadius: 'var(--radius-md)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead style={{ background: 'var(--sand-light)', position: 'sticky', top: 0, zIndex: 1 }}>
-                    <tr>
-                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Row #</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Student Name</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Phone</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'left' }}>Error Rationale</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.errors.map((errItem, idx) => (
-                      <tr key={idx} style={{ borderTop: '1px solid var(--sand)' }}>
-                        <td style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--ink-mid)' }}>Row {errItem.row}</td>
-                        <td style={{ padding: '6px 10px', fontWeight: 500 }}>{errItem.name}</td>
-                        <td style={{ padding: '6px 10px', color: 'var(--ink-soft)' }}>{errItem.phone || '—'}</td>
-                        <td style={{ padding: '6px 10px', color: 'var(--red)', fontWeight: 500 }}>{errItem.error}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-            <Button variant="outline" onClick={handleReset}>
-              Import Another File
-            </Button>
-            <Button variant="emerald" onClick={handleClose}>
-              Done
-            </Button>
-          </div>
-        </div>
       )}
     </Modal>
   );
-
 }
