@@ -86,14 +86,12 @@ export default function ImportStudentsModal({
     }
   };
 
- 
 
   const handleMinimize = () => {
     onClose(); // close modal, float card takes over
   };
 
  
-
   // Determine if we should show the form or the job view
   const showForm = phase === 'idle';
   const showJobView = phase !== 'idle';
@@ -101,7 +99,25 @@ export default function ImportStudentsModal({
   return (
     <Modal open={isOpen} onClose={handleMinimize} title="⬇ Bulk Import Students" size="lg">
 
-     
+      {/* ── UPLOADING PHASE ───────────────────────────────────────────────── */}
+      {phase === 'uploading' && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', gap: 16, textAlign: 'center' }}>
+          <LoadingSpinner size={40} />
+          <div>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
+              Uploading File...
+            </h4>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-mid)' }}>
+              Validating format and sending to background processor.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={handleMinimize} style={{ marginTop: 8 }}>
+            ↘ Minimize modal, process continues in background
+          </Button>
+        </div>
+      )}
+
+
       {/* ── Initial PHASE (Upload File Form) ──────────────────────────────────────── */}
       {showForm && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
