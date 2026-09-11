@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '../../components/PageHeader';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -37,6 +37,9 @@ export default function Students() {
     if (user?.id) importJob.setUserId(user.id);
   }, [user?.id]); 
 
+  const handleImportSuccess = useCallback(() => {
+    qc.invalidateQueries(['students', selectedCenter, activeTab]);
+  }, [qc, selectedCenter, activeTab]);
 
   // Auto-open modal when navigating to Students page if a job is active
   useEffect(() => {
@@ -382,7 +385,7 @@ export default function Students() {
         centers={centers}
         defaultCenterId={selectedCenter}
         isGlobal={isGlobal}
-        onSuccess={() => qc.invalidateQueries(['students', selectedCenter, activeTab])}
+        onSuccess={handleImportSuccess}
       />
     </>
   );

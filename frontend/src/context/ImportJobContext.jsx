@@ -117,7 +117,7 @@ export function ImportJobProvider({ children }) {
   const [jobData, setJobData] = useState(null);
   const [phase, setPhase] = useState('idle'); // idle | uploading | polling | results | error
   const [modalOpen, setModalOpen] = useState(false);
-  const [onSuccessCallbacks, setOnSuccessCallbacks] = useState([]);
+  const onSuccessCallbacksRef = useRef(new Set());
   const pollRef = useRef(null);
 
   const storageKey = `${STORAGE_KEY_PREFIX}${userId || 'current'}`;
@@ -157,7 +157,9 @@ export function ImportJobProvider({ children }) {
           persistState(id, 'completed');
           if (data.counters.studentsCreated > 0 || data.counters.enrollmentsCreated > 0) {
             // Fire all registered success callbacks
-            setOnSuccessCallbacks(cbs => { cbs.forEach(cb => cb()); return cbs; });
+            onSuccessCallbacksRef.current.forEach(cb => {
+              try { cb(); } catch (err) { console.error('[ImportJobContext] Callback error:', err); }
+            });
           }
         }
       } else if (data.status === 'failed') {
@@ -227,15 +229,19 @@ export function ImportJobProvider({ children }) {
     setJobData(null);
     setPhase('idle');
     clearPersisted();
-    setOnSuccessCallbacks([]);
+    onSuccessCallbacksRef.current.clear();
   }, [stopPolling, clearPersisted]);
 
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
 
   const registerOnSuccess = useCallback((cb) => {
-    setOnSuccessCallbacks(prev => [...prev, cb]);
-    return () => setOnSuccessCallbacks(prev => prev.filter(c => c !== cb));
+    if (typeof cb === 'function') {
+      onSuccessCallbacksRef.current.add(cb);
+    }
+    return () => {
+      onSuccessCallbacksRef.current.delete(cb);
+    };
   }, []);
 
   const isActive = phase === 'uploading' || phase === 'polling';
