@@ -1,6 +1,7 @@
 #version: "3.9"
 
 services:
+  
   api:
     build: .
     container_name: qf_lms_api
@@ -16,7 +17,41 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: ["npx", "nodemon", "src/server.js"]
+      - import_temp:/tmp/imports
+    command: [ "npx", "nodemon", "src/server.js" ]
+    restart: unless-stopped
+
+  import-worker:
+    build: .
+    container_name: qf_lms_import_worker
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - import_temp:/tmp/imports
+    command: [ "node", "src/workers/studentImportWorker.js" ]
+    restart: unless-stopped
+
+  image-worker:
+    build: .
+    container_name: qf_lms_image_worker
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: [ "node", "src/workers/profileImageWorker.js" ]
     restart: unless-stopped
 
   db:
@@ -32,11 +67,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-qf_lms}"
-        ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-qf_lms}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,7 +81,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,3 +90,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  import_temp:
