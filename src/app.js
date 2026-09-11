@@ -8,7 +8,45 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 
-// Security headers —  for development (inline scripts )
+app.set("trust proxy", 1);
+
+// CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowedEnv = (process.env.CORS_ORIGIN || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const defaultAllowed = [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://quran-foundation-gamma.vercel.app",
+    ];
+    const isAllowed =
+      allowedEnv.includes(origin) ||
+      defaultAllowed.includes(origin) ||
+      origin.endsWith(".vercel.app") ||
+      origin.endsWith(".onrender.com");
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS Blocked] Origin: "${origin}"`);
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+// Security headers
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -25,32 +63,6 @@ app.use(
       },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
-  }),
-);
-
-// CORS
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      const allowed = (process.env.CORS_ORIGIN || "http://localhost:3001")
-        .split(",")
-        .map((s) => s.trim());
-      const isAllowed =
-        allowed.includes(origin) ||
-        "http://localhost:5173" ||
-        origin.endsWith(".vercel.app");
-
-      console.log(`[CORS] Origin: "${origin}" | Allowed: ${isAllowed}`);
-
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
-    credentials: true,
   }),
 );
 
