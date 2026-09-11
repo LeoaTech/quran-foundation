@@ -299,14 +299,40 @@ async function importStudentsData({ user: caller, centerId, fileBuffer, fileName
   }).returning('*');
 
   // Enqueue to Bull queue — lightweight payload, no file data
-  await studentImportQueue.add({
-    jobId: importJob.id,
-    storageKey: localPath,
-    centerId: targetCenterId,
-    callerUserId: caller.id,
-    callerRoles: caller.roles,
-    callerCenterId: caller.center_id,
-  });
+  try {
+    await studentImportQueue.add({
+      jobId: importJob.id,
+      storageKey: localPath,
+      centerId: targetCenterId,
+      callerUserId: caller.id,
+      callerRoles: caller.roles,
+      callerCenterId: caller.center_id,
+    });
+  } catch (queueErr) {
+    console.warn('[ImportService] Bull queue enqueue error (Redis issue), processing job inline:', queueErr.message);
+    // If Bull fails or Redis is unreachable, process asynchronously via worker logic
+    setImmediate(async () => {
+      try {
+        const { processImportJob } = require('../workers/studentImportWorker');
+        if (typeof processImportJob === 'function') {
+          await processImportJob({
+            jobId: importJob.id,
+            storageKey: localPath,
+            centerId: targetCenterId,
+            callerUserId: caller.id,
+            callerRoles: caller.roles,
+            callerCenterId: caller.center_id,
+          });
+        }
+      } catch (inlineErr) {
+        console.error('[ImportService] Inline background import failed:', inlineErr.message);
+        await db('import_jobs').where({ id: importJob.id }).update({
+          status: 'failed',
+          failed_reason: inlineErr.message,
+        });
+      }
+    });
+  }
 
   return {
     jobId: importJob.id,
