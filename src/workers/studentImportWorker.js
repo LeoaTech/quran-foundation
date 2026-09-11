@@ -102,10 +102,10 @@ async function incrementCounter(importJobId, column, amount = 1) {
 
 // ── Worker ───────────────────────────────────────────────────────────────────
 
-studentImportQueue.process(1, async (job) => {
-  const { jobId, storageKey, centerId, callerUserId } = job.data;
+async function processImportJob(data) {
+  const { jobId, storageKey, centerId, callerUserId } = data;
 
-  console.log(`[import-worker] Starting job ${jobId} (attempt ${job.attemptsMade + 1})`);
+  console.log(`[import-worker] Starting job ${jobId}`);
 
   // ── STEP 0: Attempt-start reset ──────────────────────────────────────────
   // Purge stale data from any previous failed attempt so counters are clean.
@@ -772,6 +772,10 @@ studentImportQueue.process(1, async (job) => {
   // ── STEP 7: Mark job completed ───────────────────────────────────────────
   await db('import_jobs').where({ id: jobId }).update({ status: 'completed' });
   console.log(`[import-worker] Job ${jobId} completed.`);
+}
+
+studentImportQueue.process(1, async (job) => {
+  return processImportJob(job.data);
 });
 
 // ── Event handlers ─────────────────────────────────────────────────────────
@@ -793,3 +797,5 @@ studentImportQueue.on('failed', async (job, err) => {
 });
 
 console.log('[import-worker] Listening on queue: student-import');
+
+module.exports = { processImportJob };
