@@ -5,9 +5,12 @@ const db = require('./db/knex');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-// In single-container free tier environments, run background workers inline.
-if (process.env.RUN_WORKER_INLINE === 'true') {
-  console.log('[Startup] RUN_WORKER_INLINE is true. Starting background workers inline...');
+// In single-container free tier or production web services, run background workers inline unless explicitly disabled.
+const runInline = process.env.RUN_WORKER_INLINE === 'true' ||
+  (process.env.RUN_WORKER_INLINE !== 'false' && (process.env.RENDER === 'true' || process.env.NODE_ENV === 'production'));
+
+if (runInline) {
+  console.log('[Startup] Starting background workers inline...');
   require('./workers/whatsappWorker');
   require('./workers/studentImportWorker');
   require('./workers/profileImageWorker');
