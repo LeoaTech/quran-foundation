@@ -2,16 +2,19 @@ const { createClient } = require('redis');
 
 const isTLS = process.env.REDIS_TLS === 'true';
 const redisHost = process.env.REDIS_HOST || 'localhost';
-
-// Check if REDIS_HOST is a connection URL or if REDIS_URL is provided
 const isUrl = redisHost.startsWith('redis://') || redisHost.startsWith('rediss://');
 const redisUrl = process.env.REDIS_URL || (isUrl ? redisHost : null);
+const isRediss = redisUrl && redisUrl.startsWith('rediss://');
 
 const client = redisUrl
-  ? createClient({ 
+  ? createClient({
       url: redisUrl,
-      pingInterval: 10000, // Send a PING every 10s to prevent idle timeout
-      socket: { keepAlive: 5000 } // Enable TCP Keep-Alive
+      pingInterval: 10000,
+      socket: {
+        keepAlive: 5000,
+        tls: isRediss || isTLS ? { rejectUnauthorized: false } : undefined,
+        reconnectStrategy: (retries) => Math.min(retries * 100, 3000),
+      },
     })
   : createClient({
       password: process.env.REDIS_PASSWORD || undefined,
@@ -19,19 +22,29 @@ const client = redisUrl
       socket: {
         host: redisHost,
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        tls: isTLS,
+        tls: isTLS ? { rejectUnauthorized: false } : undefined,
         keepAlive: 5000,
+        reconnectStrategy: (retries) => Math.min(retries * 100, 3000),
       },
     });
 
-client.on('error', (err) => console.error('Redis error:', err.message));
+client.on('error', (err) => console.error('[Redis Client] Error:', err.message));
 
 let connectPromise = null;
 
 async function getRedis() {
-  if (client.isOpen) return client;
+  if (client.isOpen && client.isReady) return client;
+  if (client.isOpen) return client; // Currently connecting/reconnecting
+
   if (!connectPromise) {
-    connectPromise = client.connect().finally(() => { connectPromise = null; });
+    connectPromise = client
+      .connect()
+      .catch((err) => {
+        console.error('[Redis Client] Initial connect failed:', err.message);
+      })
+      .finally(() => {
+        connectPromise = null;
+      });
   }
   await connectPromise;
   return client;
