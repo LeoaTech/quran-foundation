@@ -10,7 +10,9 @@
     "migrate:rollback": "knex migrate:rollback",
     "migrate:make": "knex migrate:make",
     "seed": "knex seed:run",
-    "worker:whatsapp": "node src/workers/whatsappWorker.js"
+    "worker:whatsapp": "node src/workers/whatsappWorker.js",
+    "worker:import": "node src/workers/studentImportWorker.js",
+    "worker:image": "node src/workers/profileImageWorker.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
