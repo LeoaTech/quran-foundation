@@ -19,6 +19,9 @@ export const updateProfile = (userId, formData) =>
 export const changePassword = (userId, payload) =>
   client.post(`/users/${userId}/change-password`, payload).then((r) => r.data);
 
+export const dispatchCredentials = (userId) =>
+  client.post(`/users/${userId}/share-credentials`).then((r) => r.data);
+
 export const updateStaffProfile = (userId, centerId, payload) =>
   client.patch(`/users/${userId}/center/${centerId}/staff_profile`, payload).then((r) => r.data);
 
