@@ -14,6 +14,7 @@ if (runInline) {
   require('./workers/whatsappWorker');
   require('./workers/studentImportWorker');
   require('./workers/profileImageWorker');
+  require('./workers/credentialWorker');
 }
 
 async function start() {
