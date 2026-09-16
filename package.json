@@ -12,7 +12,8 @@
     "seed": "knex seed:run",
     "worker:whatsapp": "node src/workers/whatsappWorker.js",
     "worker:import": "node src/workers/studentImportWorker.js",
-    "worker:image": "node src/workers/profileImageWorker.js"
+    "worker:image": "node src/workers/profileImageWorker.js",
+    "worker:credential": "node src/workers/credentialWorker.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -28,6 +29,7 @@
     "multer": "^2.2.0",
     "pg": "^8.13.1",
     "redis": "^4.7.0",
+    "twilio": "^6.1.1",
     "uuid": "^11.0.5",
     "xlsx": "^0.18.5",
     "zod": "^3.24.1"
