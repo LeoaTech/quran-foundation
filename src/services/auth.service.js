@@ -82,6 +82,8 @@ async function login({ phone, password, center_id }) {
       preferred_lang: user.preferred_lang,
       roles,
       center_id: scopedCenterId,
+      status: 'active',
+      must_reset_password: !!user.must_reset_password,
     },
   };
 }

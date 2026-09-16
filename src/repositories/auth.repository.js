@@ -1,11 +1,11 @@
 const db = require('../db/knex');
 
 function findByPhone(phone) {
-  return db('users').where({ phone, is_active: true }).first();
+  return db('users').where({ phone }).whereNot('status', 'inactive').first();
 }
 
 function findById(id) {
-  return db('users').where({ id, is_active: true }).first();
+  return db('users').where({ id }).whereNot('status', 'inactive').first();
 }
 
 // Returns all active role rows for the user across all centers.
@@ -19,7 +19,12 @@ function getUserRoles(userId) {
 }
 
 function updateLastLogin(userId) {
-  return db('users').where({ id: userId }).update({ last_login_at: db.fn.now() });
+  return db('users').where({ id: userId }).update({
+    last_login_at: db.fn.now(),
+    status: 'active',
+    is_active: true,
+    updated_at: db.fn.now(),
+  });
 }
 
 function updatePassword(userId, passwordHash) {
