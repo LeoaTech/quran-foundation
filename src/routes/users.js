@@ -217,6 +217,14 @@ router.post(
   controller.regeneratePassword,
 );
 
+router.post(
+  '/users/:user_id/share-credentials',
+  requireAuth,
+  requirePermission('users.edit'),
+  controller.shareCredentials,
+);
+
+
 router.patch(
   '/users/:user_id/center/:center_id/staff_profile',
   requireAuth,
