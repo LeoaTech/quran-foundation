@@ -54,6 +54,22 @@ services:
     command: [ "node", "src/workers/profileImageWorker.js" ]
     restart: unless-stopped
 
+  credential-worker:
+    build: .
+    container_name: qf_lms_credential_worker
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: [ "node", "src/workers/credentialWorker.js" ]
+    restart: unless-stopped
+
   db:
     image: postgres:15-alpine
     container_name: qf_lms_db
