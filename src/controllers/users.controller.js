@@ -123,6 +123,15 @@ async function regeneratePassword(req, res, next) {
   }
 }
 
+async function shareCredentials(req, res, next) {
+  try {
+    const result = await service.shareCredentials({ user: req.user, userId: req.params.user_id });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listUsers,
   getUser,
@@ -137,4 +146,5 @@ module.exports = {
   updateProfile,
   changePassword,
   regeneratePassword,
+  shareCredentials,
 };
