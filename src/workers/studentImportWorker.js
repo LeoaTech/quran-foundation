@@ -3,6 +3,7 @@ require('dotenv').config();
 const xlsx = require('xlsx');
 const studentImportQueue = require('../jobs/studentImport');
 const profileImageQueue = require('../jobs/profileImage');
+const credentialQueue = require('../jobs/credential');
 const db = require('../db/knex');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -388,7 +389,7 @@ async function processImportJob(data) {
               }
 
               if (!guardianUser) {
-                // Create guardian
+                // Create guardian with status pending_invite
                 const gPass = generateTempPassword();
                 const gHash = await bcrypt.hash(gPass, 10);
                 const [newG] = await trx('users').insert({
@@ -397,7 +398,8 @@ async function processImportJob(data) {
                   whatsapp: cleanGPhone,
                   password_hash: gHash,
                   preferred_lang: 'ur',
-                  is_active: true,
+                  is_active: false,
+                  status: 'pending_invite',
                   is_minor: false,
                 }).returning('*');
 
@@ -416,7 +418,7 @@ async function processImportJob(data) {
               existingUsersMap.set(cleanGPhone, guardianUser);
             }
 
-            // Create student user (is_active = false; activated by separate credential delivery)
+            // Create student user with status pending_invite (activated upon credential dispatch & login)
             const [newStudent] = await trx('users').insert({
               full_name: fullName,
               full_name_ur: fullNameUr || null,
@@ -426,6 +428,7 @@ async function processImportJob(data) {
               gender: cleanGender,
               preferred_lang: 'ur',
               is_active: false,
+              status: 'pending_invite',
               is_minor: isMinor,
               metadata: JSON.stringify(metadata),
               password_hash: passHash,
@@ -461,6 +464,14 @@ async function processImportJob(data) {
           } else if (phone) {
             jobAdultStudentMap.set(phone.trim(), createdStudent);
           }
+
+          // Enqueue credential dispatch job onto Bull queue
+          // Adult student -> dispatch for student_id; Minor student -> dispatch for guardian_id
+          const targetUserIdForCredential = isMinor && guardianPhone
+            ? (batchGuardianMap.get(guardianPhone.trim())?.id || createdStudent.id)
+            : createdStudent.id;
+
+          await credentialQueue.add({ userId: targetUserIdForCredential });
 
           await incrementCounter(jobId, 'students_created');
 
