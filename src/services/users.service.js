@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const repo = require('../repositories/users.repository');
 const activityLog = require('./activityLog.service');
 const db = require('../db/knex');
+const credentialQueue = require('../jobs/credential');
 const { AppError } = require('../utils/errors');
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -314,7 +315,11 @@ async function regeneratePassword({ user: caller, userId }) {
 
   const newPassword = generateTempPassword();
   const password_hash = await bcrypt.hash(newPassword, 10);
-  await db('users').where({ id: userId }).update({ password_hash });
+  await db('users').where({ id: userId }).update({
+    password_hash,
+    must_reset_password: true,
+    updated_at: db.fn.now(),
+  });
 
   activityLog.log({
     actor: caller,
@@ -326,6 +331,51 @@ async function regeneratePassword({ user: caller, userId }) {
   }).catch(() => { });
 
   return { new_password: newPassword };
+}
+
+async function shareCredentials({ user: caller, userId }) {
+  if (!caller.roles.includes('super_admin') && !caller.roles.includes('center_manager')) {
+    throw forbidden();
+  }
+
+  const target = await repo.getUserById(userId);
+  if (!target) throw notFound();
+
+  if (!caller.roles.includes('super_admin')) {
+    const targetRoles = await db('user_roles').where({ user_id: userId, center_id: caller.center_id }).first();
+    if (!targetRoles && caller.id !== userId) {
+      throw forbidden();
+    }
+  }
+
+  let dispatchTargetId = userId;
+  if (target.is_minor) {
+    const guardianLink = await db('guardians').where({ student_user_id: userId }).first();
+    if (guardianLink) {
+      dispatchTargetId = guardianLink.guardian_user_id;
+    }
+  }
+
+  await db('users')
+    .whereIn('id', [userId, dispatchTargetId])
+    .update({
+      status: 'pending_invite',
+      invite_error: null,
+      updated_at: db.fn.now(),
+    });
+
+  await credentialQueue.add({ userId: dispatchTargetId });
+
+  activityLog.log({
+    actor: caller,
+    action: 'user.credentials_share',
+    entity_type: 'user',
+    entity_id: userId,
+    center_id: caller.center_id,
+    summary_en: `Triggered credential dispatch for "${target.full_name}"`,
+  }).catch(() => { });
+
+  return { message: 'Credential dispatch enqueued successfully.', status: 'pending_invite' };
 }
 
 async function updateStaffProfile({ user: caller, userId, oldCenterId, body }) {
@@ -524,4 +574,5 @@ module.exports = {
   updateProfile,
   changePassword,
   regeneratePassword,
+  shareCredentials,
 };
